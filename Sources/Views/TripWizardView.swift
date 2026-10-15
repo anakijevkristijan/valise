@@ -55,7 +55,7 @@ struct TripWizardView: View {
 
     var body: some View {
         ZStack {
-            LuxBackground()
+            PaperBackground()
 
             VStack(spacing: 0) {
                 topBar
@@ -64,7 +64,7 @@ struct TripWizardView: View {
                     .padding(.top, 6)
 
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 26) {
+                    VStack(alignment: .leading, spacing: 28) {
                         titleBlock
                         stepContent
                     }
@@ -99,9 +99,8 @@ struct TripWizardView: View {
             }
             Spacer()
             Text(String(format: "%02d / %02d", step + 1, stepCount))
-                .font(.serif(15))
+                .font(.codes(17))
                 .foregroundStyle(Theme.inkSoft)
-                .monospacedDigit()
             Spacer()
             if step > 0 {
                 CircleIconButton(systemName: "xmark") { dismiss() }
@@ -117,8 +116,8 @@ struct TripWizardView: View {
         HStack(spacing: 6) {
             ForEach(0..<stepCount, id: \.self) { i in
                 Capsule()
-                    .fill(i <= step ? Theme.gold : Theme.ink.opacity(0.08))
-                    .frame(height: 3)
+                    .fill(i <= step ? Theme.navy : Theme.navy.opacity(0.1))
+                    .frame(height: 2)
             }
         }
         .padding(.top, 12)
@@ -127,7 +126,7 @@ struct TripWizardView: View {
 
     private var titleBlock: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Eyebrow(eyebrow)
+            Eyebrow(eyebrow, color: Theme.gold)
             Text(title)
                 .font(.serif(34))
                 .foregroundStyle(Theme.ink)
@@ -139,26 +138,37 @@ struct TripWizardView: View {
     }
 
     private var eyebrow: String {
-        ["Дестинација", "Датуми", "Превоз и багаж", "Стил на патувањето", "Преглед"][step]
+        switch step {
+        case 0: return L("Дестинација", "Destination")
+        case 1: return L("Датуми", "Dates")
+        case 2: return L("Превоз и багаж", "Transport and luggage")
+        case 3: return L("Стил на патувањето", "Travel style")
+        default: return L("Преглед", "Review")
+        }
     }
 
     private var title: String {
         switch step {
-        case 0: return "Каде патуваш?"
-        case 1: return "Кога?"
-        case 2: return "Како стигнуваш?"
-        case 3: return "Што ќе правиш?"
-        default: return "Сè е спремно."
+        case 0: return L("Каде патуваш?", "Where are you going?")
+        case 1: return L("Кога?", "When?")
+        case 2: return L("Како стигнуваш?", "How are you getting there?")
+        case 3: return L("Што ќе правиш?", "What will you do?")
+        default: return L("Картата е спремна.", "Your ticket is ready.")
         }
     }
 
     private var subtitle: String {
         switch step {
-        case 0: return "Ќе го проверам времето на дестинацијата и дали ти треба адаптер за струја."
-        case 1: return "Од бројот на денови зависи колку облека ти треба."
-        case 2: return "Ги знам мерките за рачен багаж — за да не платиш казна на излезот."
-        case 3: return "Избери сè што важи. Листата се прилагодува на твојот план."
-        default: return "Провери го прегледот и ќе ја составам твојата листа."
+        case 0: return L("Ќе го проверам времето на дестинацијата и дали ти треба адаптер за струја.",
+                         "I'll check the weather at your destination and whether you need a plug adapter.")
+        case 1: return L("Од бројот на денови зависи колку облека ти треба.",
+                         "The number of days decides how much clothing you need.")
+        case 2: return L("Ги знам мерките за рачен багаж — за да не платиш казна на излезот.",
+                         "I know the hand-luggage sizes, so you won't pay a fee at the gate.")
+        case 3: return L("Избери сè што важи. Листата се прилагодува на твојот план.",
+                         "Pick everything that applies. The list adapts to your plans.")
+        default: return L("Провери ги деталите и ќе ја составам твојата листа.",
+                          "Check the details and I'll put your list together.")
         }
     }
 
@@ -178,8 +188,15 @@ struct TripWizardView: View {
     // Чекор 1
     private var destinationStep: some View {
         VStack(alignment: .leading, spacing: 14) {
-            PlaceSearchField(label: "Од", placeholder: "Град на поаѓање", selection: $draft.origin)
-            PlaceSearchField(label: "До", placeholder: "Град, држава…", selection: $draft.destination, suggestions: ["Рим", "Париз", "Истанбул", "Барселона", "Виена", "Атина"])
+            PlaceSearchField(label: L("Од", "From"),
+                             placeholder: L("Град на поаѓање", "Departure city"),
+                             selection: $draft.origin)
+            PlaceSearchField(label: L("До", "To"),
+                             placeholder: L("Град, држава…", "City, country…"),
+                             selection: $draft.destination,
+                             suggestions: AppLanguage.current == .mk
+                                ? ["Рим", "Париз", "Истанбул", "Барселона", "Виена", "Атина"]
+                                : ["Rome", "Paris", "Istanbul", "Barcelona", "Vienna", "Athens"])
         }
     }
 
@@ -187,23 +204,22 @@ struct TripWizardView: View {
     private var datesStep: some View {
         VStack(alignment: .leading, spacing: 18) {
             VStack(spacing: 0) {
-                dateRow(label: "Поаѓање", icon: "airplane.departure", selection: $draft.startDate, from: Date().startOfDay)
+                dateRow(label: L("Поаѓање", "Departure"), icon: "airplane.departure", selection: $draft.startDate, from: Date().startOfDay)
                 Hairline().padding(.horizontal, 18)
-                dateRow(label: "Враќање", icon: "airplane.arrival", selection: $draft.endDate, from: draft.startDate)
+                dateRow(label: L("Враќање", "Return"), icon: "airplane.arrival", selection: $draft.endDate, from: draft.startDate)
             }
             .luxCard(padding: 0)
-            .environment(\.locale, Fmt.mk)
             .onChange(of: draft.startDate) { _, newValue in
                 if draft.endDate < newValue { draft.endDate = newValue }
             }
 
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
                 Text("\(draft.dayCount)")
-                    .font(.serif(64, .light))
-                    .foregroundStyle(Theme.goldDeep)
+                    .font(.codes(68))
+                    .foregroundStyle(Theme.navy)
                     .contentTransition(.numericText())
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(draft.dayCount == 1 ? "ден" : "дена")
+                    Text(dayWord)
                         .font(.serif(22))
                         .foregroundStyle(Theme.ink)
                     Text(Fmt.nights(max(0, draft.dayCount - 1)))
@@ -216,33 +232,37 @@ struct TripWizardView: View {
 
             Toggle(isOn: $draft.hasLaundry) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Ќе имам перална машина")
+                    Text(L("Ќе имам перална машина", "I'll have a washing machine"))
                         .font(.sans(15, .medium))
                         .foregroundStyle(Theme.ink)
-                    Text("Пакуваш облека за најмногу 4 дена и переш.")
+                    Text(L("Пакуваш облека за најмногу 4 дена и переш.", "Pack for at most 4 days and wash."))
                         .font(.sans(13))
                         .foregroundStyle(Theme.inkSoft)
                 }
             }
-            .tint(Theme.gold)
+            .tint(Theme.navy)
             .luxCard(padding: 18)
         }
+    }
+
+    private var dayWord: String {
+        if AppLanguage.current == .mk { return draft.dayCount == 1 ? "ден" : "дена" }
+        return draft.dayCount == 1 ? "day" : "days"
     }
 
     private func dateRow(label: String, icon: String, selection: Binding<Date>, from: Date) -> some View {
         HStack(spacing: 14) {
             Image(systemName: icon)
-                .font(.system(size: 15))
-                .foregroundStyle(Theme.goldDeep)
-                .frame(width: 36, height: 36)
-                .background(Circle().fill(Theme.goldLight.opacity(0.6)))
+                .font(.system(size: 14, weight: .light))
+                .foregroundStyle(Theme.gold)
+                .frame(width: 24)
             Text(label)
-                .font(.sans(16, .medium))
+                .font(.sans(15, .medium))
                 .foregroundStyle(Theme.ink)
             Spacer()
             DatePicker("", selection: selection, in: from..., displayedComponents: .date)
                 .labelsHidden()
-                .tint(Theme.goldDeep)
+                .tint(Theme.navy)
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 14)
@@ -250,7 +270,7 @@ struct TripWizardView: View {
 
     // Чекор 3
     private var transportStep: some View {
-        VStack(alignment: .leading, spacing: 24) {
+        VStack(alignment: .leading, spacing: 26) {
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
                 ForEach(Transport.allCases) { t in
                     SelectTile(icon: t.icon, title: t.title, subtitle: nil, isSelected: draft.transport == t) {
@@ -265,7 +285,7 @@ struct TripWizardView: View {
 
             if draft.transport == .plane {
                 VStack(alignment: .leading, spacing: 12) {
-                    Eyebrow("Авиокомпанија", color: Theme.muted)
+                    Eyebrow(L("Авиокомпанија", "Airline"))
                     ScrollView(.horizontal) {
                         HStack(spacing: 8) {
                             ForEach(Airlines.all) { airline in
@@ -285,7 +305,7 @@ struct TripWizardView: View {
             }
 
             VStack(alignment: .leading, spacing: 12) {
-                Eyebrow("Со што пакуваш", color: Theme.muted)
+                Eyebrow(L("Со што пакуваш", "What you're packing in"))
                 VStack(spacing: 0) {
                     let options = draft.bagOptions
                     ForEach(Array(options.enumerated()), id: \.offset) { index, bag in
@@ -295,7 +315,7 @@ struct TripWizardView: View {
                                 draft.useCustomBag = false
                             }
                         }
-                        Hairline().padding(.leading, 70)
+                        Hairline().padding(.leading, 64)
                     }
                     BagOptionRow(bag: draft.customBag, isSelected: draft.useCustomBag) {
                         withAnimation(.easeInOut(duration: 0.2)) { draft.useCustomBag = true }
@@ -312,7 +332,8 @@ struct TripWizardView: View {
                     if let tip = Airlines.find(draft.airlineID)?.tip {
                         noteRow(icon: "exclamationmark.circle", text: tip)
                     }
-                    noteRow(icon: "info.circle", text: "Мерките се информативни (\(Airlines.dataUpdated)). Провери ги на сајтот на авиокомпанијата пред лет.")
+                    noteRow(icon: "info.circle", text: L("Мерките се информативни (\(Airlines.dataUpdated)). Провери ги на сајтот на авиокомпанијата пред лет.",
+                                                         "Sizes are a guide (\(Airlines.dataUpdated)). Check the airline's website before you fly."))
                 }
             }
         }
@@ -320,23 +341,23 @@ struct TripWizardView: View {
 
     private var customBagEditor: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Eyebrow("Мерки на твојот багаж", color: Theme.muted)
+            Eyebrow(L("Мерки на твојот багаж", "Your bag's size"))
             HStack(spacing: 10) {
-                numberField("Висина", value: $draft.customBag.height, unit: "cm")
-                numberField("Ширина", value: $draft.customBag.width, unit: "cm")
-                numberField("Длабочина", value: $draft.customBag.depth, unit: "cm")
+                numberField(L("Висина", "Height"), value: $draft.customBag.height, unit: "cm")
+                numberField(L("Ширина", "Width"), value: $draft.customBag.width, unit: "cm")
+                numberField(L("Длабочина", "Depth"), value: $draft.customBag.depth, unit: "cm")
             }
             HStack(spacing: 10) {
-                numberField("Макс. тежина", value: Binding(
+                numberField(L("Макс. тежина", "Max weight"), value: Binding(
                     get: { draft.customBag.weightLimit ?? 0 },
                     set: { draft.customBag.weightLimit = $0 > 0 ? $0 : nil }
                 ), unit: "kg")
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Волумен")
+                    Text(L("Волумен", "Volume"))
                         .font(.sans(11, .medium))
                         .foregroundStyle(Theme.muted)
                     Text("\(Int(draft.customBag.volume.rounded())) L")
-                        .font(.serif(20))
+                        .font(.codes(22))
                         .foregroundStyle(Theme.ink)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -353,7 +374,7 @@ struct TripWizardView: View {
             HStack(spacing: 4) {
                 TextField("0", value: value, format: .number)
                     .keyboardType(.decimalPad)
-                    .font(.serif(20))
+                    .font(.codes(20))
                     .foregroundStyle(Theme.ink)
                 Text(unit)
                     .font(.sans(12))
@@ -361,8 +382,8 @@ struct TripWizardView: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.ivory))
-            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 0.75))
+            .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Theme.paper))
+            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 0.75))
         }
         .frame(maxWidth: .infinity)
     }
@@ -370,9 +391,9 @@ struct TripWizardView: View {
     private func noteRow(icon: String, text: String) -> some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 13))
-                .foregroundStyle(Theme.goldDeep)
-                .padding(.top, 1)
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.gold)
+                .padding(.top, 2)
             Text(text)
                 .font(.sans(13))
                 .foregroundStyle(Theme.inkSoft)
@@ -402,7 +423,7 @@ struct TripWizardView: View {
             }
 
             VStack(alignment: .leading, spacing: 12) {
-                Eyebrow("За кого пакуваме", color: Theme.muted)
+                Eyebrow(L("За кого пакуваме", "Who are we packing for"))
                 HStack(spacing: 8) {
                     ForEach(TravelerStyle.allCases) { style in
                         ChipButton(title: style.title, isSelected: draft.style == style, expand: true) {
@@ -415,31 +436,42 @@ struct TripWizardView: View {
     }
 
     // Чекор 5
+    private var previewTrip: Trip? {
+        guard let destination = draft.destination else { return nil }
+        var trip = Trip(origin: draft.origin,
+                        destination: destination,
+                        startDate: draft.startDate.startOfDay,
+                        endDate: max(draft.endDate, draft.startDate).startOfDay,
+                        transport: draft.transport,
+                        airlineID: draft.transport == .plane ? draft.airlineID : nil,
+                        bag: draft.resolvedBag,
+                        activities: Activity.allCases.filter { draft.activities.contains($0) },
+                        style: draft.style,
+                        hasLaundry: draft.hasLaundry)
+        trip.weather = weather
+        trip.weatherSource = weatherSource
+        trip.tint = store.trips.count % Theme.ticketColors.count
+        return trip
+    }
+
     private var reviewStep: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            VStack(alignment: .leading, spacing: 16) {
-                if let destination = draft.destination {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text(destination.name)
-                            .font(.serif(32))
-                            .foregroundStyle(Theme.ink)
-                        Text(destination.flag)
-                            .font(.system(size: 24))
-                    }
-                }
-                summaryRow(icon: "mappin.and.ellipse", text: routeText)
-                summaryRow(icon: "calendar", text: "\(Fmt.range(draft.startDate, draft.endDate)) · \(Fmt.days(draft.dayCount))")
+        VStack(alignment: .leading, spacing: 22) {
+            if let trip = previewTrip {
+                BoardingPassCard(trip: trip)
+            }
+
+            VStack(alignment: .leading, spacing: 14) {
                 summaryRow(icon: draft.transport.icon, text: transportText)
-                summaryRow(icon: draft.resolvedBag.kind.icon, text: "\(draft.resolvedBag.title) · \(draft.resolvedBag.limitText)")
+                summaryRow(icon: draft.resolvedBag.kind.icon, text: "\(draft.resolvedBag.displayTitle) · \(draft.resolvedBag.limitText)")
                 if !draft.activities.isEmpty {
                     summaryRow(icon: "sparkles", text: Activity.allCases.filter { draft.activities.contains($0) }.map(\.title).joined(separator: ", "))
                 }
             }
-            .luxCard(padding: 22)
+            .luxCard(padding: 20)
 
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    Eyebrow("Време на дестинацијата", color: Theme.muted)
+                    Eyebrow(L("Време на дестинацијата", "Weather at your destination"))
                     Spacer()
                     if !weather.isEmpty {
                         Text(weatherSource.label)
@@ -449,14 +481,15 @@ struct TripWizardView: View {
                 }
                 if isLoadingWeather {
                     HStack(spacing: 12) {
-                        ProgressView().tint(Theme.gold)
-                        Text("Ја читам прогнозата…")
+                        ProgressView().tint(Theme.navy)
+                        Text(L("Ја читам прогнозата…", "Reading the forecast…"))
                             .font(.sans(14))
                             .foregroundStyle(Theme.inkSoft)
                     }
                     .luxCard(padding: 18)
                 } else if weather.isEmpty {
-                    Text("Прогнозата не е достапна во моментов. Ќе додадам работи за секое време, а подоцна ќе ја освежам.")
+                    Text(L("Прогнозата не е достапна во моментов. Ќе додадам работи за секое време, а подоцна ќе ја освежам.",
+                           "The forecast isn't available right now. I'll pack for any weather and refresh it later."))
                         .font(.sans(14))
                         .foregroundStyle(Theme.inkSoft)
                         .luxCard(padding: 18)
@@ -471,20 +504,14 @@ struct TripWizardView: View {
     private func summaryRow(icon: String, text: String) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 14))
-                .foregroundStyle(Theme.goldDeep)
+                .font(.system(size: 13, weight: .light))
+                .foregroundStyle(Theme.gold)
                 .frame(width: 22)
             Text(text)
                 .font(.sans(15))
                 .foregroundStyle(Theme.ink)
                 .fixedSize(horizontal: false, vertical: true)
         }
-    }
-
-    private var routeText: String {
-        let to = draft.destination?.name ?? "—"
-        if let from = draft.origin?.name { return "\(from) → \(to)" }
-        return to
     }
 
     private var transportText: String {
@@ -518,9 +545,9 @@ struct TripWizardView: View {
         VStack(spacing: 0) {
             Button(action: next) {
                 HStack(spacing: 10) {
-                    Text(step == stepCount - 1 ? "Состави ја листата" : "Продолжи")
+                    Text(step == stepCount - 1 ? L("Состави ја листата", "Build my list") : L("Продолжи", "Continue"))
                     Image(systemName: step == stepCount - 1 ? "sparkles" : "arrow.right")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 12, weight: .semibold))
                 }
             }
             .buttonStyle(PrimaryButtonStyle())
@@ -531,7 +558,7 @@ struct TripWizardView: View {
             .padding(.bottom, 10)
         }
         .frame(maxWidth: .infinity)
-        .background(Theme.ivory.opacity(0.94).ignoresSafeArea(edges: .bottom))
+        .background(Theme.paper.opacity(0.96).ignoresSafeArea(edges: .bottom))
         .overlay(alignment: .top) { Hairline() }
     }
 
@@ -560,23 +587,8 @@ struct TripWizardView: View {
     }
 
     private func create() {
-        guard let destination = draft.destination else { return }
-        var trip = Trip(
-            origin: draft.origin,
-            destination: destination,
-            startDate: draft.startDate.startOfDay,
-            endDate: max(draft.endDate, draft.startDate).startOfDay,
-            transport: draft.transport,
-            airlineID: draft.transport == .plane ? draft.airlineID : nil,
-            bag: draft.resolvedBag,
-            activities: Activity.allCases.filter { draft.activities.contains($0) },
-            style: draft.style,
-            hasLaundry: draft.hasLaundry
-        )
-        trip.weather = weather
-        trip.weatherSource = weatherSource
+        guard var trip = previewTrip else { return }
         trip.weatherUpdatedAt = weather.isEmpty ? nil : Date()
-        trip.tint = store.trips.count % Theme.tints.count
         trip.items = PackingEngine.generate(for: trip)
         trip.exitChecklist = PackingEngine.defaultExitChecklist()
 
@@ -612,8 +624,8 @@ struct PlaceSearchField: View {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 14) {
                     Text(label.uppercased())
-                        .font(.sans(11, .semibold))
-                        .tracking(1.6)
+                        .font(.sans(10, .semibold))
+                        .tracking(1.8)
                         .foregroundStyle(Theme.gold)
                         .frame(width: 30, alignment: .leading)
 
@@ -626,7 +638,7 @@ struct PlaceSearchField: View {
                             .textInputAutocapitalization(.words)
                             .submitLabel(.search)
                         if isSearching {
-                            ProgressView().tint(Theme.gold)
+                            ProgressView().tint(Theme.navy)
                         } else if !query.isEmpty {
                             Button { query = "" } label: {
                                 Image(systemName: "xmark.circle.fill")
@@ -641,7 +653,6 @@ struct PlaceSearchField: View {
                             focused = true
                         } label: {
                             HStack(spacing: 12) {
-                                Text(place.flag).font(.system(size: 24))
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(place.name)
                                         .font(.serif(21))
@@ -654,9 +665,9 @@ struct PlaceSearchField: View {
                                     }
                                 }
                                 Spacer()
-                                Image(systemName: "pencil")
-                                    .font(.system(size: 13))
-                                    .foregroundStyle(Theme.muted)
+                                Text(place.code)
+                                    .font(.codes(22))
+                                    .foregroundStyle(Theme.navy)
                             }
                             .contentShape(Rectangle())
                         }
@@ -671,7 +682,7 @@ struct PlaceSearchField: View {
                     ForEach(results) { place in
                         Button { choose(place) } label: {
                             HStack(spacing: 12) {
-                                Text(place.flag).font(.system(size: 20))
+                                Text(place.flag).font(.system(size: 18))
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(place.name)
                                         .font(.sans(16, .medium))
@@ -682,6 +693,9 @@ struct PlaceSearchField: View {
                                         .lineLimit(1)
                                 }
                                 Spacer()
+                                Text(place.code)
+                                    .font(.codes(16))
+                                    .foregroundStyle(Theme.muted)
                             }
                             .padding(.horizontal, 18)
                             .padding(.vertical, 12)
@@ -750,28 +764,26 @@ struct SelectTile: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 16) {
                 HStack {
                     Image(systemName: icon)
-                        .font(.system(size: 18, weight: .regular))
-                        .foregroundStyle(isSelected ? Theme.ivory : Theme.goldDeep)
-                        .frame(width: 40, height: 40)
-                        .background(Circle().fill(isSelected ? Theme.gold : Theme.goldLight.opacity(0.55)))
+                        .font(.system(size: 17, weight: .light))
+                        .foregroundStyle(isSelected ? Theme.goldLight : Theme.navy)
                     Spacer()
-                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 18))
-                        .foregroundStyle(isSelected ? Theme.gold : Theme.hairline)
+                    Image(systemName: isSelected ? "checkmark" : "plus")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(isSelected ? Theme.goldLight : Theme.muted)
                 }
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
                         .font(.serif(18))
-                        .foregroundStyle(Theme.ink)
+                        .foregroundStyle(isSelected ? Theme.ticketText : Theme.ink)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                     if let subtitle {
                         Text(subtitle)
                             .font(.sans(12))
-                            .foregroundStyle(Theme.inkSoft)
+                            .foregroundStyle(isSelected ? Theme.ticketText.opacity(0.7) : Theme.inkSoft)
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
                     }
@@ -780,12 +792,12 @@ struct SelectTile: View {
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(isSelected ? Theme.goldLight.opacity(0.45) : Theme.surface)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(isSelected ? Theme.navy : Theme.surface)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(isSelected ? Theme.gold : Theme.hairline, lineWidth: isSelected ? 1.2 : 0.75)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(isSelected ? Theme.navy : Theme.hairline, lineWidth: 0.75)
             )
             .contentShape(Rectangle())
         }
@@ -803,13 +815,13 @@ struct ChipButton: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.sans(14, isSelected ? .semibold : .medium))
-                .foregroundStyle(isSelected ? Theme.ivory : Theme.ink)
+                .font(.sans(13, isSelected ? .semibold : .medium))
+                .foregroundStyle(isSelected ? Theme.goldLight : Theme.ink)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
                 .frame(maxWidth: expand ? .infinity : nil)
-                .background(Capsule().fill(isSelected ? Theme.ink : Theme.surface))
-                .overlay(Capsule().strokeBorder(isSelected ? Theme.ink : Theme.hairline, lineWidth: 0.75))
+                .background(Capsule().fill(isSelected ? Theme.navy : Theme.surface))
+                .overlay(Capsule().strokeBorder(isSelected ? Theme.navy : Theme.hairline, lineWidth: 0.75))
         }
         .buttonStyle(PressableStyle())
     }
@@ -824,30 +836,26 @@ struct BagOptionRow: View {
         Button(action: action) {
             HStack(spacing: 14) {
                 Image(systemName: bag.kind.icon)
-                    .font(.system(size: 17))
-                    .foregroundStyle(Theme.goldDeep)
-                    .frame(width: 40, height: 40)
-                    .background(Circle().fill(Theme.goldLight.opacity(0.55)))
+                    .font(.system(size: 16, weight: .light))
+                    .foregroundStyle(Theme.navy)
+                    .frame(width: 34)
 
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 8) {
-                        Text(bag.title)
-                            .font(.sans(16, .medium))
+                        Text(bag.displayTitle)
+                            .font(.sans(15, .medium))
                             .foregroundStyle(Theme.ink)
                         if bag.isFree {
-                            Text("БЕСПЛАТНО")
+                            Text(L("БЕСПЛАТНО", "FREE"))
                                 .font(.sans(9, .bold))
-                                .tracking(1)
+                                .tracking(1.2)
                                 .foregroundStyle(Theme.sage)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 3)
-                                .background(Capsule().fill(Theme.sage.opacity(0.12)))
                         }
                     }
-                    Text(bag.kind == .custom ? (bag.detail ?? "") : bag.limitText)
+                    Text(bag.kind == .custom ? (bag.displayDetail ?? "") : bag.limitText)
                         .font(.sans(13))
                         .foregroundStyle(Theme.inkSoft)
-                    if bag.kind != .custom, let detail = bag.detail {
+                    if bag.kind != .custom, let detail = bag.displayDetail {
                         Text(detail)
                             .font(.sans(12))
                             .foregroundStyle(Theme.muted)
@@ -858,11 +866,11 @@ struct BagOptionRow: View {
 
                 ZStack {
                     Circle()
-                        .strokeBorder(isSelected ? Theme.gold : Theme.hairline, lineWidth: 1.5)
+                        .strokeBorder(isSelected ? Theme.navy : Theme.hairline, lineWidth: 1.2)
                         .frame(width: 22, height: 22)
                     if isSelected {
                         Circle()
-                            .fill(Theme.gold)
+                            .fill(Theme.navy)
                             .frame(width: 12, height: 12)
                     }
                 }
@@ -875,20 +883,38 @@ struct BagOptionRow: View {
     }
 }
 
+// MARK: - Време
+
 struct WeatherStrip: View {
     let days: [WeatherDay]
 
     var body: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 10) {
-                ForEach(days) { day in
-                    WeatherDayCell(day: day)
+        VStack(alignment: .leading, spacing: 8) {
+            ScrollView(.horizontal) {
+                HStack(spacing: 8) {
+                    ForEach(days) { day in
+                        WeatherDayCell(day: day)
+                    }
                 }
+                .padding(.vertical, 2)
+                .padding(.horizontal, 1)
             }
-            .padding(.vertical, 4)
-            .padding(.horizontal, 1)
+            .scrollIndicators(.hidden)
+
+            if days.contains(where: \.isEstimate) {
+                HStack(alignment: .top, spacing: 4) {
+                    Text("*")
+                        .font(.codes(14))
+                        .foregroundStyle(Theme.gold)
+                    Text(L("Истиот ден лани. Се заменува со вистинска прогноза 16 дена пред денот.",
+                           "Same day last year. Replaced by the real forecast 16 days ahead."))
+                        .font(.sans(12))
+                        .foregroundStyle(Theme.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.horizontal, 2)
+            }
         }
-        .scrollIndicators(.hidden)
     }
 }
 
@@ -896,36 +922,49 @@ struct WeatherDayCell: View {
     let day: WeatherDay
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 7) {
             Text(Fmt.weekdayShort(day.date).uppercased())
-                .font(.sans(10, .semibold))
+                .font(.sans(9, .semibold))
                 .tracking(1.2)
                 .foregroundStyle(Theme.muted)
-            Text(Fmt.day(day.date))
-                .font(.sans(12, .medium))
-                .foregroundStyle(Theme.inkSoft)
+            HStack(spacing: 1) {
+                Text(Fmt.day(day.date))
+                    .font(.codes(15))
+                    .foregroundStyle(Theme.inkSoft)
+                if day.isEstimate {
+                    Text("*")
+                        .font(.codes(15))
+                        .foregroundStyle(Theme.gold)
+                }
+            }
             Image(systemName: day.icon)
-                .font(.system(size: 22))
+                .font(.system(size: 19, weight: .light))
                 .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(Theme.goldDeep)
-                .frame(height: 26)
+                .foregroundStyle(Theme.navy)
+                .frame(height: 24)
             Text("\(Int(day.maxTemp.rounded()))°")
-                .font(.serif(19, .medium))
+                .font(.codes(20))
                 .foregroundStyle(Theme.ink)
             Text("\(Int(day.minTemp.rounded()))°")
-                .font(.sans(13))
+                .font(.codes(14))
                 .foregroundStyle(Theme.muted)
             HStack(spacing: 2) {
                 Image(systemName: "drop.fill")
-                    .font(.system(size: 8))
+                    .font(.system(size: 7))
                 Text("\(day.rainChance ?? 0)%")
-                    .font(.sans(10, .medium))
+                    .font(.sans(9, .medium))
             }
-            .foregroundStyle((day.rainChance ?? 0) >= 40 ? Color(hex: 0x6F8797) : Theme.muted.opacity(0.7))
+            .foregroundStyle((day.rainChance ?? 0) >= 40 ? Theme.rain : Theme.muted.opacity(0.7))
         }
-        .frame(width: 64)
-        .padding(.vertical, 14)
-        .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Theme.surface))
-        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 0.75))
+        .frame(width: 58)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(day.isEstimate ? Theme.paper : Theme.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Theme.hairline, style: StrokeStyle(lineWidth: 0.75, dash: day.isEstimate ? [3, 3] : []))
+        )
     }
 }

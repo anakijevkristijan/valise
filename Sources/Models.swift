@@ -29,6 +29,8 @@ struct Place: Codable, Hashable, Identifiable {
             .filter { !$0.isEmpty && $0 != name }
             .joined(separator: ", ")
     }
+
+    var code: String { CityCode.code(for: name) }
 }
 
 // MARK: - Превоз
@@ -40,10 +42,10 @@ enum Transport: String, Codable, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .plane: return "Авион"
-        case .car: return "Кола"
-        case .train: return "Воз"
-        case .bus: return "Автобус"
+        case .plane: return L("Авион", "Plane")
+        case .car: return L("Кола", "Car")
+        case .train: return L("Воз", "Train")
+        case .bus: return L("Автобус", "Bus")
         }
     }
 
@@ -91,12 +93,21 @@ struct BagSpec: Codable, Hashable {
     var weightLimit: Double?
     var kind: BagKind
     var isFree: Bool = false
+    /// Стабилен клуч (пр. „wizz.cabin“) за превод на насловот.
+    var key: String?
 
-    /// Волумен во литри.
     var volume: Double { height * width * depth / 1000 }
-
-    /// Реално искористлив простор (ѕидови, патенти, облини).
     var usableVolume: Double { volume * 0.88 }
+
+    var displayTitle: String {
+        if let key, let spec = Airlines.spec(forKey: key) { return spec.title }
+        return title
+    }
+
+    var displayDetail: String? {
+        if let key, let spec = Airlines.spec(forKey: key) { return spec.detail }
+        return detail
+    }
 
     var dimensionText: String {
         "\(Fmt.number(height)) × \(Fmt.number(width)) × \(Fmt.number(depth)) cm"
@@ -104,7 +115,7 @@ struct BagSpec: Codable, Hashable {
 
     var limitText: String {
         var parts = [dimensionText]
-        if let weightLimit { parts.append("до \(Fmt.number(weightLimit)) kg") }
+        if let weightLimit { parts.append(L("до \(Fmt.number(weightLimit)) kg", "up to \(Fmt.number(weightLimit)) kg")) }
         return parts.joined(separator: " · ")
     }
 }
@@ -118,27 +129,27 @@ enum Activity: String, Codable, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .photo: return "Сликање"
-        case .walking: return "Прошетки"
-        case .dining: return "Елегантни вечери"
-        case .work: return "Работа"
-        case .fitness: return "Фитнес"
-        case .beach: return "Плажа"
-        case .hiking: return "Планина"
-        case .nightlife: return "Ноќен живот"
+        case .photo: return L("Сликање", "Photos")
+        case .walking: return L("Прошетки", "Walking")
+        case .dining: return L("Елегантни вечери", "Fine dining")
+        case .work: return L("Работа", "Work")
+        case .fitness: return L("Фитнес", "Fitness")
+        case .beach: return L("Плажа", "Beach")
+        case .hiking: return L("Планина", "Hiking")
+        case .nightlife: return L("Ноќен живот", "Nightlife")
         }
     }
 
     var subtitle: String {
         switch self {
-        case .photo: return "Instagram и спомени"
-        case .walking: return "Град пеш, тури"
-        case .dining: return "Ресторани, настани"
-        case .work: return "Лаптоп и состаноци"
-        case .fitness: return "Тренинг на пат"
-        case .beach: return "Сонце и море"
-        case .hiking: return "Патеки и природа"
-        case .nightlife: return "Барови и забава"
+        case .photo: return L("Instagram и спомени", "Instagram and memories")
+        case .walking: return L("Град пеш, тури", "City on foot, tours")
+        case .dining: return L("Ресторани, настани", "Restaurants, events")
+        case .work: return L("Лаптоп и состаноци", "Laptop and meetings")
+        case .fitness: return L("Тренинг на пат", "Training on the go")
+        case .beach: return L("Сонце и море", "Sun and sea")
+        case .hiking: return L("Патеки и природа", "Trails and nature")
+        case .nightlife: return L("Барови и забава", "Bars and parties")
         }
     }
 
@@ -163,9 +174,9 @@ enum TravelerStyle: String, Codable, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .woman: return "Жена"
-        case .man: return "Маж"
-        case .neutral: return "Неутрално"
+        case .woman: return L("Жена", "Woman")
+        case .man: return L("Маж", "Man")
+        case .neutral: return L("Неутрално", "Neutral")
         }
     }
 }
@@ -179,15 +190,15 @@ enum ItemCategory: String, Codable, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .documents: return "Документи"
-        case .clothing: return "Облека"
-        case .shoes: return "Обувки"
-        case .toiletries: return "Хигиена и козметика"
-        case .health: return "Здравје"
-        case .electronics: return "Електроника"
-        case .accessories: return "Додатоци"
-        case .activity: return "За активностите"
-        case .journey: return "За патот"
+        case .documents: return L("Документи", "Documents")
+        case .clothing: return L("Облека", "Clothing")
+        case .shoes: return L("Обувки", "Shoes")
+        case .toiletries: return L("Хигиена и козметика", "Toiletries")
+        case .health: return L("Здравје", "Health")
+        case .electronics: return L("Електроника", "Electronics")
+        case .accessories: return L("Додатоци", "Accessories")
+        case .activity: return L("За активностите", "For your activities")
+        case .journey: return L("За патот", "For the journey")
         }
     }
 
@@ -213,20 +224,39 @@ struct PackingItem: Codable, Identifiable, Hashable {
     var quantity: Int
     var note: String?
     var isPacked: Bool = false
-    /// Литри по парче (спакувано/свиткано).
     var unitVolume: Double
-    /// Килограми по парче.
     var unitWeight: Double
-    /// Колку парчиња ги носиш на себе на пат (не влегуваат во багажот).
     var wornCount: Int = 0
     var isCustom: Bool = false
+    /// Клуч од каталогот — името се преведува при приказ.
+    var key: String?
+    var noteKey: String?
 
     var bagUnits: Int { max(0, quantity - wornCount) }
 
+    var displayName: String {
+        if let key, let translated = Catalog.name(key) { return translated }
+        return name
+    }
+
+    var displayNote: String? {
+        if let noteKey, let translated = Catalog.note(noteKey) { return translated }
+        return note
+    }
+
+    /// Идентитет за споредба (клуч ако има, инаку име).
+    var identity: String { (key ?? name).lowercased() }
+
     var detailText: String? {
         var parts: [String] = []
-        if wornCount > 0 { parts.append(wornCount == quantity ? "на тебе на пат" : "\(wornCount) на тебе на пат") }
-        if let note, !note.isEmpty { parts.append(note) }
+        if wornCount > 0 {
+            if wornCount == quantity {
+                parts.append(L("на тебе на пат", "wear it on the way"))
+            } else {
+                parts.append(L("\(wornCount) на тебе на пат", "\(wornCount) worn on the way"))
+            }
+        }
+        if let note = displayNote, !note.isEmpty { parts.append(note) }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 }
@@ -236,18 +266,25 @@ struct ChecklistItem: Codable, Identifiable, Hashable {
     var title: String
     var icon: String
     var isDone: Bool = false
+    var key: String?
+
+    var displayTitle: String {
+        if let key, let translated = Catalog.exitTitle(key) { return translated }
+        return title
+    }
 }
 
 // MARK: - Време
 
 enum WeatherSource: String, Codable {
-    case forecast, lastYear, none
+    case forecast, lastYear, mixed, none
 
     var label: String {
         switch self {
-        case .forecast: return "Прогноза"
-        case .lastYear: return "Проценка според лани"
-        case .none: return "Нема податоци"
+        case .forecast: return L("Прогноза", "Forecast")
+        case .lastYear: return L("Лани*", "Last year*")
+        case .mixed: return L("Прогноза + лани*", "Forecast + last year*")
+        case .none: return L("Нема податоци", "No data")
         }
     }
 }
@@ -259,8 +296,11 @@ struct WeatherDay: Codable, Hashable, Identifiable {
     var rainChance: Int?
     var precipitation: Double?
     var code: Int
+    /// true = истиот ден лани (проценка), не прогноза.
+    var fromLastYear: Bool?
 
     var id: Date { date }
+    var isEstimate: Bool { fromLastYear ?? false }
 
     var icon: String {
         switch code {
@@ -304,7 +344,7 @@ struct WeatherSummary {
 
     var shortText: String? {
         guard let minTemp, let maxTemp else { return nil }
-        return "\(Int(maxTemp.rounded()))° / \(Int(minTemp.rounded()))°"
+        return "\(Int(maxTemp.rounded()))°/\(Int(minTemp.rounded()))°"
     }
 }
 
@@ -331,7 +371,6 @@ struct Trip: Codable, Identifiable, Hashable {
     var tint: Int = 0
     var createdAt: Date = Date()
 
-    // Траење
     var dayCount: Int {
         let diff = Calendar.current.dateComponents([.day], from: startDate.startOfDay, to: endDate.startOfDay).day ?? 0
         return max(1, diff + 1)
@@ -347,13 +386,12 @@ struct Trip: Codable, Identifiable, Hashable {
     var isOngoing: Bool { daysUntil <= 0 && !isPast }
 
     var countdownText: String {
-        if isPast { return "Завршено" }
-        if isOngoing { return daysUntil == 0 ? "Денес" : "Во тек" }
-        if daysUntil == 1 { return "Утре" }
-        return "За \(Fmt.days(daysUntil))"
+        if isPast { return L("Завршено", "Completed") }
+        if isOngoing { return daysUntil == 0 ? L("Денес", "Today") : L("Во тек", "Now") }
+        if daysUntil == 1 { return L("Утре", "Tomorrow") }
+        return L("За \(Fmt.days(daysUntil))", "In \(Fmt.days(daysUntil))")
     }
 
-    // Пакување
     var packedCount: Int { items.filter(\.isPacked).count }
     var progress: Double { items.isEmpty ? 0 : Double(packedCount) / Double(items.count) }
 
@@ -364,7 +402,9 @@ struct Trip: Codable, Identifiable, Hashable {
         return origin.countryCode.uppercased() != destination.countryCode.uppercased()
     }
 
-    // Багаж
+    var originCode: String { origin?.code ?? "———" }
+    var destinationCode: String { destination.code }
+
     var packedVolume: Double {
         items.reduce(0) { $0 + Double($1.bagUnits) * $1.unitVolume }
     }
@@ -391,9 +431,9 @@ struct Trip: Codable, Identifiable, Hashable {
 
     var shareText: String {
         var lines: [String] = []
-        lines.append("🧳 \(destination.name), \(destination.country) \(destination.flag)")
+        lines.append("✈︎ \(originCode) → \(destinationCode) · \(destination.name) \(destination.flag)")
         lines.append("\(Fmt.range(startDate, endDate)) · \(Fmt.days(dayCount))")
-        lines.append("Багаж: \(bag.title) (\(bag.limitText))")
+        lines.append(L("Багаж", "Bag") + ": \(bag.displayTitle) (\(bag.limitText))")
         for category in ItemCategory.allCases {
             let group = items.filter { $0.category == category }
             guard !group.isEmpty else { continue }
@@ -402,11 +442,11 @@ struct Trip: Codable, Identifiable, Hashable {
             for item in group {
                 let box = item.isPacked ? "☑︎" : "☐"
                 let qty = item.quantity > 1 ? " ×\(item.quantity)" : ""
-                lines.append("\(box) \(item.name)\(qty)")
+                lines.append("\(box) \(item.displayName)\(qty)")
             }
         }
         lines.append("")
-        lines.append("Спакувано со Valise")
+        lines.append(L("Спакувано со Valise", "Packed with Valise"))
         return lines.joined(separator: "\n")
     }
 }

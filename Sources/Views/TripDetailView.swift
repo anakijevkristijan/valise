@@ -5,6 +5,7 @@ struct TripDetailView: View {
 
     @EnvironmentObject private var store: TripStore
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @AppStorage("userName") private var userName: String = ""
 
     enum Tab: String, CaseIterable { case packing, exit }
@@ -16,30 +17,37 @@ struct TripDetailView: View {
     @State private var confirmDelete = false
     @State private var confirmRegenerate = false
     @State private var isRefreshing = false
+    @State private var showStory = false
 
     var body: some View {
         Group {
             if let trip = store.trip(tripID) {
                 content(trip)
             } else {
-                LuxBackground()
+                PaperBackground()
                     .onAppear { dismiss() }
             }
         }
         .toolbar(.hidden, for: .navigationBar)
-        .task { await autoRefresh() }
+        .task { await refreshWeather(force: false) }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                Task { await refreshWeather(force: false) }
+            }
+        }
     }
 
     // MARK: Распоред
 
     private func content(_ trip: Trip) -> some View {
         ZStack {
-            LuxBackground()
+            PaperBackground()
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 26) {
+                VStack(alignment: .leading, spacing: 28) {
                     topBar(trip)
-                    hero(trip)
+                    titleBlock(trip)
+                    BoardingPassCard(trip: trip)
                     weatherSection(trip)
                     BagFitCard(trip: trip)
                     tabPicker(trip)
@@ -59,7 +67,7 @@ struct TripDetailView: View {
                 .frame(maxWidth: .infinity)
             }
             .scrollIndicators(.hidden)
-            .refreshable { await refreshWeather() }
+            .refreshable { await refreshWeather(force: true) }
         }
         .sensoryFeedback(.selection, trigger: trip.packedCount)
         .sensoryFeedback(.success, trigger: trip.items.count > 0 && trip.packedCount == trip.items.count)
@@ -68,29 +76,33 @@ struct TripDetailView: View {
                 store.mutate(tripID) { $0.items.append(item) }
             }
             .presentationDetents([.medium, .large])
-            .presentationCornerRadius(30)
+            .presentationCornerRadius(28)
         }
-        .alert("Нова ставка", isPresented: $showAddExit) {
-            TextField("пр. Исклучен рутер", text: $newExitTitle)
-            Button("Додај") {
+        .sheet(isPresented: $showStory) {
+            StorySheet(trip: trip)
+                .presentationCornerRadius(28)
+        }
+        .alert(L("Нова ставка", "New item"), isPresented: $showAddExit) {
+            TextField(L("пр. Исклучен рутер", "e.g. Router switched off"), text: $newExitTitle)
+            Button(L("Додај", "Add")) {
                 let title = newExitTitle.trimmingCharacters(in: .whitespaces)
                 if !title.isEmpty {
                     store.mutate(tripID) { $0.exitChecklist.append(ChecklistItem(title: title, icon: "checkmark.circle")) }
                 }
                 newExitTitle = ""
             }
-            Button("Откажи", role: .cancel) { newExitTitle = "" }
+            Button(L("Откажи", "Cancel"), role: .cancel) { newExitTitle = "" }
         }
-        .confirmationDialog("Да се избрише патувањето?", isPresented: $confirmDelete, titleVisibility: .visible) {
-            Button("Избриши", role: .destructive) {
+        .confirmationDialog(L("Да се избрише патувањето?", "Delete this trip?"), isPresented: $confirmDelete, titleVisibility: .visible) {
+            Button(L("Избриши", "Delete"), role: .destructive) {
                 store.delete(tripID)
                 dismiss()
             }
         } message: {
-            Text("Листата и сите белешки ќе се изгубат.")
+            Text(L("Листата и сите белешки ќе се изгубат.", "The list and all notes will be lost."))
         }
-        .confirmationDialog("Нова листа?", isPresented: $confirmRegenerate, titleVisibility: .visible) {
-            Button("Состави повторно") {
+        .confirmationDialog(L("Нова листа?", "Rebuild the list?"), isPresented: $confirmRegenerate, titleVisibility: .visible) {
+            Button(L("Состави повторно", "Rebuild")) {
                 withAnimation {
                     store.mutate(tripID) {
                         $0.items = PackingEngine.regenerate($0)
@@ -99,7 +111,8 @@ struct TripDetailView: View {
                 }
             }
         } message: {
-            Text("Листата ќе се состави одново според последната прогноза. Спакуваното и рачно додаденото остануваат.")
+            Text(L("Листата ќе се состави одново според последната прогноза. Спакуваното и рачно додаденото остануваат.",
+                   "The list is rebuilt from the latest forecast. Packed and custom items stay."))
         }
     }
 
@@ -107,18 +120,34 @@ struct TripDetailView: View {
         HStack(spacing: 10) {
             CircleIconButton(systemName: "chevron.left") { dismiss() }
             Spacer()
+            Button {
+                showStory = true
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "camera.aperture")
+                        .font(.system(size: 13, weight: .regular))
+                    Text("STORY")
+                        .font(.sans(11, .semibold))
+                        .tracking(1.6)
+                }
+                .foregroundStyle(Theme.goldLight)
+                .padding(.horizontal, 14)
+                .frame(height: 42)
+                .background(Capsule().fill(Theme.navy))
+            }
+            .buttonStyle(PressableStyle())
             ShareLink(item: trip.shareText) {
                 CircleIcon(systemName: "square.and.arrow.up")
             }
             Menu {
-                Button("Освежи прогноза", systemImage: "arrow.clockwise") {
-                    Task { await refreshWeather() }
+                Button(L("Освежи прогноза", "Refresh forecast"), systemImage: "arrow.clockwise") {
+                    Task { await refreshWeather(force: true) }
                 }
-                Button("Состави ја листата одново", systemImage: "wand.and.stars") {
+                Button(L("Состави ја листата одново", "Rebuild the list"), systemImage: "wand.and.stars") {
                     confirmRegenerate = true
                 }
                 Divider()
-                Button("Избриши патување", systemImage: "trash", role: .destructive) {
+                Button(L("Избриши патување", "Delete trip"), systemImage: "trash", role: .destructive) {
                     confirmDelete = true
                 }
             } label: {
@@ -128,58 +157,26 @@ struct TripDetailView: View {
         .padding(.top, 8)
     }
 
-    // MARK: Херој
-
-    private func hero(_ trip: Trip) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
+    private func titleBlock(_ trip: Trip) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Eyebrow("\(trip.destination.flag)  \(trip.destination.country)", color: Theme.goldDeep)
+                Eyebrow("\(trip.destination.flag)  \(trip.destination.country)", color: Theme.gold)
                 Spacer()
                 Pill(text: trip.countdownText, icon: "calendar")
             }
-
             Text(trip.destination.name)
-                .font(.serif(48))
+                .font(.serif(44))
                 .foregroundStyle(Theme.ink)
                 .lineLimit(2)
                 .minimumScaleFactor(0.5)
-                .padding(.top, 26)
-
-            Text(trip.routeText)
-                .font(.sans(15, .medium))
+            Text(heroDetail(trip))
+                .font(.sans(14))
                 .foregroundStyle(Theme.inkSoft)
-                .padding(.top, 6)
-
-            Hairline().padding(.vertical, 18)
-
-            HStack(alignment: .center) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(Fmt.range(trip.startDate, trip.endDate))
-                        .font(.serif(19))
-                        .foregroundStyle(Theme.ink)
-                    Text(heroDetail(trip))
-                        .font(.sans(13))
-                        .foregroundStyle(Theme.inkSoft)
-                }
-                Spacer()
-                ProgressRing(progress: trip.progress, size: 62)
-            }
         }
-        .padding(24)
-        .background(
-            RoundedRectangle(cornerRadius: 32, style: .continuous)
-                .fill(LinearGradient(colors: [Theme.tint(trip.tint), Theme.surface],
-                                     startPoint: .topLeading, endPoint: .bottomTrailing))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 32, style: .continuous)
-                .strokeBorder(Theme.hairline, lineWidth: 0.75)
-        )
-        .shadow(color: Theme.ink.opacity(0.06), radius: 26, x: 0, y: 14)
     }
 
     private func heroDetail(_ trip: Trip) -> String {
-        var parts = [Fmt.days(trip.dayCount), Fmt.nights(trip.nightCount), trip.transport.title]
+        var parts = [Fmt.range(trip.startDate, trip.endDate), Fmt.nights(trip.nightCount), trip.transport.title]
         if let airline = trip.airline, airline.id != "other" { parts.append(airline.name) }
         return parts.joined(separator: " · ")
     }
@@ -189,12 +186,12 @@ struct TripDetailView: View {
     private func weatherSection(_ trip: Trip) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Eyebrow("Време", color: Theme.muted)
+                Eyebrow(L("Време", "Weather"))
                 Spacer()
                 if isRefreshing {
-                    ProgressView().controlSize(.small).tint(Theme.gold)
+                    ProgressView().controlSize(.small).tint(Theme.navy)
                 } else {
-                    Text(trip.weatherSource.label)
+                    Text(updatedLabel(trip))
                         .font(.sans(11, .medium))
                         .foregroundStyle(Theme.muted)
                 }
@@ -203,53 +200,63 @@ struct TripDetailView: View {
             if trip.weather.isEmpty {
                 HStack(spacing: 14) {
                     Image(systemName: "cloud.sun")
-                        .font(.system(size: 22, weight: .light))
-                        .foregroundStyle(Theme.goldDeep)
-                    Text(trip.isPast ? "Патувањето заврши." : "Прогнозата не е достапна. Повлечи надолу за да пробаш повторно.")
+                        .font(.system(size: 20, weight: .light))
+                        .foregroundStyle(Theme.navy)
+                    Text(trip.isPast
+                         ? L("Патувањето заврши.", "This trip is over.")
+                         : L("Прогнозата не е достапна. Повлечи надолу за да пробаш повторно.", "No forecast yet. Pull down to try again."))
                         .font(.sans(14))
                         .foregroundStyle(Theme.inkSoft)
                 }
                 .luxCard(padding: 18)
             } else {
                 WeatherStrip(days: trip.weather)
-                if trip.weatherSource == .lastYear {
-                    Text("Прогнозата се гледа 16 дена однапред. Дотогаш — какво беше времето истите денови лани.")
-                        .font(.sans(12))
-                        .foregroundStyle(Theme.muted)
-                        .padding(.horizontal, 2)
-                }
             }
         }
+    }
+
+    private func updatedLabel(_ trip: Trip) -> String {
+        var label = trip.weatherSource.label
+        if let updated = trip.weatherUpdatedAt {
+            let f = DateFormatter()
+            f.locale = AppLanguage.current.locale
+            f.dateFormat = "HH:mm"
+            label += " · " + f.string(from: updated)
+        }
+        return label
     }
 
     // MARK: Табови
 
     private func tabPicker(_ trip: Trip) -> some View {
-        HStack(spacing: 4) {
-            tabButton(.packing, title: "Пакување", count: "\(trip.packedCount)/\(trip.items.count)")
-            tabButton(.exit, title: "Пред излез", count: "\(trip.exitChecklist.filter(\.isDone).count)/\(trip.exitChecklist.count)")
+        HStack(spacing: 24) {
+            tabButton(.packing, title: L("Пакување", "Packing"), count: "\(trip.packedCount)/\(trip.items.count)")
+            tabButton(.exit, title: L("Пред излез", "Before you leave"), count: "\(trip.exitChecklist.filter(\.isDone).count)/\(trip.exitChecklist.count)")
+            Spacer()
         }
-        .padding(4)
-        .background(Capsule().fill(Theme.sand.opacity(0.7)))
-        .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 0.5))
+        .overlay(alignment: .bottom) { Hairline() }
     }
 
     private func tabButton(_ value: Tab, title: String, count: String) -> some View {
         Button {
             withAnimation(.easeInOut(duration: 0.25)) { tab = value }
         } label: {
-            HStack(spacing: 6) {
-                Text(title)
-                    .font(.sans(14, .semibold))
-                Text(count)
-                    .font(.sans(12, .medium))
-                    .opacity(0.6)
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 6) {
+                    Text(title.uppercased())
+                        .font(.sans(12, .semibold))
+                        .tracking(1.6)
+                    Text(count)
+                        .font(.codes(14))
+                        .opacity(0.6)
+                }
+                .foregroundStyle(tab == value ? Theme.navy : Theme.muted)
+                Rectangle()
+                    .fill(tab == value ? Theme.navy : Color.clear)
+                    .frame(height: 1.5)
             }
-            .foregroundStyle(tab == value ? Theme.ivory : Theme.inkSoft)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 11)
-            .background(Capsule().fill(tab == value ? Theme.ink : Color.clear))
-            .contentShape(Capsule())
+            .fixedSize()
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -257,18 +264,20 @@ struct TripDetailView: View {
     // MARK: Пакување
 
     private func packingSection(_ trip: Trip) -> some View {
-        VStack(alignment: .leading, spacing: 22) {
+        VStack(alignment: .leading, spacing: 24) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .firstTextBaseline) {
-                    Text(trip.packedCount == trip.items.count && !trip.items.isEmpty ? "Сè е спакувано." : "\(trip.packedCount) од \(trip.items.count) спакувани")
+                    Text(trip.packedCount == trip.items.count && !trip.items.isEmpty
+                         ? L("Сè е спакувано.", "All packed.")
+                         : L("\(trip.packedCount) од \(trip.items.count) спакувани", "\(trip.packedCount) of \(trip.items.count) packed"))
                         .font(.serif(22))
                         .foregroundStyle(Theme.ink)
                     Spacer()
                     Text("\(Int((trip.progress * 100).rounded()))%")
-                        .font(.serif(18))
-                        .foregroundStyle(Theme.goldDeep)
+                        .font(.codes(22))
+                        .foregroundStyle(Theme.navy)
                 }
-                GaugeBar(ratio: trip.progress, color: Theme.gold, height: 5)
+                GaugeBar(ratio: trip.progress, color: Theme.navy, height: 3)
             }
 
             let suggestions = PackingEngine.suggestions(for: trip)
@@ -279,7 +288,7 @@ struct TripDetailView: View {
                                 },
                                 onDismissAll: {
                                     withAnimation {
-                                        store.mutate(tripID) { $0.dismissedSuggestions.append(contentsOf: suggestions.map(\.name)) }
+                                        store.mutate(tripID) { $0.dismissedSuggestions.append(contentsOf: suggestions.map(\.identity)) }
                                     }
                                 })
             }
@@ -296,14 +305,15 @@ struct TripDetailView: View {
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "plus")
-                        .font(.system(size: 13, weight: .semibold))
-                    Text("Додај свој предмет")
+                        .font(.system(size: 11, weight: .semibold))
+                    Text(L("Додај свој предмет", "Add your own item"))
                 }
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(SecondaryButtonStyle())
 
-            Text("Допри за спакувано. Држи подолго за количина или бришење.")
+            Text(L("Допри за спакувано. Држи подолго за количина или бришење.",
+                   "Tap to mark as packed. Long-press for quantity or removal."))
                 .font(.sans(12))
                 .foregroundStyle(Theme.muted)
                 .frame(maxWidth: .infinity)
@@ -312,21 +322,18 @@ struct TripDetailView: View {
     }
 
     private func categoryBlock(_ category: ItemCategory, items: [PackingItem]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
-                Image(systemName: category.icon)
-                    .font(.system(size: 14))
-                    .foregroundStyle(Theme.goldDeep)
-                Text(category.title)
-                    .font(.serif(21))
-                    .foregroundStyle(Theme.ink)
+                Text(category.title.uppercased())
+                    .font(.sans(11, .semibold))
+                    .tracking(2)
+                    .foregroundStyle(Theme.navy)
                 Spacer()
                 Text("\(items.filter(\.isPacked).count)/\(items.count)")
-                    .font(.sans(12, .medium))
+                    .font(.codes(14))
                     .foregroundStyle(Theme.muted)
-                    .monospacedDigit()
             }
-            .padding(.horizontal, 4)
+            .padding(.horizontal, 2)
 
             VStack(spacing: 0) {
                 ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
@@ -336,7 +343,7 @@ struct TripDetailView: View {
                                onDecrease: { changeQuantity(item, by: -1) },
                                onDelete: { remove(item) })
                     if index < items.count - 1 {
-                        Hairline().padding(.leading, 58)
+                        Hairline().padding(.leading, 50)
                     }
                 }
                 Hairline()
@@ -345,20 +352,22 @@ struct TripDetailView: View {
                 } label: {
                     HStack(spacing: 10) {
                         Image(systemName: "plus")
-                            .font(.system(size: 12, weight: .semibold))
-                            .frame(width: 26)
-                        Text("Додај")
-                            .font(.sans(14, .medium))
+                            .font(.system(size: 11, weight: .semibold))
+                            .frame(width: 18)
+                        Text(L("Додај", "Add"))
+                            .font(.sans(12, .semibold))
+                            .tracking(1.2)
+                            .textCase(.uppercase)
                         Spacer()
                     }
-                    .foregroundStyle(Theme.goldDeep)
+                    .foregroundStyle(Theme.gold)
                     .padding(.horizontal, 18)
                     .padding(.vertical, 13)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
-            .luxCard(padding: 0, radius: 22)
+            .luxCard(padding: 0, radius: 16)
         }
     }
 
@@ -386,7 +395,7 @@ struct TripDetailView: View {
         withAnimation {
             store.mutate(tripID) { trip in
                 trip.items.removeAll { $0.id == item.id }
-                if !item.isCustom { trip.dismissedSuggestions.append(item.name) }
+                if !item.isCustom { trip.dismissedSuggestions.append(item.identity) }
             }
         }
     }
@@ -396,30 +405,33 @@ struct TripDetailView: View {
     private func exitSection(_ trip: Trip) -> some View {
         let done = trip.exitChecklist.filter(\.isDone).count
         let allDone = !trip.exitChecklist.isEmpty && done == trip.exitChecklist.count
+        let firstName = userName.split(separator: " ").first.map(String.init) ?? userName
 
         return VStack(alignment: .leading, spacing: 20) {
             if allDone {
                 VStack(spacing: 12) {
                     Image(systemName: "checkmark.seal")
-                        .font(.system(size: 40, weight: .light))
-                        .foregroundStyle(Theme.goldDeep)
-                    Text("Спремно за пат.")
+                        .font(.system(size: 36, weight: .ultraLight))
+                        .foregroundStyle(Theme.goldLight)
+                    Text(L("Спремно за пат.", "Ready to go."))
                         .font(.serif(28))
-                        .foregroundStyle(Theme.ink)
-                    Text("Домот е безбеден. Убав пат, \(userName.split(separator: " ").first.map(String.init) ?? userName)!")
-                        .font(.sans(15))
-                        .foregroundStyle(Theme.inkSoft)
+                        .foregroundStyle(Theme.ticketText)
+                    Text(L("Домот е безбеден. Убав пат, \(firstName).", "Home is secure. Have a beautiful trip, \(firstName)."))
+                        .font(.sans(14))
+                        .foregroundStyle(Theme.ticketText.opacity(0.75))
                         .multilineTextAlignment(.center)
                 }
                 .frame(maxWidth: .infinity)
-                .luxCard(padding: 26, fill: Theme.goldLight.opacity(0.45), radius: 26)
+                .padding(26)
+                .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Theme.ticket(trip.tint)))
                 .transition(.scale(scale: 0.96).combined(with: .opacity))
             } else {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Последен круг низ домот")
+                    Text(L("Последен круг низ домот", "One last walk through home"))
                         .font(.serif(22))
                         .foregroundStyle(Theme.ink)
-                    Text("Помини ја листата на излез — за да не мислиш на шпоретот на аеродром.")
+                    Text(L("Помини ја листата на излез — за да не мислиш на шпоретот на аеродром.",
+                           "Run through this on your way out, so you're not thinking about the stove at the airport."))
                         .font(.sans(14))
                         .foregroundStyle(Theme.inkSoft)
                 }
@@ -441,17 +453,17 @@ struct TripDetailView: View {
                         }
                     }
                     if index < trip.exitChecklist.count - 1 {
-                        Hairline().padding(.leading, 66)
+                        Hairline().padding(.leading, 56)
                     }
                 }
             }
-            .luxCard(padding: 0, radius: 22)
+            .luxCard(padding: 0, radius: 16)
 
             HStack(spacing: 10) {
                 Button {
                     showAddExit = true
                 } label: {
-                    Label("Додај", systemImage: "plus").frame(maxWidth: .infinity)
+                    Label(L("Додај", "Add"), systemImage: "plus").frame(maxWidth: .infinity)
                 }
                 .buttonStyle(SecondaryButtonStyle())
 
@@ -462,7 +474,7 @@ struct TripDetailView: View {
                         }
                     }
                 } label: {
-                    Label("Одново", systemImage: "arrow.counterclockwise").frame(maxWidth: .infinity)
+                    Label(L("Одново", "Reset"), systemImage: "arrow.counterclockwise").frame(maxWidth: .infinity)
                 }
                 .buttonStyle(SecondaryButtonStyle())
             }
@@ -470,18 +482,12 @@ struct TripDetailView: View {
         .sensoryFeedback(.success, trigger: allDone)
     }
 
-    // MARK: Прогноза
+    // MARK: Прогноза — при секое отворање
 
     @MainActor
-    private func autoRefresh() async {
-        guard let trip = store.trip(tripID), store.needsWeatherRefresh(trip) else { return }
-        await refreshWeather()
-    }
-
-    @MainActor
-    private func refreshWeather() async {
+    private func refreshWeather(force: Bool) async {
         isRefreshing = true
-        await store.refreshWeather(tripID)
+        await store.refreshWeather(tripID, force: force)
         isRefreshing = false
     }
 }
@@ -499,23 +505,23 @@ struct PackingRow: View {
         Button(action: onToggle) {
             HStack(spacing: 14) {
                 ZStack {
-                    Circle()
-                        .fill(item.isPacked ? Theme.gold : Color.clear)
-                    Circle()
-                        .strokeBorder(item.isPacked ? Theme.gold : Theme.muted.opacity(0.45), lineWidth: 1.3)
+                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                        .fill(item.isPacked ? Theme.navy : Color.clear)
+                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                        .strokeBorder(item.isPacked ? Theme.navy : Theme.muted.opacity(0.6), lineWidth: 1)
                     if item.isPacked {
                         Image(systemName: "checkmark")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(Theme.surface)
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(Theme.goldLight)
                             .transition(.scale.combined(with: .opacity))
                     }
                 }
-                .frame(width: 26, height: 26)
+                .frame(width: 18, height: 18)
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(item.name)
+                    Text(item.displayName)
                         .strikethrough(item.isPacked, color: Theme.muted.opacity(0.6))
-                        .font(.sans(16))
+                        .font(.sans(15))
                         .foregroundStyle(item.isPacked ? Theme.muted : Theme.ink)
                     if let detail = item.detailText {
                         Text(detail)
@@ -528,9 +534,8 @@ struct PackingRow: View {
 
                 if item.quantity > 1 {
                     Text("×\(item.quantity)")
-                        .font(.serif(17))
-                        .foregroundStyle(item.isPacked ? Theme.muted : Theme.goldDeep)
-                        .monospacedDigit()
+                        .font(.codes(17))
+                        .foregroundStyle(item.isPacked ? Theme.muted : Theme.navy)
                 }
             }
             .padding(.horizontal, 18)
@@ -539,10 +544,10 @@ struct PackingRow: View {
         }
         .buttonStyle(.plain)
         .contextMenu {
-            Button("Уште едно", systemImage: "plus", action: onIncrease)
-            Button("Едно помалку", systemImage: "minus", action: onDecrease)
+            Button(L("Уште едно", "One more"), systemImage: "plus", action: onIncrease)
+            Button(L("Едно помалку", "One less"), systemImage: "minus", action: onDecrease)
             Divider()
-            Button("Отстрани", systemImage: "trash", role: .destructive, action: onDelete)
+            Button(L("Отстрани", "Remove"), systemImage: "trash", role: .destructive, action: onDelete)
         }
     }
 }
@@ -556,29 +561,38 @@ struct ExitRow: View {
         Button(action: onToggle) {
             HStack(spacing: 14) {
                 Image(systemName: item.icon)
-                    .font(.system(size: 15))
-                    .foregroundStyle(item.isDone ? Theme.surface : Theme.goldDeep)
-                    .frame(width: 36, height: 36)
-                    .background(Circle().fill(item.isDone ? Theme.sage : Theme.goldLight.opacity(0.55)))
+                    .font(.system(size: 14, weight: .light))
+                    .foregroundStyle(item.isDone ? Theme.muted : Theme.navy)
+                    .frame(width: 26)
 
-                Text(item.title)
+                Text(item.displayTitle)
+                    .strikethrough(item.isDone, color: Theme.muted.opacity(0.6))
                     .font(.sans(15))
                     .foregroundStyle(item.isDone ? Theme.muted : Theme.ink)
                     .fixedSize(horizontal: false, vertical: true)
 
                 Spacer(minLength: 8)
 
-                Image(systemName: item.isDone ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 22))
-                    .foregroundStyle(item.isDone ? Theme.sage : Theme.hairline)
+                ZStack {
+                    Circle()
+                        .fill(item.isDone ? Theme.navy : Color.clear)
+                    Circle()
+                        .strokeBorder(item.isDone ? Theme.navy : Theme.muted.opacity(0.6), lineWidth: 1)
+                    if item.isDone {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(Theme.goldLight)
+                    }
+                }
+                .frame(width: 22, height: 22)
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.vertical, 13)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .contextMenu {
-            Button("Отстрани", systemImage: "trash", role: .destructive, action: onDelete)
+            Button(L("Отстрани", "Remove"), systemImage: "trash", role: .destructive, action: onDelete)
         }
     }
 }
@@ -590,17 +604,16 @@ struct BagFitCard: View {
 
     var body: some View {
         let level = PackingEngine.fitLevel(for: trip)
-        let color: Color = level == .over ? Theme.terracotta : (level == .snug ? Theme.gold : Theme.sage)
+        let color: Color = level == .over ? Theme.terracotta : (level == .snug ? Theme.gold : Theme.navy)
 
         VStack(alignment: .leading, spacing: 18) {
             HStack(spacing: 14) {
                 Image(systemName: trip.bag.kind.icon)
-                    .font(.system(size: 18))
-                    .foregroundStyle(Theme.goldDeep)
-                    .frame(width: 46, height: 46)
-                    .background(Circle().fill(Theme.goldLight.opacity(0.6)))
+                    .font(.system(size: 18, weight: .light))
+                    .foregroundStyle(Theme.navy)
+                    .frame(width: 30)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(trip.bag.title)
+                    Text(trip.bag.displayTitle)
                         .font(.serif(20))
                         .foregroundStyle(Theme.ink)
                     Text(trip.bag.limitText)
@@ -610,21 +623,21 @@ struct BagFitCard: View {
                 Spacer()
             }
 
-            meter(label: "Волумен",
+            meter(label: L("Волумен", "Volume"),
                   value: "\(Int(trip.packedVolume.rounded())) / \(Int(trip.bag.usableVolume.rounded())) L",
                   ratio: trip.fillRatio,
                   color: color)
 
             if let weightRatio = trip.weightRatio, let limit = trip.bag.weightLimit {
-                meter(label: "Тежина (проценка)",
+                meter(label: L("Тежина (проценка)", "Weight (estimate)"),
                       value: "\(Fmt.number((trip.packedWeight * 10).rounded() / 10)) / \(Fmt.number(limit)) kg",
                       ratio: weightRatio,
-                      color: weightRatio > 1 ? Theme.terracotta : (weightRatio > 0.9 ? Theme.gold : Theme.sage))
+                      color: weightRatio > 1 ? Theme.terracotta : (weightRatio > 0.9 ? Theme.gold : Theme.navy))
             }
 
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: level == .over ? "exclamationmark.triangle" : (level == .snug ? "hand.raised" : "checkmark.circle"))
-                    .font(.system(size: 14))
+                    .font(.system(size: 13, weight: .light))
                     .foregroundStyle(color)
                     .padding(.top, 1)
                 Text(PackingEngine.advice(for: trip))
@@ -632,26 +645,24 @@ struct BagFitCard: View {
                     .foregroundStyle(Theme.inkSoft)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(color.opacity(0.09)))
+            .padding(.top, 2)
         }
-        .luxCard(padding: 20, radius: 26)
+        .luxCard(padding: 20, radius: 18)
     }
 
     private func meter(label: String, value: String, ratio: Double, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
-                Text(label)
-                    .font(.sans(13, .medium))
-                    .foregroundStyle(Theme.inkSoft)
+                Text(label.uppercased())
+                    .font(.sans(10, .semibold))
+                    .tracking(1.6)
+                    .foregroundStyle(Theme.muted)
                 Spacer()
                 Text(value)
-                    .font(.serif(16, .medium))
+                    .font(.codes(17))
                     .foregroundStyle(Theme.ink)
-                    .monospacedDigit()
             }
-            GaugeBar(ratio: ratio, color: color, height: 8)
+            GaugeBar(ratio: ratio, color: color, height: 3)
         }
     }
 }
@@ -667,13 +678,14 @@ struct SuggestionsCard: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Image(systemName: "sparkles")
-                    .foregroundStyle(Theme.goldDeep)
-                Text("Предлози според новата прогноза")
+                    .font(.system(size: 13, weight: .light))
+                    .foregroundStyle(Theme.gold)
+                Text(L("Предлози според новата прогноза", "Suggested by the new forecast"))
                     .font(.sans(14, .semibold))
                     .foregroundStyle(Theme.ink)
                 Spacer()
-                Button("Отфрли", action: onDismissAll)
-                    .font(.sans(13, .medium))
+                Button(L("Отфрли", "Dismiss"), action: onDismissAll)
+                    .font(.sans(12, .medium))
                     .foregroundStyle(Theme.muted)
             }
             ScrollView(.horizontal) {
@@ -682,15 +694,15 @@ struct SuggestionsCard: View {
                         Button { onAdd(item) } label: {
                             HStack(spacing: 6) {
                                 Image(systemName: "plus")
-                                    .font(.system(size: 11, weight: .bold))
-                                Text(item.quantity > 1 ? "\(item.name) ×\(item.quantity)" : item.name)
+                                    .font(.system(size: 10, weight: .bold))
+                                Text(item.quantity > 1 ? "\(item.displayName) ×\(item.quantity)" : item.displayName)
                                     .font(.sans(13, .medium))
                             }
-                            .foregroundStyle(Theme.ink)
+                            .foregroundStyle(Theme.navy)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 9)
                             .background(Capsule().fill(Theme.surface))
-                            .overlay(Capsule().strokeBorder(Theme.gold.opacity(0.5), lineWidth: 0.75))
+                            .overlay(Capsule().strokeBorder(Theme.navy.opacity(0.25), lineWidth: 0.75))
                         }
                         .buttonStyle(PressableStyle())
                     }
@@ -699,7 +711,7 @@ struct SuggestionsCard: View {
             }
             .scrollIndicators(.hidden)
         }
-        .luxCard(padding: 16, fill: Theme.goldLight.opacity(0.4), radius: 22)
+        .luxCard(padding: 16, fill: Theme.goldPale, radius: 16)
     }
 }
 
@@ -718,30 +730,30 @@ struct AddItemSheet: View {
 
     var body: some View {
         ZStack {
-            Theme.ivory.ignoresSafeArea()
+            PaperBackground()
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
                     HStack {
-                        Eyebrow("Нов предмет")
+                        Eyebrow(L("Нов предмет", "New item"), color: Theme.gold)
                         Spacer()
                         CircleIconButton(systemName: "xmark") { dismiss() }
                     }
 
                     VStack(alignment: .leading, spacing: 10) {
-                        TextField("", text: $name, prompt: Text("Што да спакуваме?").foregroundColor(Theme.muted.opacity(0.7)))
+                        TextField("", text: $name, prompt: Text(L("Што да спакуваме?", "What should we pack?")).foregroundColor(Theme.muted.opacity(0.7)))
                             .font(.serif(26))
                             .foregroundStyle(Theme.ink)
                             .focused($focused)
                             .submitLabel(.done)
                             .onSubmit(add)
                         Rectangle()
-                            .fill(focused ? Theme.gold : Theme.hairline)
+                            .fill(focused ? Theme.navy : Theme.hairline)
                             .frame(height: 1)
                     }
 
                     VStack(alignment: .leading, spacing: 10) {
-                        Eyebrow("Категорија", color: Theme.muted)
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 8)], spacing: 8) {
+                        Eyebrow(L("Категорија", "Category"))
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 130), spacing: 8)], spacing: 8) {
                             ForEach(ItemCategory.allCases) { c in
                                 ChipButton(title: c.title, isSelected: category == c, expand: true) {
                                     category = c
@@ -751,24 +763,23 @@ struct AddItemSheet: View {
                     }
 
                     HStack {
-                        Text("Количина")
+                        Text(L("Количина", "Quantity"))
                             .font(.sans(15, .medium))
                             .foregroundStyle(Theme.ink)
                         Spacer()
                         HStack(spacing: 16) {
                             stepButton("minus") { quantity = max(1, quantity - 1) }
                             Text("\(quantity)")
-                                .font(.serif(22))
+                                .font(.codes(24))
                                 .foregroundStyle(Theme.ink)
                                 .frame(minWidth: 28)
-                                .monospacedDigit()
                             stepButton("plus") { quantity = min(30, quantity + 1) }
                         }
                     }
                     .luxCard(padding: 16)
 
                     Button(action: add) {
-                        Text("Додај во листата")
+                        Text(L("Додај во листата", "Add to list"))
                     }
                     .buttonStyle(PrimaryButtonStyle())
                     .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
@@ -788,11 +799,10 @@ struct AddItemSheet: View {
     private func stepButton(_ icon: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Theme.ink)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Theme.navy)
                 .frame(width: 34, height: 34)
-                .background(Circle().fill(Theme.ivory))
-                .overlay(Circle().strokeBorder(Theme.hairline, lineWidth: 0.75))
+                .overlay(Circle().strokeBorder(Theme.navy.opacity(0.25), lineWidth: 0.75))
         }
         .buttonStyle(PressableStyle())
     }

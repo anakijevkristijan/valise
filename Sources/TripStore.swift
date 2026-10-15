@@ -6,6 +6,7 @@ final class TripStore: ObservableObject {
     @Published private(set) var trips: [Trip] = []
 
     private let fileURL: URL
+    private var refreshing: Set<UUID> = []
 
     init() {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -50,25 +51,31 @@ final class TripStore: ObservableObject {
         save()
     }
 
-    // MARK: Освежување на прогнозата
+    // MARK: Прогноза — се освежува при секое отворање
 
-    func needsWeatherRefresh(_ trip: Trip) -> Bool {
-        guard !trip.isPast else { return false }
-        let inHorizon = trip.daysUntil <= WeatherService.forecastHorizonDays
-        if trip.weatherSource != .forecast { return inHorizon || trip.weather.isEmpty }
-        guard let updated = trip.weatherUpdatedAt else { return true }
-        return Date().timeIntervalSince(updated) > 6 * 3600
-    }
-
+    /// Освежи го времето за едно патување. Двојни повици во иста минута се прескокнуваат.
     @MainActor
-    func refreshWeather(_ id: UUID) async {
-        guard let current = self.trip(id) else { return }
+    func refreshWeather(_ id: UUID, force: Bool = false) async {
+        guard let current = self.trip(id), !current.isPast else { return }
+        if !force, let updated = current.weatherUpdatedAt, Date().timeIntervalSince(updated) < 60 { return }
+        guard !refreshing.contains(id) else { return }
+        refreshing.insert(id)
+        defer { refreshing.remove(id) }
+
         let result = await WeatherService.fetchWeather(for: current.destination, from: current.startDate, to: current.endDate)
         guard !result.days.isEmpty else { return }
         mutate(id) {
             $0.weather = result.days
             $0.weatherSource = result.source
             $0.weatherUpdatedAt = Date()
+        }
+    }
+
+    /// При отворање на апликацијата и враќање во неа.
+    @MainActor
+    func refreshAllUpcoming() async {
+        for trip in upcoming {
+            await refreshWeather(trip.id)
         }
     }
 
@@ -86,7 +93,7 @@ final class TripStore: ObservableObject {
             let data = try JSONEncoder().encode(trips)
             try data.write(to: fileURL, options: .atomic)
         } catch {
-            print("Valise: не успеав да зачувам — \(error)")
+            print("Valise: save failed — \(error)")
         }
     }
 }

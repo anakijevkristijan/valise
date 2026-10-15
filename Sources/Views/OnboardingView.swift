@@ -2,58 +2,54 @@ import SwiftUI
 
 struct OnboardingView: View {
     @AppStorage("userName") private var userName: String = ""
+    @AppStorage(AppLanguage.storageKey) private var language: String = AppLanguage.mk.rawValue
     @State private var name: String = ""
     @State private var appeared = false
     @FocusState private var focused: Bool
 
     var body: some View {
         ZStack {
-            LuxBackground()
+            PaperBackground()
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    Spacer(minLength: 56)
-
-                    // Монограм
-                    ZStack {
-                        Circle()
-                            .fill(Theme.surface)
-                            .frame(width: 84, height: 84)
-                            .shadow(color: Theme.gold.opacity(0.25), radius: 24, x: 0, y: 10)
-                        Circle()
-                            .strokeBorder(Theme.gold.opacity(0.6), lineWidth: 1)
-                            .frame(width: 84, height: 84)
-                        Image(systemName: "suitcase.rolling")
-                            .font(.system(size: 32, weight: .light))
-                            .foregroundStyle(Theme.goldDeep)
+                    HStack {
+                        Text("VALISE")
+                            .font(.sans(12, .semibold))
+                            .tracking(4)
+                            .foregroundStyle(Theme.navy)
+                        Spacer()
+                        LanguageToggle(language: $language)
                     }
-                    .padding(.bottom, 34)
+                    .padding(.top, 20)
+                    .padding(.bottom, 36)
 
-                    Eyebrow("Valise")
-                        .padding(.bottom, 14)
+                    sampleTicket
+                        .padding(.bottom, 36)
 
-                    Text("Пакувај паметно.\nПатувај лесно.")
-                        .font(.serif(40))
+                    Text(L("Пакувај паметно.\nПатувај лесно.", "Pack smart.\nTravel light."))
+                        .font(.serif(38))
                         .foregroundStyle(Theme.ink)
                         .lineSpacing(2)
-                        .padding(.bottom, 16)
+                        .padding(.bottom, 14)
 
-                    Text("Твој личен асистент што знае какво ќе е времето, колку собира торбата и што не смее да се заборави.")
+                    Text(L("Твој личен асистент што знае какво ќе е времето, колку собира торбата и што не смее да се заборави.",
+                           "Your personal assistant that knows the weather, how much your bag holds, and what you mustn't forget."))
                         .font(.sans(16))
                         .foregroundStyle(Theme.inkSoft)
                         .lineSpacing(4)
-                        .padding(.bottom, 36)
+                        .padding(.bottom, 30)
 
-                    VStack(alignment: .leading, spacing: 18) {
-                        feature("cloud.sun", "Листа според прогнозата", "Чадор само кога ќе треба, јакна само кога е студено.")
-                        feature("ruler", "Без казни на аеродром", "Точни мерки за рачен багаж кај авиокомпаниите.")
-                        feature("house", "Мирен излез од дома", "Шпорет, вода, прозорци — проверено пред да заклучиш.")
+                    VStack(alignment: .leading, spacing: 16) {
+                        feature("cloud.sun", L("Листа според прогнозата", "A list that follows the forecast"))
+                        feature("ruler", L("Без казни за багаж на аеродром", "No baggage fees at the gate"))
+                        feature("house", L("Мирен излез од дома", "Leave home with peace of mind"))
                     }
-                    .padding(.bottom, 40)
+                    .padding(.bottom, 36)
 
                     VStack(alignment: .leading, spacing: 10) {
-                        Eyebrow("Како да те викам?", color: Theme.muted)
-                        TextField("", text: $name, prompt: Text("Твоето име").foregroundColor(Theme.muted.opacity(0.7)))
+                        Eyebrow(L("Како да те викам?", "What should I call you?"))
+                        TextField("", text: $name, prompt: Text(L("Твоето име", "Your name")).foregroundColor(Theme.muted.opacity(0.7)))
                             .font(.serif(26))
                             .foregroundStyle(Theme.ink)
                             .textInputAutocapitalization(.words)
@@ -62,17 +58,17 @@ struct OnboardingView: View {
                             .focused($focused)
                             .onSubmit(start)
                         Rectangle()
-                            .fill(focused ? Theme.gold : Theme.hairline)
+                            .fill(focused ? Theme.navy : Theme.hairline)
                             .frame(height: 1)
                             .animation(.easeInOut, value: focused)
                     }
-                    .padding(.bottom, 30)
+                    .padding(.bottom, 28)
 
                     Button(action: start) {
                         HStack(spacing: 10) {
-                            Text("Започни")
+                            Text(L("Започни", "Begin"))
                             Image(systemName: "arrow.right")
-                                .font(.system(size: 14, weight: .semibold))
+                                .font(.system(size: 12, weight: .semibold))
                         }
                     }
                     .buttonStyle(PrimaryButtonStyle())
@@ -80,17 +76,62 @@ struct OnboardingView: View {
 
                     Spacer(minLength: 40)
                 }
-                .padding(.horizontal, 28)
+                .padding(.horizontal, 26)
                 .frame(maxWidth: 560)
                 .frame(maxWidth: .infinity)
                 .opacity(appeared ? 1 : 0)
-                .offset(y: appeared ? 0 : 18)
+                .offset(y: appeared ? 0 : 16)
             }
             .scrollDismissesKeyboard(.interactively)
         }
         .onAppear {
             withAnimation(.easeOut(duration: 0.9)) { appeared = true }
         }
+    }
+
+    private var sampleTicket: some View {
+        VStack(spacing: 0) {
+            HStack(alignment: .bottom) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("SKP").font(.codes(40))
+                    Text(L("Дома", "Home")).font(.sans(11, .medium)).opacity(0.7)
+                }
+                Spacer()
+                Image(systemName: "airplane")
+                    .font(.system(size: 15, weight: .light))
+                    .foregroundStyle(Theme.goldLight)
+                    .padding(.bottom, 26)
+                Spacer()
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text("???").font(.codes(40))
+                    Text(L("Следно", "Next")).font(.sans(11, .medium)).opacity(0.7)
+                }
+            }
+            .foregroundStyle(Theme.ticketText)
+            .padding(22)
+            .background(TicketHalf(side: .top).fill(Theme.navy))
+            .overlay(alignment: .bottom) {
+                DashedLine()
+                    .stroke(Theme.goldLight.opacity(0.45), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                    .frame(height: 1)
+                    .padding(.horizontal, 16)
+            }
+
+            HStack {
+                Text(L("ПРВА КЛАСА", "FIRST CLASS"))
+                    .font(.sans(10, .semibold))
+                    .tracking(2.4)
+                    .foregroundStyle(Theme.goldLight)
+                Spacer()
+                BarcodeView(seed: "valise-onboarding")
+                    .frame(width: 120, height: 26)
+            }
+            .padding(.horizontal, 22)
+            .padding(.vertical, 18)
+            .background(TicketHalf(side: .bottom).fill(Theme.navy))
+        }
+        .compositingGroup()
+        .shadow(color: Theme.navy.opacity(0.2), radius: 20, x: 0, y: 12)
     }
 
     private var trimmed: String {
@@ -103,22 +144,40 @@ struct OnboardingView: View {
         userName = trimmed
     }
 
-    private func feature(_ icon: String, _ title: String, _ text: String) -> some View {
-        HStack(alignment: .top, spacing: 16) {
+    private func feature(_ icon: String, _ title: String) -> some View {
+        HStack(spacing: 14) {
             Image(systemName: icon)
-                .font(.system(size: 16, weight: .regular))
-                .foregroundStyle(Theme.goldDeep)
-                .frame(width: 40, height: 40)
-                .background(Circle().fill(Theme.goldLight.opacity(0.6)))
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(.sans(15, .semibold))
-                    .foregroundStyle(Theme.ink)
-                Text(text)
-                    .font(.sans(14))
-                    .foregroundStyle(Theme.inkSoft)
-                    .fixedSize(horizontal: false, vertical: true)
+                .font(.system(size: 14, weight: .light))
+                .foregroundStyle(Theme.gold)
+                .frame(width: 22)
+            Text(title)
+                .font(.sans(15))
+                .foregroundStyle(Theme.ink)
+        }
+    }
+}
+
+/// MK | EN прекинувач.
+struct LanguageToggle: View {
+    @Binding var language: String
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(AppLanguage.allCases) { lang in
+                Button {
+                    language = lang.rawValue
+                } label: {
+                    Text(lang.shortName)
+                        .font(.sans(11, .semibold))
+                        .tracking(1.4)
+                        .foregroundStyle(language == lang.rawValue ? Theme.goldLight : Theme.navy)
+                        .frame(width: 40, height: 28)
+                        .background(Capsule().fill(language == lang.rawValue ? Theme.navy : Color.clear))
+                }
+                .buttonStyle(.plain)
             }
         }
+        .padding(3)
+        .overlay(Capsule().strokeBorder(Theme.navy.opacity(0.25), lineWidth: 0.75))
     }
 }

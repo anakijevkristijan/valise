@@ -4,26 +4,25 @@ struct SettingsView: View {
     @EnvironmentObject private var store: TripStore
     @Environment(\.dismiss) private var dismiss
     @AppStorage("userName") private var userName: String = ""
+    @AppStorage(AppLanguage.storageKey) private var language: String = AppLanguage.mk.rawValue
 
     @State private var draftName = ""
     @State private var confirmReset = false
 
     var body: some View {
         ZStack {
-            Theme.ivory.ignoresSafeArea()
+            PaperBackground()
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 26) {
+                VStack(alignment: .leading, spacing: 28) {
                     HStack {
-                        Eyebrow("Профил")
+                        Eyebrow(L("Профил", "Profile"), color: Theme.gold)
                         Spacer()
                         CircleIconButton(systemName: "xmark") { save(); dismiss() }
                     }
 
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("Твоето име")
-                            .font(.sans(13, .medium))
-                            .foregroundStyle(Theme.muted)
+                        Eyebrow(L("Твоето име", "Your name"))
                         TextField("", text: $draftName)
                             .font(.serif(26))
                             .foregroundStyle(Theme.ink)
@@ -34,18 +33,33 @@ struct SettingsView: View {
                         Hairline()
                     }
 
+                    VStack(alignment: .leading, spacing: 12) {
+                        Eyebrow(L("Јазик", "Language"))
+                        HStack(spacing: 8) {
+                            ForEach(AppLanguage.allCases) { lang in
+                                ChipButton(title: lang.nativeName, isSelected: language == lang.rawValue, expand: true) {
+                                    save()
+                                    language = lang.rawValue
+                                }
+                            }
+                        }
+                    }
+
                     VStack(alignment: .leading, spacing: 14) {
-                        infoRow("suitcase", "Патувања", "\(store.trips.count)")
+                        infoRow("suitcase", L("Патувања", "Trips"), "\(store.trips.count)")
                         Hairline()
-                        infoRow("airplane", "Авиокомпании во базата", "\(Airlines.all.count - 1)")
+                        infoRow("airplane", L("Авиокомпании во базата", "Airlines in the database"), "\(Airlines.all.count - 1)")
                         Hairline()
-                        infoRow("clock", "Мерки за багаж ажурирани", Airlines.dataUpdated)
+                        infoRow("clock", L("Мерки за багаж", "Baggage sizes"), Airlines.dataUpdated)
                         Hairline()
-                        infoRow("cloud.sun", "Временска прогноза", "Open-Meteo")
+                        infoRow("cloud.sun", L("Прогноза", "Forecast"), "Open-Meteo")
+                        Hairline()
+                        infoRow("photo", L("Фотографии", "Photos"), "Wikimedia")
                     }
                     .luxCard(padding: 20)
 
-                    Text("Мерките за багаж се информативни. Авиокомпаниите ги менуваат често — пред лет секогаш провери на нивниот сајт.")
+                    Text(L("Мерките за багаж се информативни. Авиокомпаниите ги менуваат често — пред лет секогаш провери на нивниот сајт.",
+                           "Baggage sizes are a guide. Airlines change them often — always check their website before you fly."))
                         .font(.sans(13))
                         .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
@@ -53,14 +67,15 @@ struct SettingsView: View {
                     Button(role: .destructive) {
                         confirmReset = true
                     } label: {
-                        Text("Избриши ги сите патувања")
+                        Text(L("Избриши ги сите патувања", "Delete all trips"))
                             .foregroundStyle(Theme.terracotta)
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(SecondaryButtonStyle())
 
-                    Text("Valise 1.0")
-                        .font(.serif(14))
+                    Text("VALISE 1.1")
+                        .font(.sans(10, .semibold))
+                        .tracking(3)
                         .foregroundStyle(Theme.muted)
                         .frame(maxWidth: .infinity)
                 }
@@ -69,10 +84,10 @@ struct SettingsView: View {
         }
         .onAppear { draftName = userName }
         .onDisappear(perform: save)
-        .confirmationDialog("Да се избришат сите патувања?", isPresented: $confirmReset, titleVisibility: .visible) {
-            Button("Избриши сè", role: .destructive) { store.deleteAll() }
+        .confirmationDialog(L("Да се избришат сите патувања?", "Delete all trips?"), isPresented: $confirmReset, titleVisibility: .visible) {
+            Button(L("Избриши сè", "Delete everything"), role: .destructive) { store.deleteAll() }
         }
-        .presentationCornerRadius(30)
+        .presentationCornerRadius(28)
     }
 
     private func save() {
@@ -83,15 +98,15 @@ struct SettingsView: View {
     private func infoRow(_ icon: String, _ title: String, _ value: String) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 14))
-                .foregroundStyle(Theme.goldDeep)
-                .frame(width: 24)
+                .font(.system(size: 13, weight: .light))
+                .foregroundStyle(Theme.gold)
+                .frame(width: 22)
             Text(title)
                 .font(.sans(15))
                 .foregroundStyle(Theme.ink)
             Spacer()
             Text(value)
-                .font(.serif(16))
+                .font(.serif(15))
                 .foregroundStyle(Theme.inkSoft)
         }
     }

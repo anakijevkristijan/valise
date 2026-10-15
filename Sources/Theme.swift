@@ -1,6 +1,6 @@
 import SwiftUI
 
-// MARK: - Палета
+// MARK: - Палета: хартија, морнарско, шампањ злато
 
 extension Color {
     init(hex: UInt32, opacity: Double = 1) {
@@ -12,44 +12,62 @@ extension Color {
 }
 
 enum Theme {
-    // Основа — слонова коска и топол песок
-    static let ivory = Color(hex: 0xF7F2EA)
-    static let surface = Color(hex: 0xFFFCF7)
-    static let sand = Color(hex: 0xEFE6D8)
-    static let hairline = Color(hex: 0xE6DCCD)
+    // Основа
+    static let paper = Color(hex: 0xF6F3EC)
+    static let surface = Color(hex: 0xFFFFFF)
+    static let stone = Color(hex: 0xEEE9DF)
+    static let hairline = Color(hex: 0xE3DCCF)
 
-    // Текст — еспресо тонови
-    static let ink = Color(hex: 0x1F1A15)
-    static let inkSoft = Color(hex: 0x5C5248)
-    static let muted = Color(hex: 0x9C9184)
+    // Текст
+    static let ink = Color(hex: 0x131B2B)
+    static let inkSoft = Color(hex: 0x4F5666)
+    static let muted = Color(hex: 0x958D7F)
 
-    // Акцент — шампањ злато
-    static let gold = Color(hex: 0xB08D57)
-    static let goldDeep = Color(hex: 0x8A6A3B)
-    static let goldLight = Color(hex: 0xEADFC9)
+    // Карта
+    static let navy = Color(hex: 0x13213A)
+    static let ticketText = Color(hex: 0xF4EDDF)
+    static let gold = Color(hex: 0xA9874F)        // злато врз светло
+    static let goldLight = Color(hex: 0xD8BE86)   // злато врз темно
+    static let goldPale = Color(hex: 0xEFE6D2)
 
     // Сигнали
-    static let sage = Color(hex: 0x7D8C6E)
-    static let terracotta = Color(hex: 0xB5654A)
+    static let sage = Color(hex: 0x6C8770)
+    static let terracotta = Color(hex: 0xAE5A40)
+    static let rain = Color(hex: 0x5B7891)
 
-    // Нежни тонови за картичките на патувањата
-    static let tints: [Color] = [
-        Color(hex: 0xEADFC9), // шампањ
-        Color(hex: 0xEED9D0), // пудра
-        Color(hex: 0xDCE2D3), // жалфија
-        Color(hex: 0xD9E1E6), // магла
-        Color(hex: 0xE7DEEA)  // лаванда
+    /// Бои на картите: морнарско, смарагд, бордо, графит.
+    static let ticketColors: [Color] = [
+        Color(hex: 0x13213A),
+        Color(hex: 0x173A31),
+        Color(hex: 0x4A1A25),
+        Color(hex: 0x25272D)
     ]
 
-    static func tint(_ index: Int) -> Color {
-        tints[abs(index) % tints.count]
+    static func ticket(_ index: Int) -> Color {
+        ticketColors[abs(index) % ticketColors.count]
     }
+
+    static let metallic = LinearGradient(
+        colors: [Color(hex: 0xB8914F), Color(hex: 0xEAD6A4), Color(hex: 0xB8914F)],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+
+    // Стари имиња (компатибилност)
+    static var ivory: Color { paper }
+    static var sand: Color { stone }
+    static var goldDeep: Color { gold }
 }
 
 extension Font {
-    /// Серифен фонт (New York) за наслови — дава луксузен, уреднички тон.
+    /// Наслови и зборови — New York (поддржува кирилица).
     static func serif(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
         .system(size: size, weight: weight, design: .serif)
+    }
+
+    /// Кодови и бројки на картата — Didot (само латиница и бројки).
+    static func codes(_ size: CGFloat) -> Font {
+        .custom("Didot", size: size)
     }
 
     static func sans(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
@@ -59,24 +77,9 @@ extension Font {
 
 // MARK: - Позадина
 
-struct LuxBackground: View {
+struct PaperBackground: View {
     var body: some View {
-        ZStack {
-            Theme.ivory
-            RadialGradient(
-                colors: [Theme.goldLight.opacity(0.65), Theme.ivory.opacity(0)],
-                center: .topTrailing,
-                startRadius: 10,
-                endRadius: 460
-            )
-            RadialGradient(
-                colors: [Color(hex: 0xEED9D0).opacity(0.4), Theme.ivory.opacity(0)],
-                center: .bottomLeading,
-                startRadius: 10,
-                endRadius: 420
-            )
-        }
-        .ignoresSafeArea()
+        Theme.paper.ignoresSafeArea()
     }
 }
 
@@ -94,7 +97,7 @@ struct LuxCard: ViewModifier {
             .background(
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
                     .fill(fill)
-                    .shadow(color: Theme.ink.opacity(0.05), radius: 22, x: 0, y: 12)
+                    .shadow(color: Theme.navy.opacity(0.04), radius: 14, x: 0, y: 6)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
@@ -104,18 +107,18 @@ struct LuxCard: ViewModifier {
 }
 
 extension View {
-    func luxCard(padding: CGFloat = 20, fill: Color = Theme.surface, radius: CGFloat = 24) -> some View {
+    func luxCard(padding: CGFloat = 20, fill: Color = Theme.surface, radius: CGFloat = 18) -> some View {
         modifier(LuxCard(padding: padding, fill: fill, radius: radius))
     }
 }
 
-// MARK: - Типографски елементи
+// MARK: - Типографија
 
 struct Eyebrow: View {
     let text: String
     var color: Color
 
-    init(_ text: String, color: Color = Theme.gold) {
+    init(_ text: String, color: Color = Theme.muted) {
         self.text = text
         self.color = color
     }
@@ -123,15 +126,17 @@ struct Eyebrow: View {
     var body: some View {
         Text(text.uppercased())
             .font(.sans(11, .semibold))
-            .tracking(1.8)
+            .tracking(2.2)
             .foregroundStyle(color)
     }
 }
 
 struct Hairline: View {
+    var color: Color = Theme.hairline
+
     var body: some View {
         Rectangle()
-            .fill(Theme.hairline)
+            .fill(color)
             .frame(height: 0.75)
     }
 }
@@ -149,14 +154,16 @@ struct PrimaryButtonStyle: ButtonStyle {
 
         var body: some View {
             configuration.label
-                .font(.sans(16, .semibold))
-                .foregroundStyle(Theme.ivory)
+                .font(.sans(13, .semibold))
+                .tracking(1.8)
+                .textCase(.uppercase)
+                .foregroundStyle(isEnabled ? Theme.goldLight : Theme.ticketText.opacity(0.8))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 18)
                 .background(
-                    Capsule().fill(isEnabled ? Theme.ink : Theme.muted.opacity(0.45))
+                    Capsule().fill(isEnabled ? Theme.navy : Theme.muted.opacity(0.45))
                 )
-                .shadow(color: Theme.ink.opacity(isEnabled ? 0.18 : 0), radius: 16, x: 0, y: 8)
+                .shadow(color: Theme.navy.opacity(isEnabled ? 0.18 : 0), radius: 14, x: 0, y: 8)
                 .scaleEffect(configuration.isPressed ? 0.98 : 1)
                 .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
         }
@@ -166,18 +173,19 @@ struct PrimaryButtonStyle: ButtonStyle {
 struct SecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.sans(15, .medium))
-            .foregroundStyle(Theme.ink)
-            .padding(.vertical, 13)
+            .font(.sans(12, .semibold))
+            .tracking(1.4)
+            .textCase(.uppercase)
+            .foregroundStyle(Theme.navy)
+            .padding(.vertical, 14)
             .padding(.horizontal, 20)
             .background(Capsule().fill(Theme.surface))
-            .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 1))
+            .overlay(Capsule().strokeBorder(Theme.navy.opacity(0.25), lineWidth: 0.75))
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
     }
 }
 
-/// Нежно „притискање“ за картички.
 struct PressableStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -204,12 +212,11 @@ struct CircleIcon: View {
 
     var body: some View {
         Image(systemName: systemName)
-            .font(.system(size: 15, weight: .medium))
-            .foregroundStyle(Theme.ink)
+            .font(.system(size: 15, weight: .regular))
+            .foregroundStyle(Theme.navy)
             .frame(width: 42, height: 42)
-            .background(Circle().fill(Theme.surface.opacity(0.92)))
+            .background(Circle().fill(Theme.surface))
             .overlay(Circle().strokeBorder(Theme.hairline, lineWidth: 0.75))
-            .shadow(color: Theme.ink.opacity(0.06), radius: 10, x: 0, y: 4)
     }
 }
 
@@ -218,22 +225,22 @@ struct CircleIcon: View {
 struct ProgressRing: View {
     var progress: Double
     var size: CGFloat = 56
-    var lineWidth: CGFloat = 3.5
-    var showLabel: Bool = true
+    var lineWidth: CGFloat = 2.5
+    var track: Color = Theme.navy.opacity(0.08)
+    var tint: Color = Theme.gold
+    var labelColor: Color = Theme.ink
 
     var body: some View {
         ZStack {
             Circle()
-                .stroke(Theme.ink.opacity(0.08), lineWidth: lineWidth)
+                .stroke(track, lineWidth: lineWidth)
             Circle()
                 .trim(from: 0, to: max(0.001, min(progress, 1)))
-                .stroke(Theme.gold, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                .stroke(tint, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-            if showLabel {
-                Text("\(Int((progress * 100).rounded()))%")
-                    .font(.serif(size * 0.27, .medium))
-                    .foregroundStyle(Theme.ink)
-            }
+            Text("\(Int((progress * 100).rounded()))%")
+                .font(.codes(size * 0.3))
+                .foregroundStyle(labelColor)
         }
         .frame(width: size, height: size)
         .animation(.easeInOut(duration: 0.4), value: progress)
@@ -242,13 +249,13 @@ struct ProgressRing: View {
 
 struct GaugeBar: View {
     var ratio: Double
-    var color: Color = Theme.gold
-    var height: CGFloat = 7
+    var color: Color = Theme.navy
+    var height: CGFloat = 3
 
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
-                Capsule().fill(Theme.ink.opacity(0.07))
+                Capsule().fill(Theme.navy.opacity(0.08))
                 Capsule()
                     .fill(color)
                     .frame(width: max(height, geo.size.width * min(max(ratio, 0), 1)))
@@ -263,48 +270,51 @@ struct GaugeBar: View {
 struct Pill: View {
     let text: String
     var icon: String?
-    var fill: Color = Theme.surface.opacity(0.85)
-    var foreground: Color = Theme.ink
+    var foreground: Color = Theme.navy
+    var stroke: Color = Theme.navy.opacity(0.2)
 
     var body: some View {
         HStack(spacing: 5) {
             if let icon {
                 Image(systemName: icon)
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 10, weight: .semibold))
             }
-            Text(text)
-                .font(.sans(12, .semibold))
+            Text(text.uppercased())
+                .font(.sans(10, .semibold))
+                .tracking(1.4)
         }
         .foregroundStyle(foreground)
-        .padding(.horizontal, 11)
+        .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(Capsule().fill(fill))
-        .overlay(Capsule().strokeBorder(Theme.hairline.opacity(0.8), lineWidth: 0.5))
+        .overlay(Capsule().strokeBorder(stroke, lineWidth: 0.75))
     }
 }
 
-// MARK: - Форматирање
+// MARK: - Форматирање (според јазикот)
 
 enum Fmt {
-    static let mk = Locale(identifier: "mk_MK")
+    private static var cache: [String: DateFormatter] = [:]
 
     private static func formatter(_ format: String) -> DateFormatter {
+        let language = AppLanguage.current
+        let key = language.rawValue + "|" + format
+        if let cached = cache[key] { return cached }
         let f = DateFormatter()
-        f.locale = mk
+        f.locale = language.locale
         f.dateFormat = format
+        cache[key] = f
         return f
     }
 
-    private static let dayF = formatter("d")
-    private static let dayMonthF = formatter("d MMMM")
-    private static let dayMonthShortF = formatter("d MMM")
-    private static let weekdayShortF = formatter("EEE")
-    private static let weekdayLongF = formatter("EEEE, d MMMM")
+    static func day(_ d: Date) -> String { formatter("d").string(from: d) }
+    static func dayMonth(_ d: Date) -> String { formatter("d MMMM").string(from: d) }
+    static func weekdayShort(_ d: Date) -> String {
+        formatter("EEE").string(from: d).replacingOccurrences(of: ".", with: "")
+    }
+    static func weekdayLong(_ d: Date) -> String { formatter("EEEE, d MMMM").string(from: d) }
 
-    static func day(_ d: Date) -> String { dayF.string(from: d) }
-    static func dayMonth(_ d: Date) -> String { dayMonthF.string(from: d) }
-    static func weekdayShort(_ d: Date) -> String { weekdayShortF.string(from: d) }
-    static func weekdayLong(_ d: Date) -> String { weekdayLongF.string(from: d) }
+    /// 29.10 — за картата (само бројки, без кирилица во Didot).
+    static func ticketDate(_ d: Date) -> String { formatter("dd.MM").string(from: d) }
 
     static func range(_ a: Date, _ b: Date) -> String {
         let cal = Calendar.current
@@ -312,7 +322,7 @@ enum Fmt {
         if cal.component(.month, from: a) == cal.component(.month, from: b) {
             return "\(day(a)) – \(dayMonth(b))"
         }
-        return "\(dayMonthShortF.string(from: a)) – \(dayMonthShortF.string(from: b))"
+        return "\(dayMonth(a)) – \(dayMonth(b))"
     }
 
     static func number(_ d: Double) -> String {
@@ -321,11 +331,13 @@ enum Fmt {
     }
 
     static func days(_ n: Int) -> String {
-        n == 1 ? "1 ден" : "\(n) дена"
+        if AppLanguage.current == .mk { return n == 1 ? "1 ден" : "\(n) дена" }
+        return n == 1 ? "1 day" : "\(n) days"
     }
 
     static func nights(_ n: Int) -> String {
-        n == 1 ? "1 ноќ" : "\(n) ноќи"
+        if AppLanguage.current == .mk { return n == 1 ? "1 ноќ" : "\(n) ноќи" }
+        return n == 1 ? "1 night" : "\(n) nights"
     }
 }
 

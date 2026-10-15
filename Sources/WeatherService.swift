@@ -1,12 +1,13 @@
 import Foundation
 
-/// Open-Meteo: бесплатно, без API клуч.
-/// • Пребарување места (на македонски кога има превод)
-/// • Прогноза до 16 дена однапред
-/// • За подалечни датуми — реално време од истите датуми лани како проценка
+/// Open-Meteo (open-meteo.com) — бесплатно, без API клуч.
+/// • Пребарување места: GeoNames преку Open-Meteo Geocoding
+/// • Прогноза: модели на националните служби (ECMWF, DWD, NOAA…), до 16 дена
+/// • Денови подалеку од прогнозата: истите датуми лани од архивата ERA5 (Copernicus/ECMWF)
 enum WeatherService {
 
     static let forecastHorizonDays = 15
+    static let maxTripDays = 30
 
     // MARK: Пребарување места
 
@@ -35,7 +36,7 @@ enum WeatherService {
         components.queryItems = [
             URLQueryItem(name: "name", value: query),
             URLQueryItem(name: "count", value: "8"),
-            URLQueryItem(name: "language", value: "mk"),
+            URLQueryItem(name: "language", value: AppLanguage.current.rawValue),
             URLQueryItem(name: "format", value: "json")
         ]
         guard let url = components.url else { return [] }
@@ -53,7 +54,7 @@ enum WeatherService {
         }
     }
 
-    // MARK: Време
+    // MARK: Време за целото патување
 
     private struct DailyResponse: Decodable {
         struct Daily: Decodable {
@@ -85,40 +86,66 @@ enum WeatherService {
         return f
     }()
 
+    /// Секој ден од патувањето: прогноза каде што ја има, инаку истиот ден лани (означен).
     static func fetchWeather(for place: Place, from start: Date, to end: Date) async -> (days: [WeatherDay], source: WeatherSource) {
         let today = Date().startOfDay
         let horizon = today.adding(days: forecastHorizonDays)
         let tripStart = start.startOfDay
-        let tripEnd = end.startOfDay
+        let tripEnd = min(end.startOfDay, tripStart.adding(days: maxTripDays - 1))
 
-        if tripEnd < today {
-            return ([], .none)
-        }
+        if tripEnd < today { return ([], .none) }
+        let from = max(tripStart, today)
 
-        if tripStart <= horizon {
-            // Реална прогноза за деновите што се во дометот
-            let from = max(tripStart, today)
+        // 1) Прогноза за деновите во дометот
+        var forecast: [WeatherDay] = []
+        if from <= horizon {
             let to = min(tripEnd, horizon)
-            if let days = try? await fetchDaily(base: "https://api.open-meteo.com/v1/forecast",
-                                                place: place, from: from, to: to,
-                                                includeProbability: true, shiftYears: 0),
-               !days.isEmpty {
-                return (days, .forecast)
-            }
-        } else {
-            // Предалеку за прогноза → истите датуми лани како проценка
-            let cappedEnd = min(tripEnd, tripStart.adding(days: forecastHorizonDays))
+            forecast = (try? await fetchDaily(base: "https://api.open-meteo.com/v1/forecast",
+                                              place: place, from: from, to: to,
+                                              includeProbability: true, shiftYears: 0)) ?? []
+        }
+
+        // 2) Денови без прогноза
+        let covered = Set(forecast.map(\.date))
+        var missing: [Date] = []
+        var cursor = from
+        while cursor <= tripEnd {
+            if !covered.contains(cursor) { missing.append(cursor) }
+            cursor = cursor.adding(days: 1)
+        }
+
+        // 3) Истите датуми лани
+        var estimates: [WeatherDay] = []
+        if let first = missing.first, let last = missing.last {
             let cal = Calendar.current
-            if let lyStart = cal.date(byAdding: .year, value: -1, to: tripStart),
-               let lyEnd = cal.date(byAdding: .year, value: -1, to: cappedEnd),
-               let days = try? await fetchDaily(base: "https://archive-api.open-meteo.com/v1/archive",
-                                                place: place, from: lyStart, to: lyEnd,
-                                                includeProbability: false, shiftYears: 1),
-               !days.isEmpty {
-                return (days, .lastYear)
+            if let lyStart = cal.date(byAdding: .year, value: -1, to: first),
+               let lyEnd = cal.date(byAdding: .year, value: -1, to: last) {
+                let archive = (try? await fetchDaily(base: "https://archive-api.open-meteo.com/v1/archive",
+                                                     place: place, from: lyStart, to: lyEnd,
+                                                     includeProbability: false, shiftYears: 1)) ?? []
+                let wanted = Set(missing)
+                estimates = archive
+                    .filter { wanted.contains($0.date) }
+                    .map { day in
+                        var copy = day
+                        copy.fromLastYear = true
+                        return copy
+                    }
             }
         }
-        return ([], .none)
+
+        let all = (forecast + estimates).sorted { $0.date < $1.date }
+        let source: WeatherSource
+        if all.isEmpty {
+            source = .none
+        } else if estimates.isEmpty {
+            source = .forecast
+        } else if forecast.isEmpty {
+            source = .lastYear
+        } else {
+            source = .mixed
+        }
+        return (all, source)
     }
 
     private static func fetchDaily(base: String,
@@ -141,7 +168,10 @@ enum WeatherService {
         ]
         guard let url = components.url else { return [] }
 
-        let (data, _) = try await URLSession.shared.data(from: url)
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 15
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        let (data, _) = try await URLSession.shared.data(for: request)
         let response = try JSONDecoder().decode(DailyResponse.self, from: data)
         guard let d = response.daily else { return [] }
 
@@ -151,14 +181,13 @@ enum WeatherService {
             guard let parsed = dayFormatter.date(from: dateString),
                   let maxT = value(d.tMax, i),
                   let minT = value(d.tMin, i) else { continue }
-            let date = shiftYears == 0 ? parsed : (cal.date(byAdding: .year, value: shiftYears, to: parsed) ?? parsed)
+            let shifted = shiftYears == 0 ? parsed : (cal.date(byAdding: .year, value: shiftYears, to: parsed) ?? parsed)
             let precipitation = value(d.precipitation, i)
             var chance = value(d.rainProbability, i).map { Int($0.rounded()) }
             if chance == nil, let precipitation {
-                // Архивата нема веројатност — грубо ја изведуваме од врнежите
                 chance = precipitation >= 1 ? 70 : (precipitation > 0.2 ? 30 : 5)
             }
-            result.append(WeatherDay(date: date.startOfDay,
+            result.append(WeatherDay(date: shifted.startOfDay,
                                      maxTemp: maxT,
                                      minTemp: minT,
                                      rainChance: chance,
