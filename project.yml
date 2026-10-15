@@ -22,8 +22,8 @@ targets:
       base:
         PRODUCT_NAME: Valise
         PRODUCT_BUNDLE_IDENTIFIER: com.valise.packing
-        MARKETING_VERSION: "1.1"
-        CURRENT_PROJECT_VERSION: "2"
+        MARKETING_VERSION: "1.2"
+        CURRENT_PROJECT_VERSION: "3"
         TARGETED_DEVICE_FAMILY: "1,2"
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: Valise

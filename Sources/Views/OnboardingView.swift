@@ -118,9 +118,9 @@ struct OnboardingView: View {
             }
 
             HStack {
-                Text(L("ПРВА КЛАСА", "FIRST CLASS"))
+                Text("VALISE")
                     .font(.sans(10, .semibold))
-                    .tracking(2.4)
+                    .tracking(3.2)
                     .foregroundStyle(Theme.goldLight)
                 Spacer()
                 BarcodeView(seed: "valise-onboarding")
@@ -179,5 +179,88 @@ struct LanguageToggle: View {
         }
         .padding(3)
         .overlay(Capsule().strokeBorder(Theme.navy.opacity(0.25), lineWidth: 0.75))
+    }
+}
+
+/// Прв екран: избор на јазик пред сè друго.
+struct LanguagePickerView: View {
+    @AppStorage(AppLanguage.storageKey) private var language: String = AppLanguage.mk.rawValue
+    @AppStorage("languageChosen") private var languageChosen: Bool = false
+    @State private var appeared = false
+
+    var body: some View {
+        ZStack {
+            PaperBackground()
+
+            VStack(alignment: .leading, spacing: 0) {
+                Text("VALISE")
+                    .font(.sans(12, .semibold))
+                    .tracking(4)
+                    .foregroundStyle(Theme.navy)
+                    .padding(.top, 20)
+
+                Spacer()
+
+                Text("Добредојде.")
+                    .font(.serif(40))
+                    .foregroundStyle(Theme.ink)
+                Text("Welcome.")
+                    .font(.serif(40))
+                    .foregroundStyle(Theme.muted)
+                    .padding(.bottom, 14)
+
+                Text("Избери јазик · Choose your language")
+                    .font(.sans(14))
+                    .foregroundStyle(Theme.inkSoft)
+                    .padding(.bottom, 30)
+
+                VStack(spacing: 12) {
+                    option(.mk, code: "MK", subtitle: "Северна Македонија")
+                    option(.en, code: "EN", subtitle: "International")
+                }
+
+                Spacer()
+                Spacer()
+            }
+            .padding(.horizontal, 26)
+            .frame(maxWidth: 560)
+            .frame(maxWidth: .infinity)
+            .opacity(appeared ? 1 : 0)
+            .offset(y: appeared ? 0 : 16)
+        }
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.9)) { appeared = true }
+        }
+    }
+
+    private func option(_ lang: AppLanguage, code: String, subtitle: String) -> some View {
+        Button {
+            language = lang.rawValue
+            languageChosen = true
+        } label: {
+            HStack(spacing: 18) {
+                Text(code)
+                    .font(.codes(30))
+                    .foregroundStyle(Theme.goldLight)
+                    .frame(width: 64, height: 64)
+                    .background(Circle().fill(Theme.navy))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(lang.nativeName)
+                        .font(.serif(24))
+                        .foregroundStyle(Theme.ink)
+                    Text(subtitle.uppercased())
+                        .font(.sans(10, .semibold))
+                        .tracking(1.8)
+                        .foregroundStyle(Theme.muted)
+                }
+                Spacer()
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 14, weight: .light))
+                    .foregroundStyle(Theme.navy)
+            }
+            .padding(16)
+            .luxCard(padding: 0, radius: 20)
+        }
+        .buttonStyle(PressableStyle())
     }
 }

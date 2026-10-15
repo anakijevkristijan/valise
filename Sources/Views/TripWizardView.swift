@@ -16,6 +16,7 @@ struct TripDraft {
     var activities: Set<Activity> = [.walking]
     var style: TravelerStyle = .neutral
     var hasLaundry = false
+    var companions: [Companion] = []
 
     var bagOptions: [BagSpec] {
         if transport == .plane {
@@ -50,6 +51,8 @@ struct TripWizardView: View {
     @State private var weatherSource: WeatherSource = .none
     @State private var isLoadingWeather = false
     @State private var weatherKey = ""
+    @State private var companionName = ""
+    @FocusState private var companionFocused: Bool
 
     private let stepCount = 5
 
@@ -161,8 +164,8 @@ struct TripWizardView: View {
         switch step {
         case 0: return L("Ќе го проверам времето на дестинацијата и дали ти треба адаптер за струја.",
                          "I'll check the weather at your destination and whether you need a plug adapter.")
-        case 1: return L("Од бројот на денови зависи колку облека ти треба.",
-                         "The number of days decides how much clothing you need.")
+        case 1: return L("Допри го денот на поаѓање, па денот на враќање.",
+                         "Tap your departure day, then your return day.")
         case 2: return L("Ги знам мерките за рачен багаж — за да не платиш казна на излезот.",
                          "I know the hand-luggage sizes, so you won't pay a fee at the gate.")
         case 3: return L("Избери сè што важи. Листата се прилагодува на твојот план.",
@@ -203,15 +206,7 @@ struct TripWizardView: View {
     // Чекор 2
     private var datesStep: some View {
         VStack(alignment: .leading, spacing: 18) {
-            VStack(spacing: 0) {
-                dateRow(label: L("Поаѓање", "Departure"), icon: "airplane.departure", selection: $draft.startDate, from: Date().startOfDay)
-                Hairline().padding(.horizontal, 18)
-                dateRow(label: L("Враќање", "Return"), icon: "airplane.arrival", selection: $draft.endDate, from: draft.startDate)
-            }
-            .luxCard(padding: 0)
-            .onChange(of: draft.startDate) { _, newValue in
-                if draft.endDate < newValue { draft.endDate = newValue }
-            }
+            DateRangeCalendar(start: $draft.startDate, end: $draft.endDate)
 
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 Text("\(draft.dayCount)")
@@ -248,24 +243,6 @@ struct TripWizardView: View {
     private var dayWord: String {
         if AppLanguage.current == .mk { return draft.dayCount == 1 ? "ден" : "дена" }
         return draft.dayCount == 1 ? "day" : "days"
-    }
-
-    private func dateRow(label: String, icon: String, selection: Binding<Date>, from: Date) -> some View {
-        HStack(spacing: 14) {
-            Image(systemName: icon)
-                .font(.system(size: 14, weight: .light))
-                .foregroundStyle(Theme.gold)
-                .frame(width: 24)
-            Text(label)
-                .font(.sans(15, .medium))
-                .foregroundStyle(Theme.ink)
-            Spacer()
-            DatePicker("", selection: selection, in: from..., displayedComponents: .date)
-                .labelsHidden()
-                .tint(Theme.navy)
-        }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 14)
     }
 
     // Чекор 3
@@ -422,6 +399,8 @@ struct TripWizardView: View {
                 }
             }
 
+            companionsEditor
+
             VStack(alignment: .leading, spacing: 12) {
                 Eyebrow(L("За кого пакуваме", "Who are we packing for"))
                 HStack(spacing: 8) {
@@ -433,6 +412,73 @@ struct TripWizardView: View {
                 }
             }
         }
+    }
+
+    private var companionsEditor: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Eyebrow(L("Со кого патуваш", "Who's coming along"))
+            HStack(spacing: 10) {
+                TextField("", text: $companionName, prompt: Text(L("Име на пријател", "Friend's name")).foregroundColor(Theme.muted.opacity(0.75)))
+                    .font(.serif(18))
+                    .foregroundStyle(Theme.ink)
+                    .textInputAutocapitalization(.words)
+                    .autocorrectionDisabled()
+                    .submitLabel(.done)
+                    .focused($companionFocused)
+                    .onSubmit(addCompanion)
+                Button(action: addCompanion) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.goldLight)
+                        .frame(width: 34, height: 34)
+                        .background(Circle().fill(Theme.navy))
+                }
+                .buttonStyle(PressableStyle())
+                .disabled(companionName.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+            .padding(.leading, 16)
+            .padding(.trailing, 8)
+            .padding(.vertical, 8)
+            .luxCard(padding: 0, radius: 14)
+
+            if !draft.companions.isEmpty {
+                ScrollView(.horizontal) {
+                    HStack(spacing: 8) {
+                        ForEach(draft.companions) { companion in
+                            Button {
+                                withAnimation { draft.companions.removeAll { $0.id == companion.id } }
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Text(companion.name)
+                                        .font(.sans(13, .medium))
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 9, weight: .bold))
+                                }
+                                .foregroundStyle(Theme.goldLight)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 9)
+                                .background(Capsule().fill(Theme.navy))
+                            }
+                            .buttonStyle(PressableStyle())
+                        }
+                    }
+                }
+                .scrollIndicators(.hidden)
+            }
+
+            Text(L("Заедничките работи (шампон, крема за сонце, адаптер…) можете да ги поделите — тоа што го носи пријател не зафаќа место во твојот багаж.",
+                   "Share common items (shampoo, sunscreen, adapter…) — whatever a friend carries doesn't take space in your bag."))
+                .font(.sans(12))
+                .foregroundStyle(Theme.muted)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func addCompanion() {
+        let name = companionName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        withAnimation { draft.companions.append(Companion(name: name)) }
+        companionName = ""
     }
 
     // Чекор 5
@@ -451,6 +497,7 @@ struct TripWizardView: View {
         trip.weather = weather
         trip.weatherSource = weatherSource
         trip.tint = store.trips.count % Theme.ticketColors.count
+        trip.companions = draft.companions.isEmpty ? nil : draft.companions
         return trip
     }
 
@@ -463,6 +510,9 @@ struct TripWizardView: View {
             VStack(alignment: .leading, spacing: 14) {
                 summaryRow(icon: draft.transport.icon, text: transportText)
                 summaryRow(icon: draft.resolvedBag.kind.icon, text: "\(draft.resolvedBag.displayTitle) · \(draft.resolvedBag.limitText)")
+                if !draft.companions.isEmpty {
+                    summaryRow(icon: "person.2", text: draft.companions.map(\.name).joined(separator: ", "))
+                }
                 if !draft.activities.isEmpty {
                     summaryRow(icon: "sparkles", text: Activity.allCases.filter { draft.activities.contains($0) }.map(\.title).joined(separator: ", "))
                 }

@@ -73,7 +73,7 @@ struct SettingsView: View {
                     }
                     .buttonStyle(SecondaryButtonStyle())
 
-                    Text("VALISE 1.1")
+                    Text("VALISE 1.2")
                         .font(.sans(10, .semibold))
                         .tracking(3)
                         .foregroundStyle(Theme.muted)

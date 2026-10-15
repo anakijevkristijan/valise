@@ -231,8 +231,13 @@ struct PackingItem: Codable, Identifiable, Hashable {
     /// Клуч од каталогот — името се преведува при приказ.
     var key: String?
     var noteKey: String?
+    /// Сопатник што го носи (nil = јас).
+    var assignee: UUID?
 
-    var bagUnits: Int { max(0, quantity - wornCount) }
+    /// Парчиња во мојот багаж (без облеченото и без она што го носи сопатник).
+    var bagUnits: Int { assignee != nil ? 0 : max(0, quantity - wornCount) }
+
+    var isShareable: Bool { key.map { Catalog.isShareable($0) } ?? false }
 
     var displayName: String {
         if let key, let translated = Catalog.name(key) { return translated }
@@ -348,6 +353,17 @@ struct WeatherSummary {
     }
 }
 
+// MARK: - Сопатник
+
+struct Companion: Codable, Hashable, Identifiable {
+    var id: UUID = UUID()
+    var name: String
+
+    var firstName: String {
+        name.split(separator: " ").first.map(String.init) ?? name
+    }
+}
+
 // MARK: - Патување
 
 struct Trip: Codable, Identifiable, Hashable {
@@ -370,6 +386,20 @@ struct Trip: Codable, Identifiable, Hashable {
     var dismissedSuggestions: [String] = []
     var tint: Int = 0
     var createdAt: Date = Date()
+    var companions: [Companion]?
+
+    var travelers: [Companion] { companions ?? [] }
+
+    func companionName(_ id: UUID?) -> String? {
+        guard let id else { return nil }
+        return travelers.first { $0.id == id }?.firstName
+    }
+
+    /// Имиња за картата: јас + сопатниците.
+    func passengerNames(me: String) -> [String] {
+        let first = me.split(separator: " ").first.map(String.init) ?? me
+        return ([first] + travelers.map(\.firstName)).filter { !$0.isEmpty }
+    }
 
     var dayCount: Int {
         let diff = Calendar.current.dateComponents([.day], from: startDate.startOfDay, to: endDate.startOfDay).day ?? 0
@@ -442,11 +472,38 @@ struct Trip: Codable, Identifiable, Hashable {
             for item in group {
                 let box = item.isPacked ? "☑︎" : "☐"
                 let qty = item.quantity > 1 ? " ×\(item.quantity)" : ""
-                lines.append("\(box) \(item.displayName)\(qty)")
+                let who = companionName(item.assignee).map { " (\($0))" } ?? ""
+                lines.append("\(box) \(item.displayName)\(qty)\(who)")
             }
         }
         lines.append("")
         lines.append(L("Спакувано со Valise", "Packed with Valise"))
+        return lines.joined(separator: "\n")
+    }
+
+    /// Порака за сопатник: што носи тој/таа.
+    func shareText(for companion: Companion, from me: String) -> String {
+        let mine = items.filter { $0.assignee == companion.id }
+        var lines: [String] = []
+        lines.append(L("Здраво \(companion.firstName)! ✈︎ \(destination.name), \(Fmt.range(startDate, endDate))",
+                       "Hi \(companion.firstName)! ✈︎ \(destination.name), \(Fmt.range(startDate, endDate))"))
+        lines.append("")
+        if mine.isEmpty {
+            lines.append(L("Уште немаме поделено кој што носи. Ова е мојата листа:", "We haven't split anything yet. Here's my list:"))
+            for item in items.prefix(40) {
+                let qty = item.quantity > 1 ? " ×\(item.quantity)" : ""
+                lines.append("• \(item.displayName)\(qty)")
+            }
+        } else {
+            lines.append(L("Ова го носиш ти, јас останатото:", "You're bringing these, I've got the rest:"))
+            for item in mine {
+                let qty = item.quantity > 1 ? " ×\(item.quantity)" : ""
+                lines.append("☐ \(item.displayName)\(qty)")
+            }
+        }
+        lines.append("")
+        let sender = me.split(separator: " ").first.map(String.init) ?? me
+        lines.append(L("— \(sender), преку Valise", "— \(sender), via Valise"))
         return lines.joined(separator: "\n")
     }
 }

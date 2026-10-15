@@ -9,9 +9,7 @@ struct StoryCardView: View {
     private var foreground: Color { photo == nil ? Theme.navy : .white }
 
     private var eyebrow: String {
-        if trip.isOngoing { return L("Во моментов", "Right now") }
-        if trip.progress >= 1 { return L("Спакувано. Следна станица", "Packed. Next stop") }
-        return L("Следна станица", "Next stop")
+        trip.isOngoing ? L("Во моментов", "Right now") : L("Следна станица", "Next stop")
     }
 
     var body: some View {
@@ -72,15 +70,9 @@ struct StoryCardView: View {
 
                 Spacer().frame(height: 24)
 
-                BoardingPassCard(trip: trip, compact: true)
+                BoardingPassCard(trip: trip, style: .story)
                     .padding(.horizontal, 22)
-
-                Text(L("СПАКУВАНО СО VALISE", "PACKED WITH VALISE"))
-                    .font(.sans(8, .semibold))
-                    .tracking(2.6)
-                    .foregroundStyle(foreground.opacity(0.75))
-                    .padding(.top, 18)
-                    .padding(.bottom, 28)
+                    .padding(.bottom, 40)
             }
         }
         .frame(width: 360, height: 640)
@@ -93,6 +85,7 @@ struct StorySheet: View {
     let trip: Trip
 
     @Environment(\.dismiss) private var dismiss
+    @State private var photo: UIImage?
     @State private var rendered: UIImage?
 
     var body: some View {
@@ -106,28 +99,16 @@ struct StorySheet: View {
                     CircleIconButton(systemName: "xmark") { dismiss() }
                 }
 
-                Group {
-                    if let rendered {
-                        Image(uiImage: rendered)
-                            .resizable()
-                            .scaledToFit()
-                            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                            .shadow(color: Theme.navy.opacity(0.18), radius: 20, x: 0, y: 10)
-                    } else {
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .fill(Theme.stone)
-                            .aspectRatio(9.0 / 16.0, contentMode: .fit)
-                            .overlay(
-                                VStack(spacing: 10) {
-                                    ProgressView().tint(Theme.navy)
-                                    Text(L("Ја подготвувам сликата…", "Preparing your image…"))
-                                        .font(.sans(12))
-                                        .foregroundStyle(Theme.muted)
-                                }
-                            )
-                    }
+                // Жив преглед — се гледа веднаш, без чекање
+                GeometryReader { geo in
+                    let scale = min(geo.size.width / 360, geo.size.height / 640)
+                    StoryCardView(trip: trip, photo: photo)
+                        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                        .shadow(color: Theme.navy.opacity(0.16), radius: 24, x: 0, y: 12)
+                        .scaleEffect(scale)
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .animation(.easeInOut(duration: 0.35), value: photo != nil)
                 }
-                .frame(maxHeight: .infinity)
 
                 if let rendered {
                     let image = Image(uiImage: rendered)
@@ -146,20 +127,35 @@ struct StorySheet: View {
                         .font(.sans(12))
                         .foregroundStyle(Theme.muted)
                         .multilineTextAlignment(.center)
+                } else {
+                    Button {} label: {
+                        HStack(spacing: 10) {
+                            ProgressView().tint(Theme.goldLight)
+                            Text(L("Сподели", "Share"))
+                        }
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .disabled(true)
                 }
             }
             .padding(24)
         }
-        .task { await render() }
+        .task { await prepare() }
+    }
+
+    /// Фотографијата е обично веќе вчитана (се презема при отворање на патувањето).
+    /// Ако не е, чекаме најмногу 3 секунди, па споделуваме без неа.
+    @MainActor
+    private func prepare() async {
+        let found = await PhotoService.photo(for: trip.destination, timeout: 3)
+        if let found { photo = found }
+        render()
     }
 
     @MainActor
-    private func render() async {
-        let photo = await PhotoService.photo(for: trip.destination)
+    private func render() {
         let renderer = ImageRenderer(content: StoryCardView(trip: trip, photo: photo))
         renderer.scale = 3
-        withAnimation(.easeInOut(duration: 0.3)) {
-            rendered = renderer.uiImage
-        }
+        rendered = renderer.uiImage
     }
 }

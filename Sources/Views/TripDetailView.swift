@@ -18,6 +18,8 @@ struct TripDetailView: View {
     @State private var confirmRegenerate = false
     @State private var isRefreshing = false
     @State private var showStory = false
+    @State private var showAddCompanion = false
+    @State private var newCompanionName = ""
 
     var body: some View {
         Group {
@@ -48,6 +50,7 @@ struct TripDetailView: View {
                     topBar(trip)
                     titleBlock(trip)
                     BoardingPassCard(trip: trip)
+                    companionsSection(trip)
                     weatherSection(trip)
                     BagFitCard(trip: trip)
                     tabPicker(trip)
@@ -69,6 +72,7 @@ struct TripDetailView: View {
             .scrollIndicators(.hidden)
             .refreshable { await refreshWeather(force: true) }
         }
+        .task { _ = await PhotoService.photo(for: trip.destination) }
         .sensoryFeedback(.selection, trigger: trip.packedCount)
         .sensoryFeedback(.success, trigger: trip.items.count > 0 && trip.packedCount == trip.items.count)
         .sheet(item: $addItemCategory) { category in
@@ -81,6 +85,22 @@ struct TripDetailView: View {
         .sheet(isPresented: $showStory) {
             StorySheet(trip: trip)
                 .presentationCornerRadius(28)
+        }
+        .alert(L("Сопатник", "Travel companion"), isPresented: $showAddCompanion) {
+            TextField(L("Име", "Name"), text: $newCompanionName)
+                .textInputAutocapitalization(.words)
+            Button(L("Додај", "Add")) {
+                let name = newCompanionName.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !name.isEmpty {
+                    store.mutate(tripID) { t in
+                        var list = t.companions ?? []
+                        list.append(Companion(name: name))
+                        t.companions = list
+                    }
+                }
+                newCompanionName = ""
+            }
+            Button(L("Откажи", "Cancel"), role: .cancel) { newCompanionName = "" }
         }
         .alert(L("Нова ставка", "New item"), isPresented: $showAddExit) {
             TextField(L("пр. Исклучен рутер", "e.g. Router switched off"), text: $newExitTitle)
@@ -179,6 +199,83 @@ struct TripDetailView: View {
         var parts = [Fmt.range(trip.startDate, trip.endDate), Fmt.nights(trip.nightCount), trip.transport.title]
         if let airline = trip.airline, airline.id != "other" { parts.append(airline.name) }
         return parts.joined(separator: " · ")
+    }
+
+    // MARK: Сопатници
+
+    private func companionsSection(_ trip: Trip) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Eyebrow(L("Сопатници", "Travel companions"))
+            ScrollView(.horizontal) {
+                HStack(spacing: 8) {
+                    ForEach(trip.travelers) { companion in
+                        Menu {
+                            ShareLink(item: trip.shareText(for: companion, from: userName)) {
+                                Label(L("Испрати му/ѝ листа", "Send them the list"), systemImage: "paperplane")
+                            }
+                            Button(L("Отстрани", "Remove"), systemImage: "trash", role: .destructive) {
+                                withAnimation {
+                                    store.mutate(tripID) { t in
+                                        t.companions = (t.companions ?? []).filter { $0.id != companion.id }
+                                        for i in t.items.indices where t.items[i].assignee == companion.id {
+                                            t.items[i].assignee = nil
+                                        }
+                                    }
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 8) {
+                                Text(String(companion.firstName.prefix(1)).uppercased())
+                                    .font(.serif(13))
+                                    .foregroundStyle(Theme.goldLight)
+                                    .frame(width: 24, height: 24)
+                                    .background(Circle().fill(Theme.navy))
+                                Text(companion.firstName)
+                                    .font(.sans(14, .medium))
+                                    .foregroundStyle(Theme.ink)
+                                let count = trip.items.filter { $0.assignee == companion.id }.count
+                                if count > 0 {
+                                    Text("\(count)")
+                                        .font(.codes(14))
+                                        .foregroundStyle(Theme.gold)
+                                }
+                            }
+                            .padding(.leading, 6)
+                            .padding(.trailing, 14)
+                            .padding(.vertical, 6)
+                            .background(Capsule().fill(Theme.surface))
+                            .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 0.75))
+                        }
+                    }
+
+                    Button {
+                        showAddCompanion = true
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "person.badge.plus")
+                                .font(.system(size: 13, weight: .light))
+                            Text(L("Додај пријател", "Add a friend"))
+                                .font(.sans(13, .medium))
+                        }
+                        .foregroundStyle(Theme.navy)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .overlay(Capsule().strokeBorder(Theme.navy.opacity(0.3), style: StrokeStyle(lineWidth: 0.75, dash: [3, 3])))
+                    }
+                    .buttonStyle(PressableStyle())
+                }
+                .padding(.vertical, 1)
+            }
+            .scrollIndicators(.hidden)
+
+            if !trip.travelers.isEmpty {
+                Text(L("Држи подолго на предмет за да избереш кој го носи. Тоа што го носи пријател не зафаќа место во твојот багаж.",
+                       "Long-press an item to choose who brings it. What a friend carries doesn't take space in your bag."))
+                    .font(.sans(12))
+                    .foregroundStyle(Theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 
     // MARK: Време
@@ -296,7 +393,7 @@ struct TripDetailView: View {
             ForEach(ItemCategory.allCases) { category in
                 let group = trip.items.filter { $0.category == category }
                 if !group.isEmpty {
-                    categoryBlock(category, items: group)
+                    categoryBlock(category, items: group, trip: trip)
                 }
             }
 
@@ -312,8 +409,8 @@ struct TripDetailView: View {
             }
             .buttonStyle(SecondaryButtonStyle())
 
-            Text(L("Допри за спакувано. Држи подолго за количина или бришење.",
-                   "Tap to mark as packed. Long-press for quantity or removal."))
+            Text(L("Допри за спакувано. Држи подолго за количина, бришење или кој носи.",
+                   "Tap to mark as packed. Long-press for quantity, removal or who brings it."))
                 .font(.sans(12))
                 .foregroundStyle(Theme.muted)
                 .frame(maxWidth: .infinity)
@@ -321,7 +418,7 @@ struct TripDetailView: View {
         }
     }
 
-    private func categoryBlock(_ category: ItemCategory, items: [PackingItem]) -> some View {
+    private func categoryBlock(_ category: ItemCategory, items: [PackingItem], trip: Trip) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
                 Text(category.title.uppercased())
@@ -338,6 +435,9 @@ struct TripDetailView: View {
             VStack(spacing: 0) {
                 ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                     PackingRow(item: item,
+                               companions: trip.travelers,
+                               assigneeName: trip.companionName(item.assignee),
+                               onAssign: { assign(item, to: $0) },
                                onToggle: { toggle(item) },
                                onIncrease: { changeQuantity(item, by: 1) },
                                onDecrease: { changeQuantity(item, by: -1) },
@@ -376,6 +476,16 @@ struct TripDetailView: View {
             store.mutate(tripID) { trip in
                 if let i = trip.items.firstIndex(where: { $0.id == item.id }) {
                     trip.items[i].isPacked.toggle()
+                }
+            }
+        }
+    }
+
+    private func assign(_ item: PackingItem, to companion: UUID?) {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            store.mutate(tripID) { trip in
+                if let i = trip.items.firstIndex(where: { $0.id == item.id }) {
+                    trip.items[i].assignee = companion
                 }
             }
         }
@@ -496,6 +606,9 @@ struct TripDetailView: View {
 
 struct PackingRow: View {
     let item: PackingItem
+    var companions: [Companion] = []
+    var assigneeName: String?
+    var onAssign: (UUID?) -> Void = { _ in }
     let onToggle: () -> Void
     let onIncrease: () -> Void
     let onDecrease: () -> Void
@@ -523,6 +636,20 @@ struct PackingRow: View {
                         .strikethrough(item.isPacked, color: Theme.muted.opacity(0.6))
                         .font(.sans(15))
                         .foregroundStyle(item.isPacked ? Theme.muted : Theme.ink)
+                    if let assigneeName {
+                        HStack(spacing: 4) {
+                            Image(systemName: "person.fill")
+                                .font(.system(size: 9))
+                            Text(L("носи \(assigneeName)", "\(assigneeName) brings it"))
+                                .font(.sans(12, .medium))
+                        }
+                        .foregroundStyle(Theme.gold)
+                    } else if !companions.isEmpty && item.isShareable {
+                        Text(L("ЗАЕДНИЧКО", "SHARED"))
+                            .font(.sans(9, .semibold))
+                            .tracking(1.4)
+                            .foregroundStyle(Theme.sage)
+                    }
                     if let detail = item.detailText {
                         Text(detail)
                             .font(.sans(12))
@@ -544,6 +671,17 @@ struct PackingRow: View {
         }
         .buttonStyle(.plain)
         .contextMenu {
+            if !companions.isEmpty {
+                Menu(L("Кој го носи", "Who brings it"), systemImage: "person.2") {
+                    Button(L("Јас", "Me"), systemImage: item.assignee == nil ? "checkmark" : "person") { onAssign(nil) }
+                    ForEach(companions) { companion in
+                        Button(companion.firstName, systemImage: item.assignee == companion.id ? "checkmark" : "person") {
+                            onAssign(companion.id)
+                        }
+                    }
+                }
+                Divider()
+            }
             Button(L("Уште едно", "One more"), systemImage: "plus", action: onIncrease)
             Button(L("Едно помалку", "One less"), systemImage: "minus", action: onDecrease)
             Divider()

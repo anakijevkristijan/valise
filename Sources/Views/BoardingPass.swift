@@ -80,15 +80,27 @@ struct BarcodeView: View {
     }
 }
 
-// MARK: - Авионска карта за прва класа
+// MARK: - Авионска карта
 
 struct BoardingPassCard: View {
+    enum Style { case full, story }
+
     let trip: Trip
-    var compact: Bool = false
+    var style: Style = .full
+
+    @AppStorage("userName") private var userName: String = ""
 
     private var color: Color { Theme.ticket(trip.tint) }
-    private var codeSize: CGFloat { compact ? 36 : 44 }
-    private var pad: CGFloat { compact ? 18 : 22 }
+    private var isStory: Bool { style == .story }
+    private var codeSize: CGFloat { isStory ? 38 : 44 }
+    private var pad: CGFloat { isStory ? 18 : 22 }
+
+    private var headerRight: String {
+        if trip.transport == .plane, let airline = trip.airline, airline.id != "other" {
+            return airline.name.uppercased()
+        }
+        return ""
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -114,7 +126,7 @@ struct BoardingPassCard: View {
                     .font(.sans(10, .semibold))
                     .tracking(3.2)
                 Spacer()
-                Text(L("ПРВА КЛАСА", "FIRST CLASS"))
+                Text(headerRight)
                     .font(.sans(10, .semibold))
                     .tracking(2.4)
             }
@@ -129,17 +141,17 @@ struct BoardingPassCard: View {
                         .foregroundStyle(Theme.goldLight)
                     DashedLine()
                         .stroke(Theme.goldLight.opacity(0.6), style: StrokeStyle(lineWidth: 1, dash: [2, 3]))
-                        .frame(width: compact ? 44 : 60, height: 1)
+                        .frame(width: isStory ? 44 : 60, height: 1)
                 }
                 .padding(.bottom, 26)
                 Spacer(minLength: 4)
                 cityBlock(code: trip.destinationCode, name: trip.destination.name, alignment: .trailing)
             }
-            .padding(.top, compact ? 16 : 22)
+            .padding(.top, isStory ? 16 : 22)
         }
         .padding(.horizontal, pad)
         .padding(.top, pad)
-        .padding(.bottom, compact ? 20 : 24)
+        .padding(.bottom, isStory ? 20 : 24)
     }
 
     private func cityBlock(code: String, name: String, alignment: HorizontalAlignment) -> some View {
@@ -156,21 +168,38 @@ struct BoardingPassCard: View {
         }
     }
 
+    private var passengers: [String] { trip.passengerNames(me: userName) }
+
     private var bottomHalf: some View {
-        VStack(alignment: .leading, spacing: compact ? 14 : 18) {
+        VStack(alignment: .leading, spacing: isStory ? 14 : 18) {
+            if !passengers.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text((passengers.count > 1 ? L("Патници", "Passengers") : L("Патник", "Passenger")).uppercased())
+                        .font(.sans(9, .semibold))
+                        .tracking(1.6)
+                        .foregroundStyle(Theme.ticketText.opacity(0.55))
+                    Text(passengers.joined(separator: "  ·  "))
+                        .font(.serif(isStory ? 16 : 18))
+                        .foregroundStyle(Theme.ticketText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                }
+            }
             HStack(alignment: .top, spacing: 8) {
                 field(L("Поаѓање", "Depart"), Fmt.ticketDate(trip.startDate))
                 field(L("Враќање", "Return"), Fmt.ticketDate(trip.endDate))
                 field(L("Денови", "Days"), "\(trip.dayCount)")
             }
-            HStack(alignment: .top, spacing: 8) {
-                field(L("Багаж", "Bag"), "\(Int((trip.fillRatio * 100).rounded()))%")
-                field(L("Спакувано", "Packed"), "\(Int((trip.progress * 100).rounded()))%")
-                field(L("Време", "Weather"), trip.weatherSummary.shortText ?? "—")
+            if !isStory {
+                HStack(alignment: .top, spacing: 8) {
+                    field(L("Багаж", "Bag"), "\(Int((trip.fillRatio * 100).rounded()))%")
+                    field(L("Спакувано", "Packed"), "\(Int((trip.progress * 100).rounded()))%")
+                    field(L("Време", "Weather"), trip.weatherSummary.shortText ?? "—")
+                }
             }
             HStack(alignment: .center, spacing: 14) {
                 BarcodeView(seed: trip.id.uuidString)
-                    .frame(height: compact ? 28 : 34)
+                    .frame(height: isStory ? 28 : 34)
                 Text(trip.countdownText.uppercased())
                     .font(.sans(10, .semibold))
                     .tracking(1.8)
@@ -180,7 +209,7 @@ struct BoardingPassCard: View {
             }
         }
         .padding(.horizontal, pad)
-        .padding(.top, compact ? 18 : 22)
+        .padding(.top, isStory ? 18 : 22)
         .padding(.bottom, pad)
     }
 
@@ -191,7 +220,7 @@ struct BoardingPassCard: View {
                 .tracking(1.6)
                 .foregroundStyle(Theme.ticketText.opacity(0.55))
             Text(value)
-                .font(.codes(compact ? 17 : 20))
+                .font(.codes(isStory ? 18 : 20))
                 .foregroundStyle(Theme.ticketText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)

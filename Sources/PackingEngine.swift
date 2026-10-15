@@ -17,6 +17,16 @@ enum Catalog {
         return AppLanguage.current == .mk ? pair.0 : pair.1
     }
 
+    /// Работи што може да ги носи само еден од друштвото.
+    static func isShareable(_ key: String) -> Bool {
+        key.hasPrefix("adapter.") || shareable.contains(key)
+    }
+
+    private static let shareable: Set<String> = [
+        "shampoo", "sunscreen", "afterSun", "firstAid", "umbrella", "booking", "tollCash",
+        "carCharger", "waterSnacks", "wrinkleSpray", "tripod", "snacks", "powerbank", "usbHub"
+    ]
+
     static func exitTitle(_ key: String) -> String? {
         guard let pair = exit[key] else { return nil }
         return AppLanguage.current == .mk ? pair.0 : pair.1

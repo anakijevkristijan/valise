@@ -17,19 +17,30 @@ struct RootView: View {
     @EnvironmentObject private var store: TripStore
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("userName") private var userName: String = ""
+    @AppStorage("languageChosen") private var languageChosen: Bool = false
     @AppStorage(AppLanguage.storageKey) private var language: String = AppLanguage.mk.rawValue
+
+    /// 0 = јазик, 1 = име, 2 = почетна
+    private var stage: Int {
+        if !userName.isEmpty { return 2 }
+        return languageChosen ? 1 : 0
+    }
 
     var body: some View {
         ZStack {
-            if userName.isEmpty {
+            switch stage {
+            case 0:
+                LanguagePickerView()
+                    .transition(.opacity)
+            case 1:
                 OnboardingView()
                     .transition(.opacity)
-            } else {
+            default:
                 HomeView()
                     .transition(.opacity)
             }
         }
-        .animation(.easeInOut(duration: 0.5), value: userName.isEmpty)
+        .animation(.easeInOut(duration: 0.5), value: stage)
         .id(language)
         .environment(\.locale, AppLanguage.current.locale)
         .preferredColorScheme(.light)
