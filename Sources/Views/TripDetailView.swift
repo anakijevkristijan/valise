@@ -18,6 +18,7 @@ struct TripDetailView: View {
     @State private var confirmRegenerate = false
     @State private var isRefreshing = false
     @State private var showStory = false
+    @State private var showEdit = false
     @State private var showAddCompanion = false
     @State private var newCompanionName = ""
 
@@ -68,6 +69,7 @@ struct TripDetailView: View {
                 .padding(.bottom, 60)
                 .frame(maxWidth: 680)
                 .frame(maxWidth: .infinity)
+                .containerRelativeFrame(.horizontal)
             }
             .scrollIndicators(.hidden)
             .refreshable { await refreshWeather(force: true) }
@@ -81,6 +83,10 @@ struct TripDetailView: View {
             }
             .presentationDetents([.medium, .large])
             .presentationCornerRadius(28)
+        }
+        .fullScreenCover(isPresented: $showEdit) {
+            TripWizardView(editing: trip) { _ in }
+                .environmentObject(store)
         }
         .sheet(isPresented: $showStory) {
             StorySheet(trip: trip)
@@ -160,6 +166,9 @@ struct TripDetailView: View {
                 CircleIcon(systemName: "square.and.arrow.up")
             }
             Menu {
+                Button(L("Уреди патување", "Edit trip"), systemImage: "pencil") {
+                    showEdit = true
+                }
                 Button(L("Освежи прогноза", "Refresh forecast"), systemImage: "arrow.clockwise") {
                     Task { await refreshWeather(force: true) }
                 }
@@ -269,8 +278,8 @@ struct TripDetailView: View {
             .scrollIndicators(.hidden)
 
             if !trip.travelers.isEmpty {
-                Text(L("Држи подолго на предмет за да избереш кој го носи. Тоа што го носи пријател не зафаќа место во твојот багаж.",
-                       "Long-press an item to choose who brings it. What a friend carries doesn't take space in your bag."))
+                Text(L("Кај заедничките предмети избери кој носи со копчето десно. Тоа што го носи пријател не зафаќа место во твојот багаж.",
+                       "On shared items, pick who brings it with the button on the right. What a friend carries doesn't take space in your bag."))
                     .font(.sans(12))
                     .foregroundStyle(Theme.muted)
                     .fixedSize(horizontal: false, vertical: true)
@@ -326,7 +335,7 @@ struct TripDetailView: View {
     // MARK: Табови
 
     private func tabPicker(_ trip: Trip) -> some View {
-        HStack(spacing: 24) {
+        HStack(alignment: .bottom, spacing: 20) {
             tabButton(.packing, title: L("Пакување", "Packing"), count: "\(trip.packedCount)/\(trip.items.count)")
             tabButton(.exit, title: L("Пред излез", "Before you leave"), count: "\(trip.exitChecklist.filter(\.isDone).count)/\(trip.exitChecklist.count)")
             Spacer()
@@ -338,21 +347,24 @@ struct TripDetailView: View {
         Button {
             withAnimation(.easeInOut(duration: 0.25)) { tab = value }
         } label: {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 6) {
-                    Text(title.uppercased())
-                        .font(.sans(12, .semibold))
-                        .tracking(1.6)
-                    Text(count)
-                        .font(.codes(14))
-                        .opacity(0.6)
-                }
-                .foregroundStyle(tab == value ? Theme.navy : Theme.muted)
+            HStack(spacing: 6) {
+                Text(title.uppercased())
+                    .font(.sans(12, .semibold))
+                    .tracking(1.4)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                Text(count)
+                    .font(.codes(14))
+                    .opacity(0.6)
+                    .lineLimit(1)
+            }
+            .foregroundStyle(tab == value ? Theme.navy : Theme.muted)
+            .padding(.bottom, 11)
+            .overlay(alignment: .bottom) {
                 Rectangle()
                     .fill(tab == value ? Theme.navy : Color.clear)
                     .frame(height: 1.5)
             }
-            .fixedSize()
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -614,62 +626,86 @@ struct PackingRow: View {
     let onDecrease: () -> Void
     let onDelete: () -> Void
 
+    private var showsWhoPicker: Bool {
+        !companions.isEmpty && (item.isShareable || item.assignee != nil)
+    }
+
     var body: some View {
-        Button(action: onToggle) {
-            HStack(spacing: 14) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 3, style: .continuous)
-                        .fill(item.isPacked ? Theme.navy : Color.clear)
-                    RoundedRectangle(cornerRadius: 3, style: .continuous)
-                        .strokeBorder(item.isPacked ? Theme.navy : Theme.muted.opacity(0.6), lineWidth: 1)
-                    if item.isPacked {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(Theme.goldLight)
-                            .transition(.scale.combined(with: .opacity))
-                    }
-                }
-                .frame(width: 18, height: 18)
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(item.displayName)
-                        .strikethrough(item.isPacked, color: Theme.muted.opacity(0.6))
-                        .font(.sans(15))
-                        .foregroundStyle(item.isPacked ? Theme.muted : Theme.ink)
-                    if let assigneeName {
-                        HStack(spacing: 4) {
-                            Image(systemName: "person.fill")
-                                .font(.system(size: 9))
-                            Text(L("носи \(assigneeName)", "\(assigneeName) brings it"))
-                                .font(.sans(12, .medium))
+        HStack(spacing: 10) {
+            Button(action: onToggle) {
+                HStack(spacing: 14) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 3, style: .continuous)
+                            .fill(item.isPacked ? Theme.navy : Color.clear)
+                        RoundedRectangle(cornerRadius: 3, style: .continuous)
+                            .strokeBorder(item.isPacked ? Theme.navy : Theme.muted.opacity(0.6), lineWidth: 1)
+                        if item.isPacked {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(Theme.goldLight)
+                                .transition(.scale.combined(with: .opacity))
                         }
-                        .foregroundStyle(Theme.gold)
-                    } else if !companions.isEmpty && item.isShareable {
-                        Text(L("ЗАЕДНИЧКО", "SHARED"))
-                            .font(.sans(9, .semibold))
-                            .tracking(1.4)
-                            .foregroundStyle(Theme.sage)
                     }
-                    if let detail = item.detailText {
-                        Text(detail)
-                            .font(.sans(12))
-                            .foregroundStyle(Theme.muted)
+                    .frame(width: 18, height: 18)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(item.displayName)
+                            .strikethrough(item.isPacked, color: Theme.muted.opacity(0.6))
+                            .font(.sans(15))
+                            .foregroundStyle(item.isPacked ? Theme.muted : Theme.ink)
+                        if showsWhoPicker && item.assignee == nil {
+                            Text(L("ЗАЕДНИЧКО", "SHARED"))
+                                .font(.sans(9, .semibold))
+                                .tracking(1.4)
+                                .foregroundStyle(Theme.sage)
+                        }
+                        if let detail = item.detailText {
+                            Text(detail)
+                                .font(.sans(12))
+                                .foregroundStyle(Theme.muted)
+                        }
                     }
+
+                    Spacer(minLength: 4)
                 }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
 
-                Spacer(minLength: 8)
-
-                if item.quantity > 1 {
-                    Text("×\(item.quantity)")
-                        .font(.codes(17))
-                        .foregroundStyle(item.isPacked ? Theme.muted : Theme.navy)
+            if showsWhoPicker {
+                Menu {
+                    Button(L("Јас", "Me"), systemImage: item.assignee == nil ? "checkmark" : "person") { onAssign(nil) }
+                    ForEach(companions) { companion in
+                        Button(companion.firstName, systemImage: item.assignee == companion.id ? "checkmark" : "person") {
+                            onAssign(companion.id)
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text((assigneeName ?? L("Јас", "Me")).uppercased())
+                            .font(.sans(10, .semibold))
+                            .tracking(1)
+                            .lineLimit(1)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 8, weight: .bold))
+                    }
+                    .foregroundStyle(item.assignee != nil ? Theme.goldLight : Theme.navy)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Capsule().fill(item.assignee != nil ? Theme.navy : Color.clear))
+                    .overlay(Capsule().strokeBorder(Theme.navy.opacity(item.assignee != nil ? 0 : 0.25), lineWidth: 0.75))
                 }
             }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 13)
-            .contentShape(Rectangle())
+
+            if item.quantity > 1 {
+                Text("×\(item.quantity)")
+                    .font(.codes(17))
+                    .foregroundStyle(item.isPacked ? Theme.muted : Theme.navy)
+            }
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 13)
+        .contentShape(Rectangle())
         .contextMenu {
             if !companions.isEmpty {
                 Menu(L("Кој го носи", "Who brings it"), systemImage: "person.2") {
@@ -923,6 +959,7 @@ struct AddItemSheet: View {
                     .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
                 .padding(24)
+                .containerRelativeFrame(.horizontal)
             }
         }
         .onAppear {

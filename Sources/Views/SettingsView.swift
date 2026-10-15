@@ -73,13 +73,14 @@ struct SettingsView: View {
                     }
                     .buttonStyle(SecondaryButtonStyle())
 
-                    Text("VALISE 1.2")
+                    Text("VALISE 1.3")
                         .font(.sans(10, .semibold))
                         .tracking(3)
                         .foregroundStyle(Theme.muted)
                         .frame(maxWidth: .infinity)
                 }
                 .padding(24)
+                .containerRelativeFrame(.horizontal)
             }
         }
         .onAppear { draftName = userName }

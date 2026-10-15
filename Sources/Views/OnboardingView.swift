@@ -79,6 +79,7 @@ struct OnboardingView: View {
                 .padding(.horizontal, 26)
                 .frame(maxWidth: 560)
                 .frame(maxWidth: .infinity)
+                .containerRelativeFrame(.horizontal)
                 .opacity(appeared ? 1 : 0)
                 .offset(y: appeared ? 0 : 16)
             }

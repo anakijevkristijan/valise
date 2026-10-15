@@ -34,6 +34,7 @@ struct HomeView: View {
                     .padding(.bottom, 130)
                     .frame(maxWidth: 640)
                     .frame(maxWidth: .infinity)
+                    .containerRelativeFrame(.horizontal)
                 }
                 .scrollIndicators(.hidden)
                 .refreshable { await store.refreshAllUpcoming() }

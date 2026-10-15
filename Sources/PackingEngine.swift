@@ -389,12 +389,19 @@ enum PackingEngine {
         }
     }
 
-    /// Нова листа; спакуваното и рачно додаденото остануваат.
+    /// Нова листа; спакуваното, кој што носи и рачно додаденото остануваат.
     static func regenerate(_ trip: Trip) -> [PackingItem] {
-        let packed = Set(trip.items.filter(\.isPacked).flatMap { [$0.identity, $0.displayName.lowercased()] })
+        var previous: [String: PackingItem] = [:]
+        for item in trip.items {
+            previous[item.identity] = item
+            previous[item.displayName.lowercased()] = item
+        }
         var fresh = generate(for: trip).map { item -> PackingItem in
             var copy = item
-            copy.isPacked = packed.contains(item.identity) || packed.contains(item.displayName.lowercased())
+            if let old = previous[item.identity] ?? previous[item.displayName.lowercased()] {
+                copy.isPacked = old.isPacked
+                copy.assignee = old.assignee
+            }
             return copy
         }
         let freshIDs = Set(fresh.map(\.identity))
