@@ -1,0 +1,70 @@
+name: Изгради IPA
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Преземи код
+        uses: actions/checkout@v4
+
+      - name: Најди го проектот
+        run: |
+          DIR=$(dirname "$(find . -name project.yml -not -path './.git/*' | head -1)")
+          echo "APP_DIR=$DIR" >> "$GITHUB_ENV"
+          echo "Проектот е во: $DIR"
+
+      - name: Инсталирај XcodeGen
+        run: brew install xcodegen
+
+      - name: Направи Xcode проект
+        working-directory: ${{ env.APP_DIR }}
+        run: xcodegen generate
+
+      - name: Изгради апликација
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project Valise.xcodeproj \
+            -scheme Valise \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build 2>&1 | tee build.log
+
+      - name: Спакувај .ipa
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/Valise.app Payload/
+          zip -qry Valise.ipa Payload
+          ls -lh Valise.ipa
+
+      - name: Качи ја .ipa датотеката
+        uses: actions/upload-artifact@v4
+        with:
+          name: Valise-ipa
+          path: ${{ env.APP_DIR }}/Valise.ipa
+          retention-days: 30
+
+      - name: Прикажи ги грешките
+        if: failure()
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          {
+            echo "## Грешки при изградба"
+            echo '```'
+            grep -E "error:" build.log | sort -u | head -60
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
