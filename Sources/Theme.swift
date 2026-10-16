@@ -1,6 +1,6 @@
 import SwiftUI
 
-// MARK: - Палета: хартија, морнарско, шампањ злато
+// MARK: - Теми
 
 extension Color {
     init(hex: UInt32, opacity: Double = 1) {
@@ -11,47 +11,163 @@ extension Color {
     }
 }
 
+/// Палета на една тема.
+struct Palette: Identifiable, Equatable {
+    let id: String
+    let isPremium: Bool
+    let nameMK: String
+    let nameEN: String
+    let moodMK: String
+    let moodEN: String
+
+    let paper: Color
+    let stone: Color
+    let hairline: Color
+    let ink: Color
+    let inkSoft: Color
+    let muted: Color
+    let primary: Color
+    let ticketText: Color
+    let gold: Color
+    let goldLight: Color
+    let goldPale: Color
+    let sage: Color
+    let terracotta: Color
+    let rain: Color
+    let tickets: [Color]
+
+    var name: String { L(nameMK, nameEN) }
+    var mood: String { L(moodMK, moodEN) }
+
+    static func == (a: Palette, b: Palette) -> Bool { a.id == b.id }
+}
+
+extension Palette {
+    static let classic = Palette(
+        id: "classic", isPremium: false,
+        nameMK: "Класична", nameEN: "Classic",
+        moodMK: "Морнарско и шампањ злато", moodEN: "Navy and champagne gold",
+        paper: Color(hex: 0xF6F3EC), stone: Color(hex: 0xEEE9DF), hairline: Color(hex: 0xE3DCCF),
+        ink: Color(hex: 0x131B2B), inkSoft: Color(hex: 0x4F5666), muted: Color(hex: 0x958D7F),
+        primary: Color(hex: 0x13213A), ticketText: Color(hex: 0xF4EDDF),
+        gold: Color(hex: 0xA9874F), goldLight: Color(hex: 0xD8BE86), goldPale: Color(hex: 0xEFE6D2),
+        sage: Color(hex: 0x6C8770), terracotta: Color(hex: 0xAE5A40), rain: Color(hex: 0x5B7891),
+        tickets: [Color(hex: 0x13213A), Color(hex: 0x173A31), Color(hex: 0x4A1A25), Color(hex: 0x25272D)]
+    )
+
+    static let rose = Palette(
+        id: "rose", isPremium: true,
+        nameMK: "Ривиера роза", nameEN: "Riviera Rose",
+        moodMK: "Пудра, малина и розово злато", moodEN: "Blush, raspberry and rose gold",
+        paper: Color(hex: 0xFBF4F2), stone: Color(hex: 0xF4E6E3), hairline: Color(hex: 0xEDD9D5),
+        ink: Color(hex: 0x3A2228), inkSoft: Color(hex: 0x6E5258), muted: Color(hex: 0xA88E92),
+        primary: Color(hex: 0x8E3B55), ticketText: Color(hex: 0xFFF1EE),
+        gold: Color(hex: 0xB5787A), goldLight: Color(hex: 0xF3CFC4), goldPale: Color(hex: 0xF8E4DF),
+        sage: Color(hex: 0x7E9077), terracotta: Color(hex: 0xB4533F), rain: Color(hex: 0x7A8DA6),
+        tickets: [Color(hex: 0x8E3B55), Color(hex: 0xA4566C), Color(hex: 0x6F3A5E), Color(hex: 0x9A5B5F)]
+    )
+
+    static let lavender = Palette(
+        id: "lavender", isPremium: true,
+        nameMK: "Лаванда", nameEN: "Lavender",
+        moodMK: "Јоргован и сребрена магла", moodEN: "Lilac and silver haze",
+        paper: Color(hex: 0xF7F5FB), stone: Color(hex: 0xECE7F5), hairline: Color(hex: 0xE2DCEF),
+        ink: Color(hex: 0x251E38), inkSoft: Color(hex: 0x5A5272), muted: Color(hex: 0x9890AE),
+        primary: Color(hex: 0x4E3F7E), ticketText: Color(hex: 0xF6F1FF),
+        gold: Color(hex: 0x8F78B8), goldLight: Color(hex: 0xE3D6F7), goldPale: Color(hex: 0xEEE6FA),
+        sage: Color(hex: 0x6F8A7D), terracotta: Color(hex: 0xB0584A), rain: Color(hex: 0x6680A3),
+        tickets: [Color(hex: 0x4E3F7E), Color(hex: 0x6A4C8C), Color(hex: 0x3E4A7A), Color(hex: 0x7B5A87)]
+    )
+
+    static let emerald = Palette(
+        id: "emerald", isPremium: true,
+        nameMK: "Смарагд", nameEN: "Emerald Club",
+        moodMK: "Зелено кадифе и месинг", moodEN: "Green velvet and brass",
+        paper: Color(hex: 0xF4F4EE), stone: Color(hex: 0xE8E9E0), hairline: Color(hex: 0xDCDFD3),
+        ink: Color(hex: 0x13221D), inkSoft: Color(hex: 0x4A5853), muted: Color(hex: 0x8E978F),
+        primary: Color(hex: 0x173A31), ticketText: Color(hex: 0xF2EEDF),
+        gold: Color(hex: 0xA9874F), goldLight: Color(hex: 0xD8BE86), goldPale: Color(hex: 0xECE6D2),
+        sage: Color(hex: 0x5E7F68), terracotta: Color(hex: 0xAE5A40), rain: Color(hex: 0x5B7891),
+        tickets: [Color(hex: 0x173A31), Color(hex: 0x1F4A3F), Color(hex: 0x2E3B2F), Color(hex: 0x13302A)]
+    )
+
+    static let noir = Palette(
+        id: "noir", isPremium: true,
+        nameMK: "Ноар", nameEN: "Noir",
+        moodMK: "Црно, крем и злато", moodEN: "Black, cream and gold",
+        paper: Color(hex: 0xF5F4F1), stone: Color(hex: 0xEAE8E3), hairline: Color(hex: 0xDFDCD5),
+        ink: Color(hex: 0x111111), inkSoft: Color(hex: 0x4A4845), muted: Color(hex: 0x908C85),
+        primary: Color(hex: 0x141414), ticketText: Color(hex: 0xF3EFE6),
+        gold: Color(hex: 0xA8874E), goldLight: Color(hex: 0xD9C08B), goldPale: Color(hex: 0xEDE6D6),
+        sage: Color(hex: 0x6C8770), terracotta: Color(hex: 0xAE5A40), rain: Color(hex: 0x5B7891),
+        tickets: [Color(hex: 0x141414), Color(hex: 0x2A2A2A), Color(hex: 0x1E1B18), Color(hex: 0x33302C)]
+    )
+
+    static let azur = Palette(
+        id: "azur", isPremium: true,
+        nameMK: "Азурна обала", nameEN: "Côte d'Azur",
+        moodMK: "Медитеран, небо и песок", moodEN: "Mediterranean, sky and sand",
+        paper: Color(hex: 0xF3F6F7), stone: Color(hex: 0xE4EBEE), hairline: Color(hex: 0xD8E2E6),
+        ink: Color(hex: 0x14263A), inkSoft: Color(hex: 0x4A5C6E), muted: Color(hex: 0x8A9AA6),
+        primary: Color(hex: 0x1F4E79), ticketText: Color(hex: 0xF7F0E2),
+        gold: Color(hex: 0xB08A4E), goldLight: Color(hex: 0xF0D9A8), goldPale: Color(hex: 0xF1E8D6),
+        sage: Color(hex: 0x5F8A7C), terracotta: Color(hex: 0xB4573F), rain: Color(hex: 0x3F6E8C),
+        tickets: [Color(hex: 0x1F4E79), Color(hex: 0x2C6E8F), Color(hex: 0x17405F), Color(hex: 0x3B5F7A)]
+    )
+
+    static let all: [Palette] = [.classic, .rose, .lavender, .emerald, .noir, .azur]
+
+    static func find(_ id: String?) -> Palette {
+        all.first { $0.id == id } ?? .classic
+    }
+}
+
 enum Theme {
-    // Основа
-    static let paper = Color(hex: 0xF6F3EC)
-    static let surface = Color(hex: 0xFFFFFF)
-    static let stone = Color(hex: 0xEEE9DF)
-    static let hairline = Color(hex: 0xE3DCCF)
+    static let storageKey = "appTheme"
 
-    // Текст
-    static let ink = Color(hex: 0x131B2B)
-    static let inkSoft = Color(hex: 0x4F5666)
-    static let muted = Color(hex: 0x958D7F)
+    /// Тековна палета. Се поставува од RootView пред секое исцртување.
+    private(set) static var current: Palette = Palette.find(UserDefaults.standard.string(forKey: storageKey))
 
-    // Карта
-    static let navy = Color(hex: 0x13213A)
-    static let ticketText = Color(hex: 0xF4EDDF)
-    static let gold = Color(hex: 0xA9874F)        // злато врз светло
-    static let goldLight = Color(hex: 0xD8BE86)   // злато врз темно
-    static let goldPale = Color(hex: 0xEFE6D2)
-
-    // Сигнали
-    static let sage = Color(hex: 0x6C8770)
-    static let terracotta = Color(hex: 0xAE5A40)
-    static let rain = Color(hex: 0x5B7891)
-
-    /// Бои на картите: морнарско, смарагд, бордо, графит.
-    static let ticketColors: [Color] = [
-        Color(hex: 0x13213A),
-        Color(hex: 0x173A31),
-        Color(hex: 0x4A1A25),
-        Color(hex: 0x25272D)
-    ]
-
-    static func ticket(_ index: Int) -> Color {
-        ticketColors[abs(index) % ticketColors.count]
+    /// Премиум темите важат само ако е отклучено.
+    static func select(_ id: String, premium: Bool) {
+        let palette = Palette.find(id)
+        current = (palette.isPremium && !premium) ? .classic : palette
     }
 
-    static let metallic = LinearGradient(
-        colors: [Color(hex: 0xB8914F), Color(hex: 0xEAD6A4), Color(hex: 0xB8914F)],
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-    )
+    // Основа
+    static var paper: Color { current.paper }
+    static var surface: Color { Color(hex: 0xFFFFFF) }
+    static var stone: Color { current.stone }
+    static var hairline: Color { current.hairline }
+
+    // Текст
+    static var ink: Color { current.ink }
+    static var inkSoft: Color { current.inkSoft }
+    static var muted: Color { current.muted }
+
+    // Карта
+    static var navy: Color { current.primary }
+    static var ticketText: Color { current.ticketText }
+    static var gold: Color { current.gold }
+    static var goldLight: Color { current.goldLight }
+    static var goldPale: Color { current.goldPale }
+
+    // Сигнали
+    static var sage: Color { current.sage }
+    static var terracotta: Color { current.terracotta }
+    static var rain: Color { current.rain }
+
+    static var ticketColors: [Color] { current.tickets }
+
+    static func ticket(_ index: Int) -> Color {
+        let colors = current.tickets
+        return colors[abs(index) % colors.count]
+    }
+
+    static var metallic: LinearGradient {
+        LinearGradient(colors: [current.gold, current.goldLight, current.gold],
+                       startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
 
     // Стари имиња (компатибилност)
     static var ivory: Color { paper }

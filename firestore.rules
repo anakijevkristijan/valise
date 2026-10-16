@@ -1,0 +1,61 @@
+rules_version = '2';
+
+// Valise — правила за Firestore.
+// Копирај ги во Firebase Console → Firestore Database → Rules → Publish.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function me() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function myKeys() {
+      return ['p_' + me().get('phoneHash', '-'), 'e_' + me().get('emailHash', '-')];
+    }
+
+    function invitedTo(tripId) {
+      return exists(/databases/$(database)/documents/invites/$(myKeys()[0])/trips/$(tripId))
+          || exists(/databases/$(database)/documents/invites/$(myKeys()[1])/trips/$(tripId));
+    }
+
+    function memberOf(tripId) {
+      return request.auth.uid in get(/databases/$(database)/documents/trips/$(tripId)).data.memberUIDs;
+    }
+
+    // Профил: име и шифрирани клучеви (без вистински број/е-пошта)
+    match /users/{uid} {
+      allow read: if signedIn();
+      allow write: if signedIn() && request.auth.uid == uid;
+    }
+
+    // Пребарување пријател по шифриран број/е-пошта — само по точен клуч, без листање
+    match /lookup/{key} {
+      allow get: if signedIn();
+      allow list: if false;
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+      allow update: if signedIn()
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == request.auth.uid;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    // Патувања: ги гледаат и менуваат само членовите
+    match /trips/{tripId} {
+      allow read: if signedIn() && request.auth.uid in resource.data.memberUIDs;
+      allow create: if signedIn() && request.resource.data.ownerUID == request.auth.uid;
+      allow update: if signedIn() && (request.auth.uid in resource.data.memberUIDs || invitedTo(tripId));
+      allow delete: if signedIn() && resource.data.ownerUID == request.auth.uid;
+    }
+
+    // Покани за луѓе што уште немаат акаунт
+    match /invites/{key}/trips/{tripId} {
+      allow read: if signedIn() && key in myKeys();
+      allow create, update: if signedIn() && memberOf(tripId);
+      allow delete: if signedIn() && (key in myKeys() || memberOf(tripId));
+    }
+  }
+}

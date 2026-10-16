@@ -231,11 +231,13 @@ struct PackingItem: Codable, Identifiable, Hashable {
     /// Клуч од каталогот — името се преведува при приказ.
     var key: String?
     var noteKey: String?
-    /// Сопатник што го носи (nil = јас).
+    /// Кој го носи (id на сопатник). nil = локално „јас“, кај заедничко патување „секој свое“.
     var assignee: UUID?
+    /// Заедничко патување: кои акаунти (uid) го спакувале.
+    var packedBy: [String]?
 
-    /// Парчиња во мојот багаж (без облеченото и без она што го носи сопатник).
-    var bagUnits: Int { assignee != nil ? 0 : max(0, quantity - wornCount) }
+    /// Парчиња во торбата (без облеченото).
+    var bagUnits: Int { max(0, quantity - wornCount) }
 
     var isShareable: Bool { key.map { Catalog.isShareable($0) } ?? false }
 
@@ -358,6 +360,12 @@ struct WeatherSummary {
 struct Companion: Codable, Hashable, Identifiable {
     var id: UUID = UUID()
     var name: String
+    /// Акаунт на Valise (ако го има).
+    var uid: String?
+    /// Клуч на поканата (p_… или e_…) додека не се регистрира.
+    var inviteKey: String?
+
+    var hasAccount: Bool { uid != nil }
 
     var firstName: String {
         name.split(separator: " ").first.map(String.init) ?? name
@@ -387,12 +395,36 @@ struct Trip: Codable, Identifiable, Hashable {
     var tint: Int = 0
     var createdAt: Date = Date()
     var companions: [Companion]?
+    /// Заедничко патување (Firebase).
+    var ownerUID: String?
+    var memberUIDs: [String]?
 
-    var travelers: [Companion] { companions ?? [] }
+    /// Синхронизирано со акаунт.
+    var isCloud: Bool { ownerUID != nil }
+
+    /// Дали јас сум сопственик (или локално патување).
+    var isMine: Bool { ownerUID == nil || ownerUID == Session.uid }
+
+    /// Мојот запис меѓу учесниците (само кај заедничко патување).
+    var myCompanionID: UUID? {
+        guard let uid = Session.uid else { return nil }
+        return companions?.first { $0.uid == uid }?.id
+    }
+
+    /// Другите патници (без мене).
+    var travelers: [Companion] {
+        (companions ?? []).filter { $0.uid == nil || $0.uid != Session.uid }
+    }
 
     func companionName(_ id: UUID?) -> String? {
         guard let id else { return nil }
         return travelers.first { $0.id == id }?.firstName
+    }
+
+    /// Дали предметот оди во мојот багаж.
+    func isInMyBag(_ item: PackingItem) -> Bool {
+        guard let assignee = item.assignee else { return true }
+        return assignee == myCompanionID
     }
 
     /// Имиња за картата: јас + сопатниците.
@@ -436,11 +468,11 @@ struct Trip: Codable, Identifiable, Hashable {
     var destinationCode: String { destination.code }
 
     var packedVolume: Double {
-        items.reduce(0) { $0 + Double($1.bagUnits) * $1.unitVolume }
+        items.reduce(0) { isInMyBag($1) ? $0 + Double($1.bagUnits) * $1.unitVolume : $0 }
     }
 
     var packedWeight: Double {
-        items.reduce(bag.kind.tare) { $0 + Double($1.bagUnits) * $1.unitWeight }
+        items.reduce(bag.kind.tare) { isInMyBag($1) ? $0 + Double($1.bagUnits) * $1.unitWeight : $0 }
     }
 
     var fillRatio: Double {

@@ -725,6 +725,20 @@ struct TripWizardView: View {
         updated.exitChecklist = original.exitChecklist
         updated.dismissedSuggestions = original.dismissedSuggestions
 
+        // Заедничко патување: мојот запис, сопственикот и членовите остануваат
+        updated.ownerUID = original.ownerUID
+        if original.isCloud {
+            let mine = (original.companions ?? []).filter { $0.uid != nil && $0.uid == Session.uid }
+            let others = updated.companions ?? []
+            updated.companions = mine + others
+            let keptUIDs = Set((updated.companions ?? []).compactMap(\.uid))
+            updated.memberUIDs = (original.memberUIDs ?? []).filter { uid in
+                uid == original.ownerUID || keptUIDs.contains(uid)
+            }
+        } else {
+            updated.memberUIDs = original.memberUIDs
+        }
+
         let sameBasis = original.destination.id == updated.destination.id
             && original.startDate.startOfDay == updated.startDate
             && original.endDate.startOfDay == updated.endDate

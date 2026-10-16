@@ -4,6 +4,7 @@ struct TripDetailView: View {
     let tripID: UUID
 
     @EnvironmentObject private var store: TripStore
+    @EnvironmentObject private var account: AccountService
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("userName") private var userName: String = ""
@@ -21,6 +22,16 @@ struct TripDetailView: View {
     @State private var showEdit = false
     @State private var showAddCompanion = false
     @State private var newCompanionName = ""
+    @State private var showAccount = false
+    @State private var isInviting = false
+    @State private var inviteResult: InviteResult?
+
+    struct InviteResult: Identifiable {
+        let id = UUID()
+        let title: String
+        let detail: String
+        let shareMessage: String?
+    }
 
     var body: some View {
         Group {
@@ -92,6 +103,15 @@ struct TripDetailView: View {
             StorySheet(trip: trip)
                 .presentationCornerRadius(28)
         }
+        .sheet(isPresented: $showAccount) {
+            AccountView(startWith: .signUp)
+                .environmentObject(account)
+        }
+        .sheet(item: $inviteResult) { result in
+            InviteResultSheet(result: result)
+                .presentationDetents([.medium])
+                .presentationCornerRadius(28)
+        }
         .alert(L("Сопатник", "Travel companion"), isPresented: $showAddCompanion) {
             TextField(L("Име", "Name"), text: $newCompanionName)
                 .textInputAutocapitalization(.words)
@@ -119,13 +139,18 @@ struct TripDetailView: View {
             }
             Button(L("Откажи", "Cancel"), role: .cancel) { newExitTitle = "" }
         }
-        .confirmationDialog(L("Да се избрише патувањето?", "Delete this trip?"), isPresented: $confirmDelete, titleVisibility: .visible) {
-            Button(L("Избриши", "Delete"), role: .destructive) {
+        .confirmationDialog(trip.isMine ? L("Да се избрише патувањето?", "Delete this trip?") : L("Да излезеш од патувањето?", "Leave this trip?"),
+                            isPresented: $confirmDelete, titleVisibility: .visible) {
+            Button(trip.isMine ? L("Избриши", "Delete") : L("Излези", "Leave"), role: .destructive) {
                 store.delete(tripID)
                 dismiss()
             }
         } message: {
-            Text(L("Листата и сите белешки ќе се изгубат.", "The list and all notes will be lost."))
+            Text(trip.isMine
+                 ? (trip.travelers.contains(where: \.hasAccount)
+                    ? L("Патувањето ќе се избрише и кај сопатниците.", "The trip will be deleted for your companions too.")
+                    : L("Листата и сите белешки ќе се изгубат.", "The list and all notes will be lost."))
+                 : L("Патувањето ќе остане кај другите.", "The trip stays for everyone else."))
         }
         .confirmationDialog(L("Нова листа?", "Rebuild the list?"), isPresented: $confirmRegenerate, titleVisibility: .visible) {
             Button(L("Состави повторно", "Rebuild")) {
@@ -176,7 +201,9 @@ struct TripDetailView: View {
                     confirmRegenerate = true
                 }
                 Divider()
-                Button(L("Избриши патување", "Delete trip"), systemImage: "trash", role: .destructive) {
+                Button(trip.isMine ? L("Избриши патување", "Delete trip") : L("Излези од патувањето", "Leave trip"),
+                       systemImage: trip.isMine ? "trash" : "rectangle.portrait.and.arrow.right",
+                       role: .destructive) {
                     confirmDelete = true
                 }
             } label: {
@@ -222,12 +249,17 @@ struct TripDetailView: View {
                             ShareLink(item: trip.shareText(for: companion, from: userName)) {
                                 Label(L("Испрати му/ѝ листа", "Send them the list"), systemImage: "paperplane")
                             }
-                            Button(L("Отстрани", "Remove"), systemImage: "trash", role: .destructive) {
-                                withAnimation {
-                                    store.mutate(tripID) { t in
-                                        t.companions = (t.companions ?? []).filter { $0.id != companion.id }
-                                        for i in t.items.indices where t.items[i].assignee == companion.id {
-                                            t.items[i].assignee = nil
+                            if trip.isMine {
+                                Button(L("Отстрани", "Remove"), systemImage: "trash", role: .destructive) {
+                                    withAnimation {
+                                        store.mutate(tripID) { t in
+                                            t.companions = (t.companions ?? []).filter { $0.id != companion.id }
+                                            if let uid = companion.uid {
+                                                t.memberUIDs = (t.memberUIDs ?? []).filter { $0 != uid }
+                                            }
+                                            for i in t.items.indices where t.items[i].assignee == companion.id {
+                                                t.items[i].assignee = nil
+                                            }
                                         }
                                     }
                                 }
@@ -242,6 +274,15 @@ struct TripDetailView: View {
                                 Text(companion.firstName)
                                     .font(.sans(14, .medium))
                                     .foregroundStyle(Theme.ink)
+                                if companion.hasAccount {
+                                    Image(systemName: "checkmark.icloud")
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(Theme.sage)
+                                } else if companion.inviteKey != nil {
+                                    Image(systemName: "clock")
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(Theme.muted)
+                                }
                                 let count = trip.items.filter { $0.assignee == companion.id }.count
                                 if count > 0 {
                                     Text("\(count)")
@@ -257,12 +298,21 @@ struct TripDetailView: View {
                         }
                     }
 
-                    Button {
-                        showAddCompanion = true
+                    Menu {
+                        Button(L("Од контакти", "From contacts"), systemImage: "person.crop.circle.badge.plus") {
+                            pickContact()
+                        }
+                        Button(L("Само име", "Just a name"), systemImage: "character.cursor.ibeam") {
+                            showAddCompanion = true
+                        }
                     } label: {
                         HStack(spacing: 6) {
-                            Image(systemName: "person.badge.plus")
-                                .font(.system(size: 13, weight: .light))
+                            if isInviting {
+                                ProgressView().controlSize(.small).tint(Theme.navy)
+                            } else {
+                                Image(systemName: "person.badge.plus")
+                                    .font(.system(size: 13, weight: .light))
+                            }
                             Text(L("Додај пријател", "Add a friend"))
                                 .font(.sans(13, .medium))
                         }
@@ -271,7 +321,7 @@ struct TripDetailView: View {
                         .padding(.vertical, 10)
                         .overlay(Capsule().strokeBorder(Theme.navy.opacity(0.3), style: StrokeStyle(lineWidth: 0.75, dash: [3, 3])))
                     }
-                    .buttonStyle(PressableStyle())
+                    .disabled(isInviting)
                 }
                 .padding(.vertical, 1)
             }
@@ -284,6 +334,50 @@ struct TripDetailView: View {
                     .foregroundStyle(Theme.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
+        }
+    }
+
+    private func pickContact() {
+        guard account.isSignedIn, store.isSignedIn else {
+            showAccount = true
+            return
+        }
+        ContactPickerPresenter.shared.present { contact in
+            guard let contact else { return }
+            Task { await invite(contact) }
+        }
+    }
+
+    @MainActor
+    private func invite(_ contact: PickedContact) async {
+        isInviting = true
+        let outcome = await store.invite(name: contact.name, phones: contact.phones, emails: contact.emails, to: tripID)
+        isInviting = false
+        let first = contact.name.split(separator: " ").first.map(String.init) ?? contact.name
+        switch outcome {
+        case .joined:
+            inviteResult = InviteResult(
+                title: L("\(first) е на Valise ✓", "\(first) is on Valise ✓"),
+                detail: L("Додаден/а е во патувањето. Кај неа/него веќе се гледа истата листа — штиклирањето се синхронизира.",
+                          "They've been added to the trip and already see the same list — ticks sync both ways."),
+                shareMessage: nil)
+        case .alreadyIn:
+            inviteResult = InviteResult(
+                title: L("\(first) веќе патува со тебе", "\(first) is already on this trip"),
+                detail: "", shareMessage: nil)
+        case .invited(_, let message):
+            inviteResult = InviteResult(
+                title: L("\(first) уште нема Valise", "\(first) isn't on Valise yet"),
+                detail: L("Испрати покана. Кога ќе се регистрира со истиот број или е-пошта, патувањето автоматски ќе го/ја чека.",
+                          "Send an invite. Once they sign up with the same number or email, the trip will be waiting for them."),
+                shareMessage: message)
+        case .isYou:
+            inviteResult = InviteResult(title: L("Тоа си ти 🙂", "That's you 🙂"), detail: "", shareMessage: nil)
+        case .failed:
+            inviteResult = InviteResult(
+                title: L("Не успеа", "Couldn't add them"),
+                detail: L("Контактот нема број или е-пошта, или нема интернет.", "The contact has no number or email, or you're offline."),
+                shareMessage: nil)
         }
     }
 
@@ -449,6 +543,8 @@ struct TripDetailView: View {
                     PackingRow(item: item,
                                companions: trip.travelers,
                                assigneeName: trip.companionName(item.assignee),
+                               meID: trip.myCompanionID,
+                               isCloud: trip.isCloud,
                                onAssign: { assign(item, to: $0) },
                                onToggle: { toggle(item) },
                                onIncrease: { changeQuantity(item, by: 1) },
@@ -620,6 +716,8 @@ struct PackingRow: View {
     let item: PackingItem
     var companions: [Companion] = []
     var assigneeName: String?
+    var meID: UUID? = nil
+    var isCloud: Bool = false
     var onAssign: (UUID?) -> Void = { _ in }
     let onToggle: () -> Void
     let onIncrease: () -> Void
@@ -628,6 +726,33 @@ struct PackingRow: View {
 
     private var showsWhoPicker: Bool {
         !companions.isEmpty && (item.isShareable || item.assignee != nil)
+    }
+
+    private var isMine: Bool { item.assignee != nil && item.assignee == meID }
+    private var isAssignedToOther: Bool { item.assignee != nil && item.assignee != meID }
+
+    /// Што пишува на копчето „кој носи“.
+    private var whoLabel: String {
+        if item.assignee == nil { return isCloud ? L("Секој", "Each") : L("Јас", "Me") }
+        if isMine { return L("Јас", "Me") }
+        return assigneeName ?? "?"
+    }
+
+    @ViewBuilder
+    private var whoMenu: some View {
+        Button(L("Јас", "Me"), systemImage: (isCloud ? isMine : item.assignee == nil) ? "checkmark" : "person") {
+            onAssign(isCloud ? meID : nil)
+        }
+        ForEach(companions) { companion in
+            Button(companion.firstName, systemImage: item.assignee == companion.id ? "checkmark" : "person") {
+                onAssign(companion.id)
+            }
+        }
+        if isCloud {
+            Button(L("Секој свое", "Each brings their own"), systemImage: item.assignee == nil ? "checkmark" : "person.2") {
+                onAssign(nil)
+            }
+        }
     }
 
     var body: some View {
@@ -674,26 +799,21 @@ struct PackingRow: View {
 
             if showsWhoPicker {
                 Menu {
-                    Button(L("Јас", "Me"), systemImage: item.assignee == nil ? "checkmark" : "person") { onAssign(nil) }
-                    ForEach(companions) { companion in
-                        Button(companion.firstName, systemImage: item.assignee == companion.id ? "checkmark" : "person") {
-                            onAssign(companion.id)
-                        }
-                    }
+                    whoMenu
                 } label: {
                     HStack(spacing: 4) {
-                        Text((assigneeName ?? L("Јас", "Me")).uppercased())
+                        Text(whoLabel.uppercased())
                             .font(.sans(10, .semibold))
                             .tracking(1)
                             .lineLimit(1)
                         Image(systemName: "chevron.down")
                             .font(.system(size: 8, weight: .bold))
                     }
-                    .foregroundStyle(item.assignee != nil ? Theme.goldLight : Theme.navy)
+                    .foregroundStyle(isAssignedToOther ? Theme.goldLight : Theme.navy)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
-                    .background(Capsule().fill(item.assignee != nil ? Theme.navy : Color.clear))
-                    .overlay(Capsule().strokeBorder(Theme.navy.opacity(item.assignee != nil ? 0 : 0.25), lineWidth: 0.75))
+                    .background(Capsule().fill(isAssignedToOther ? Theme.navy : Color.clear))
+                    .overlay(Capsule().strokeBorder(Theme.navy.opacity(isAssignedToOther ? 0 : 0.25), lineWidth: 0.75))
                 }
             }
 
@@ -709,12 +829,7 @@ struct PackingRow: View {
         .contextMenu {
             if !companions.isEmpty {
                 Menu(L("Кој го носи", "Who brings it"), systemImage: "person.2") {
-                    Button(L("Јас", "Me"), systemImage: item.assignee == nil ? "checkmark" : "person") { onAssign(nil) }
-                    ForEach(companions) { companion in
-                        Button(companion.firstName, systemImage: item.assignee == companion.id ? "checkmark" : "person") {
-                            onAssign(companion.id)
-                        }
-                    }
+                    whoMenu
                 }
                 Divider()
             }
@@ -993,5 +1108,50 @@ struct AddItemSheet: View {
                           unitWeight: 0.2,
                           isCustom: true))
         dismiss()
+    }
+}
+
+
+// MARK: - Резултат од покана
+
+struct InviteResultSheet: View {
+    let result: TripDetailView.InviteResult
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ZStack {
+            PaperBackground()
+            VStack(alignment: .leading, spacing: 18) {
+                HStack {
+                    Eyebrow(L("Сопатник", "Companion"), color: Theme.gold)
+                    Spacer()
+                    CircleIconButton(systemName: "xmark") { dismiss() }
+                }
+                Text(result.title)
+                    .font(.serif(28))
+                    .foregroundStyle(Theme.ink)
+                if !result.detail.isEmpty {
+                    Text(result.detail)
+                        .font(.sans(15))
+                        .foregroundStyle(Theme.inkSoft)
+                        .lineSpacing(3)
+                }
+                Spacer(minLength: 0)
+                if let message = result.shareMessage {
+                    ShareLink(item: message) {
+                        HStack(spacing: 10) {
+                            Image(systemName: "paperplane")
+                                .font(.system(size: 12, weight: .semibold))
+                            Text(L("Испрати покана", "Send invite"))
+                        }
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                } else {
+                    Button(L("Супер", "Great")) { dismiss() }
+                        .buttonStyle(PrimaryButtonStyle())
+                }
+            }
+            .padding(24)
+        }
     }
 }

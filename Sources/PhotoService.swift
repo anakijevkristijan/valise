@@ -1,16 +1,27 @@
 import UIKit
 
-/// Фотографија од дестинацијата: Wikidata (според GeoNames ID) → слика од Wikimedia Commons.
-/// Бесплатно, без клуч. Се чува во меморија и на диск по првото симнување.
+/// Фотографии од дестинацијата, бесплатно и без клуч:
+/// Wikidata (според GeoNames ID) → главна слика (P18) + категорија на Wikimedia Commons (P373).
+/// Сè се чува во меморија и на диск.
 enum PhotoService {
 
-    private static let userAgent = "Valise/1.2 (iOS packing app)"
-    private static var memory: [Int: UIImage] = [:]
+    private static let userAgent = "Valise/1.4 (iOS packing app)"
+    private static let maxCandidates = 12
+
+    @MainActor private static var imageMemory: [URL: UIImage] = [:]
+    @MainActor private static var candidateMemory: [Int: [URL]] = [:]
+
+    // MARK: Јавно
+
+    /// Главната фотографија (прва од кандидатите).
+    static func photo(for place: Place) async -> UIImage? {
+        guard let first = await candidates(for: place).first else { return nil }
+        return await image(at: first)
+    }
 
     /// Фотографија, но најмногу `timeout` секунди чекање.
     static func photo(for place: Place, timeout: Double) async -> UIImage? {
-        if let cached = memory[place.id] { return cached }
-        return await withTaskGroup(of: UIImage?.self) { group in
+        await withTaskGroup(of: UIImage?.self) { group in
             group.addTask { await PhotoService.photo(for: place) }
             group.addTask {
                 try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
@@ -22,28 +33,62 @@ enum PhotoService {
         }
     }
 
-    static func photo(for place: Place) async -> UIImage? {
-        if let cached = memory[place.id] { return cached }
-
-        let cacheFile = cacheURL(for: place.id)
-        if let data = try? Data(contentsOf: cacheFile), let image = UIImage(data: data) {
-            await remember(image, for: place.id)
-            return image
+    /// Листа со фотографии за дестинацијата (главната прва).
+    static func candidates(for place: Place) async -> [URL] {
+        if let cached = await cachedCandidates(place.id) { return cached }
+        if let saved = loadSavedCandidates(place.id), !saved.isEmpty {
+            await remember(saved, for: place.id)
+            return saved
         }
 
-        guard let remote = await imageURL(geonamesID: place.id) else { return nil }
-        guard let data = await get(remote, timeout: 10), let image = UIImage(data: data) else { return nil }
-        try? data.write(to: cacheFile, options: .atomic)
-        await remember(image, for: place.id)
+        guard let entity = await entityID(geonamesID: place.id) else { return [] }
+
+        async let mainFile = claimString(entity: entity, property: "P18")
+        async let category = claimString(entity: entity, property: "P373")
+        let (main, cat) = await (mainFile, category)
+
+        var urls: [URL] = []
+        if let main, let url = filePathURL(main) { urls.append(url) }
+
+        var more: [URL] = []
+        if let cat {
+            more = await categoryImages(cat)
+        }
+        if more.count < 4, let label = await englishLabel(entity: entity) {
+            more += await searchImages(label)
+        }
+
+        var seen = Set(urls.map { $0.lastPathComponent.lowercased() })
+        for url in more where urls.count < maxCandidates {
+            let key = url.lastPathComponent.lowercased()
+            if !seen.contains(key) {
+                seen.insert(key)
+                urls.append(url)
+            }
+        }
+
+        if !urls.isEmpty {
+            await remember(urls, for: place.id)
+            saveCandidates(urls, for: place.id)
+        }
+        return urls
+    }
+
+    /// Една фотографија од URL (кеширана).
+    static func image(at url: URL) async -> UIImage? {
+        if let cached = await cachedImage(url) { return cached }
+        let file = cacheFile(for: url)
+        if let data = try? Data(contentsOf: file), let image = UIImage(data: data) {
+            await remember(image, for: url)
+            return image
+        }
+        guard let data = await get(url, timeout: 12), let image = UIImage(data: data) else { return nil }
+        try? data.write(to: file, options: .atomic)
+        await remember(image, for: url)
         return image
     }
 
-    @MainActor
-    private static func remember(_ image: UIImage, for id: Int) {
-        memory[id] = image
-    }
-
-    // MARK: Wikidata — брз пат (пребарување + тврдење), без SPARQL
+    // MARK: Wikidata
 
     private struct SearchResponse: Decodable {
         struct Query: Decodable {
@@ -64,38 +109,111 @@ enum PhotoService {
         let claims: [String: [Claim]]?
     }
 
-    private static func imageURL(geonamesID: Int) async -> URL? {
-        // 1) Wikidata елемент според GeoNames ID
-        guard var search = URLComponents(string: "https://www.wikidata.org/w/api.php") else { return nil }
-        search.queryItems = [
-            URLQueryItem(name: "action", value: "query"),
-            URLQueryItem(name: "list", value: "search"),
-            URLQueryItem(name: "srsearch", value: "haswbstatement:P1566=\(geonamesID)"),
-            URLQueryItem(name: "srlimit", value: "1"),
-            URLQueryItem(name: "format", value: "json")
-        ]
-        guard let searchURL = search.url,
-              let searchData = await get(searchURL, timeout: 5),
-              let found = try? JSONDecoder().decode(SearchResponse.self, from: searchData),
-              let entity = found.query?.search.first?.title else { return nil }
+    private struct LabelsResponse: Decodable {
+        struct Entity: Decodable {
+            struct Label: Decodable { let value: String }
+            let labels: [String: Label]?
+        }
+        let entities: [String: Entity]?
+    }
 
-        // 2) Слика (P18) на елементот
-        guard var claims = URLComponents(string: "https://www.wikidata.org/w/api.php") else { return nil }
-        claims.queryItems = [
-            URLQueryItem(name: "action", value: "wbgetclaims"),
-            URLQueryItem(name: "entity", value: entity),
-            URLQueryItem(name: "property", value: "P18"),
-            URLQueryItem(name: "format", value: "json")
-        ]
-        guard let claimsURL = claims.url,
-              let claimsData = await get(claimsURL, timeout: 5),
-              let decoded = try? JSONDecoder().decode(ClaimsResponse.self, from: claimsData),
-              let fileName = decoded.claims?["P18"]?.first?.mainsnak.datavalue?.value else { return nil }
+    private static func entityID(geonamesID: Int) async -> String? {
+        let url = api("https://www.wikidata.org/w/api.php", [
+            "action": "query", "list": "search",
+            "srsearch": "haswbstatement:P1566=\(geonamesID)",
+            "srlimit": "1", "format": "json"
+        ])
+        guard let url, let data = await get(url, timeout: 6),
+              let decoded = try? JSONDecoder().decode(SearchResponse.self, from: data) else { return nil }
+        return decoded.query?.search.first?.title
+    }
 
-        // 3) Намалена верзија од Commons (1080 px — доволно за Story)
+    private static func claimString(entity: String, property: String) async -> String? {
+        let url = api("https://www.wikidata.org/w/api.php", [
+            "action": "wbgetclaims", "entity": entity, "property": property, "format": "json"
+        ])
+        guard let url, let data = await get(url, timeout: 6),
+              let decoded = try? JSONDecoder().decode(ClaimsResponse.self, from: data) else { return nil }
+        return decoded.claims?[property]?.first?.mainsnak.datavalue?.value
+    }
+
+    private static func englishLabel(entity: String) async -> String? {
+        let url = api("https://www.wikidata.org/w/api.php", [
+            "action": "wbgetentities", "ids": entity, "props": "labels", "languages": "en", "format": "json"
+        ])
+        guard let url, let data = await get(url, timeout: 6),
+              let decoded = try? JSONDecoder().decode(LabelsResponse.self, from: data) else { return nil }
+        return decoded.entities?[entity]?.labels?["en"]?.value
+    }
+
+    // MARK: Wikimedia Commons
+
+    private struct CommonsResponse: Decodable {
+        struct Query: Decodable {
+            struct Page: Decodable {
+                struct Info: Decodable {
+                    let thumburl: String?
+                    let width: Int?
+                    let height: Int?
+                    let mime: String?
+                }
+                let title: String?
+                let imageinfo: [Info]?
+            }
+            let pages: [Page]?
+        }
+        let query: Query?
+    }
+
+    private static func categoryImages(_ category: String) async -> [URL] {
+        let url = api("https://commons.wikimedia.org/w/api.php", [
+            "action": "query", "generator": "categorymembers",
+            "gcmtitle": "Category:\(category)", "gcmtype": "file", "gcmlimit": "40",
+            "prop": "imageinfo", "iiprop": "url|size|mime", "iiurlwidth": "1080",
+            "format": "json", "formatversion": "2"
+        ])
+        return await commonsImages(url)
+    }
+
+    private static func searchImages(_ term: String) async -> [URL] {
+        let url = api("https://commons.wikimedia.org/w/api.php", [
+            "action": "query", "generator": "search", "gsrnamespace": "6",
+            "gsrsearch": "\"\(term)\" filetype:bitmap", "gsrlimit": "30",
+            "prop": "imageinfo", "iiprop": "url|size|mime", "iiurlwidth": "1080",
+            "format": "json", "formatversion": "2"
+        ])
+        return await commonsImages(url)
+    }
+
+    private static let excluded = ["map", "flag", "coat", "logo", "emblem", "plan", "diagram", "karta", "grb", "zname"]
+
+    private static func commonsImages(_ url: URL?) async -> [URL] {
+        guard let url, let data = await get(url, timeout: 8),
+              let decoded = try? JSONDecoder().decode(CommonsResponse.self, from: data) else { return [] }
+        return (decoded.query?.pages ?? []).compactMap { page in
+            guard let info = page.imageinfo?.first,
+                  info.mime == "image/jpeg",
+                  (info.width ?? 0) >= 900,
+                  (info.height ?? 0) >= 600,
+                  let thumb = info.thumburl else { return nil }
+            let title = (page.title ?? "").lowercased()
+            if excluded.contains(where: { title.contains($0) }) { return nil }
+            return URL(string: thumb)
+        }
+    }
+
+    private static func filePathURL(_ fileName: String) -> URL? {
         let underscored = fileName.replacingOccurrences(of: " ", with: "_")
         guard let encoded = underscored.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else { return nil }
         return URL(string: "https://commons.wikimedia.org/wiki/Special:FilePath/\(encoded)?width=1080")
+    }
+
+    // MARK: Помошни
+
+    private static func api(_ base: String, _ params: [String: String]) -> URL? {
+        guard var components = URLComponents(string: base) else { return nil }
+        components.queryItems = params.sorted { $0.key < $1.key }.map { URLQueryItem(name: $0.key, value: $0.value) }
+        return components.url
     }
 
     private static func get(_ url: URL, timeout: Double) async -> Data? {
@@ -108,10 +226,38 @@ enum PhotoService {
         return result.0
     }
 
-    private static func cacheURL(for id: Int) -> URL {
+    @MainActor private static func cachedImage(_ url: URL) -> UIImage? { imageMemory[url] }
+    @MainActor private static func remember(_ image: UIImage, for url: URL) { imageMemory[url] = image }
+    @MainActor private static func cachedCandidates(_ id: Int) -> [URL]? { candidateMemory[id] }
+    @MainActor private static func remember(_ urls: [URL], for id: Int) { candidateMemory[id] = urls }
+
+    private static var cacheFolder: URL {
         let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("photos", isDirectory: true)
         try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
-        return base.appendingPathComponent("\(id).jpg")
+        return base
+    }
+
+    private static func cacheFile(for url: URL) -> URL {
+        var hash: UInt64 = 5381
+        for byte in url.absoluteString.utf8 { hash = (hash &* 33) &+ UInt64(byte) }
+        return cacheFolder.appendingPathComponent(String(hash, radix: 16) + ".jpg")
+    }
+
+    private static func listFile(_ id: Int) -> URL {
+        cacheFolder.appendingPathComponent("list-\(id).json")
+    }
+
+    private static func saveCandidates(_ urls: [URL], for id: Int) {
+        let strings = urls.map(\.absoluteString)
+        if let data = try? JSONEncoder().encode(strings) {
+            try? data.write(to: listFile(id), options: .atomic)
+        }
+    }
+
+    private static func loadSavedCandidates(_ id: Int) -> [URL]? {
+        guard let data = try? Data(contentsOf: listFile(id)),
+              let strings = try? JSONDecoder().decode([String].self, from: data) else { return nil }
+        return strings.compactMap(URL.init(string:))
     }
 }

@@ -2,6 +2,8 @@ import SwiftUI
 
 struct HomeView: View {
     @EnvironmentObject private var store: TripStore
+    @EnvironmentObject private var premium: PremiumStore
+    @EnvironmentObject private var account: AccountService
     @AppStorage("userName") private var userName: String = ""
 
     @State private var path: [UUID] = []
@@ -12,7 +14,7 @@ struct HomeView: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            ZStack(alignment: .bottom) {
+            ZStack {
                 PaperBackground()
 
                 ScrollView {
@@ -31,17 +33,13 @@ struct HomeView: View {
                     }
                     .padding(.horizontal, 22)
                     .padding(.top, 10)
-                    .padding(.bottom, 130)
+                    .padding(.bottom, 50)
                     .frame(maxWidth: 640)
                     .frame(maxWidth: .infinity)
                     .containerRelativeFrame(.horizontal)
                 }
                 .scrollIndicators(.hidden)
                 .refreshable { await store.refreshAllUpcoming() }
-
-                if !store.upcoming.isEmpty {
-                    newTripBar
-                }
             }
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: UUID.self) { id in
@@ -58,6 +56,8 @@ struct HomeView: View {
         .sheet(isPresented: $showSettings) {
             SettingsView()
                 .environmentObject(store)
+                .environmentObject(premium)
+                .environmentObject(account)
         }
     }
 
@@ -71,6 +71,16 @@ struct HomeView: View {
                     .tracking(4)
                     .foregroundStyle(Theme.navy)
                 Spacer()
+                if !store.trips.isEmpty {
+                    Button { showWizard = true } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 15, weight: .regular))
+                            .foregroundStyle(Theme.goldLight)
+                            .frame(width: 40, height: 40)
+                            .background(Circle().fill(Theme.navy))
+                    }
+                    .buttonStyle(PressableStyle())
+                }
                 Button { showSettings = true } label: {
                     Text(initial)
                         .font(.serif(16))
@@ -124,35 +134,31 @@ struct HomeView: View {
         return L("Твојата карта за \(trip.destination.name) е спремна.", "Your ticket to \(trip.destination.name) is ready.")
     }
 
-    // MARK: Патувања
+    // MARK: Патувања — пасови во мрежа
 
-    @ViewBuilder
+    private let columns = [GridItem(.adaptive(minimum: 150, maximum: 230), spacing: 14)]
+
     private var upcomingSection: some View {
-        let trips = store.upcoming
-        if let first = trips.first {
-            NavigationLink(value: first.id) {
-                BoardingPassCard(trip: first)
-            }
-            .buttonStyle(PressableStyle())
-            .contextMenu { deleteButton(first) }
-        }
-
-        if trips.count > 1 {
-            VStack(alignment: .leading, spacing: 12) {
-                Eyebrow(L("Наскоро", "Coming up"))
-                ForEach(trips.dropFirst()) { trip in
+        VStack(alignment: .leading, spacing: 14) {
+            Eyebrow(L("Твоите пасови", "Your passes") + " · \(store.upcoming.count)")
+            LazyVGrid(columns: columns, spacing: 14) {
+                ForEach(store.upcoming) { trip in
                     NavigationLink(value: trip.id) {
-                        TicketRow(trip: trip)
+                        PassTile(trip: trip)
                     }
                     .buttonStyle(PressableStyle())
                     .contextMenu { deleteButton(trip) }
                 }
+                Button { showWizard = true } label: {
+                    NewPassTile()
+                }
+                .buttonStyle(PressableStyle())
             }
         }
     }
 
     private var pastSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
             Button {
                 withAnimation(.easeInOut) { showPast.toggle() }
             } label: {
@@ -169,13 +175,14 @@ struct HomeView: View {
             .buttonStyle(.plain)
 
             if showPast {
-                ForEach(store.past) { trip in
-                    NavigationLink(value: trip.id) {
-                        TicketRow(trip: trip)
-                            .opacity(0.7)
+                LazyVGrid(columns: columns, spacing: 14) {
+                    ForEach(store.past) { trip in
+                        NavigationLink(value: trip.id) {
+                            PassTile(trip: trip, dimmed: true)
+                        }
+                        .buttonStyle(PressableStyle())
+                        .contextMenu { deleteButton(trip) }
                     }
-                    .buttonStyle(PressableStyle())
-                    .contextMenu { deleteButton(trip) }
                 }
             }
         }
@@ -227,28 +234,6 @@ struct HomeView: View {
             .buttonStyle(PrimaryButtonStyle())
         }
         .padding(.top, 8)
-    }
-
-    private var newTripBar: some View {
-        Button { showWizard = true } label: {
-            HStack(spacing: 10) {
-                Image(systemName: "plus")
-                    .font(.system(size: 12, weight: .semibold))
-                Text(L("Ново патување", "New trip"))
-            }
-        }
-        .buttonStyle(PrimaryButtonStyle())
-        .frame(maxWidth: 420)
-        .padding(.horizontal, 32)
-        .padding(.bottom, 14)
-        .padding(.top, 30)
-        .frame(maxWidth: .infinity)
-        .background(
-            LinearGradient(colors: [Theme.paper.opacity(0), Theme.paper.opacity(0.95), Theme.paper],
-                           startPoint: .top, endPoint: .bottom)
-                .ignoresSafeArea()
-                .allowsHitTesting(false)
-        )
     }
 
     private func openPendingTrip() {

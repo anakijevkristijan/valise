@@ -28,27 +28,149 @@ final class TripStore: ObservableObject {
         trips.first { $0.id == id }
     }
 
-    // MARK: Промени
+    // MARK: Облак
 
-    func add(_ trip: Trip) {
-        trips.append(trip)
+    private(set) var cloud: CloudSync?
+
+    var isSignedIn: Bool { cloud != nil }
+
+    /// По најава: слушај ги заедничките патувања и качи ги локалните.
+    func startSync(uid: String) {
+        guard cloud?.uid != uid else { return }
+        cloud?.stop()
+        let sync = CloudSync(uid: uid, store: self)
+        cloud = sync
+        let name = UserDefaults.standard.string(forKey: "userName") ?? ""
+        for index in trips.indices where trips[index].ownerUID == nil {
+            sync.claim(&trips[index], myName: name)
+            let trip = trips[index]
+            Task { await sync.upload(trip) }
+        }
+        save()
+        sync.start()
+        objectWillChange.send()
+    }
+
+    /// По одјава: туѓите патувања се тргаат од телефонот, моите остануваат.
+    func stopSync(previousUID: String?) {
+        cloud?.stop()
+        cloud = nil
+        if let previousUID {
+            trips.removeAll { $0.ownerUID != nil && $0.ownerUID != previousUID }
+        }
+        save()
+        objectWillChange.send()
+    }
+
+    /// Промена што дошла од облакот (без повторно качување).
+    func applyRemote(_ trip: Trip) {
+        if let index = trips.firstIndex(where: { $0.id == trip.id }) {
+            if trips[index] != trip { trips[index] = trip }
+        } else {
+            trips.append(trip)
+        }
         save()
     }
 
-    func mutate(_ id: UUID, _ change: (inout Trip) -> Void) {
-        guard let index = trips.firstIndex(where: { $0.id == id }) else { return }
-        change(&trips[index])
-        save()
-    }
-
-    func delete(_ id: UUID) {
+    func removeLocal(_ id: UUID) {
+        guard trips.contains(where: { $0.id == id }) else { return }
         trips.removeAll { $0.id == id }
         save()
     }
 
+    // MARK: Промени
+
+    func add(_ trip: Trip) {
+        var newTrip = trip
+        if let cloud {
+            cloud.claim(&newTrip, myName: UserDefaults.standard.string(forKey: "userName") ?? "")
+        }
+        trips.append(newTrip)
+        save()
+        if let cloud {
+            let uploaded = newTrip
+            Task { await cloud.upload(uploaded) }
+        }
+    }
+
+    func mutate(_ id: UUID, _ change: (inout Trip) -> Void) {
+        guard let index = trips.firstIndex(where: { $0.id == id }) else { return }
+        let before = trips[index]
+        change(&trips[index])
+        save()
+        cloud?.push(old: before, new: trips[index])
+    }
+
+    func delete(_ id: UUID) {
+        guard let trip = self.trip(id) else { return }
+        trips.removeAll { $0.id == id }
+        save()
+        if let cloud {
+            Task { await cloud.removeOrLeave(trip) }
+        }
+    }
+
     func deleteAll() {
+        let all = trips
         trips.removeAll()
         save()
+        if let cloud {
+            Task { for trip in all { await cloud.removeOrLeave(trip) } }
+        }
+    }
+
+    // MARK: Покана на сопатник
+
+    enum InviteOutcome {
+        case joined(String)
+        case alreadyIn(String)
+        case invited(String, String)
+        case isYou
+        case failed
+    }
+
+    /// Пријател од контакти: ако има акаунт — веднаш е во патувањето; ако нема — покана што го чека.
+    @MainActor
+    func invite(name: String, phones: [String], emails: [String], to tripID: UUID) async -> InviteOutcome {
+        guard let cloud, let current = trip(tripID) else { return .failed }
+
+        let phoneKeys = phones.compactMap { PhoneID.normalize($0) }.map { PhoneID.phoneKey($0) }
+        let emailKeys = emails.map { PhoneID.emailKey($0) }
+        let keys = Array(Set(phoneKeys)) + Array(Set(emailKeys))
+        guard !keys.isEmpty else { return .failed }
+
+        if !current.isCloud, let index = trips.firstIndex(where: { $0.id == tripID }) {
+            cloud.claim(&trips[index], myName: UserDefaults.standard.string(forKey: "userName") ?? "")
+            save()
+        }
+        if let latest = trip(tripID), latest.ownerUID == cloud.uid { await cloud.upload(latest) }
+
+        if let uid = await cloud.lookup(keys: keys) {
+            if uid == cloud.uid { return .isYou }
+            if trip(tripID)?.memberUIDs?.contains(uid) == true { return .alreadyIn(name) }
+            mutate(tripID) { t in
+                var list = t.companions ?? []
+                list.append(Companion(name: name, uid: uid))
+                t.companions = list
+                var members = t.memberUIDs ?? []
+                if !members.contains(uid) { members.append(uid) }
+                t.memberUIDs = members
+            }
+            return .joined(name)
+        }
+
+        mutate(tripID) { t in
+            var list = t.companions ?? []
+            list.append(Companion(name: name, inviteKey: keys.first))
+            t.companions = list
+        }
+        let me = UserDefaults.standard.string(forKey: "userName") ?? ""
+        if let latest = trip(tripID) {
+            await cloud.createInvites(trip: latest, keys: keys, fromName: me)
+        }
+        let message = L("Здраво \(name.split(separator: " ").first.map(String.init) ?? name)! ✈︎ Патувам за \(current.destination.name) (\(Fmt.range(current.startDate, current.endDate))) и те додадов во Valise. Симни ја апликацијата и регистрирај се со твојот број — патувањето и листата ќе те чекаат. — \(me)",
+                        "Hi \(name.split(separator: " ").first.map(String.init) ?? name)! ✈︎ I'm going to \(current.destination.name) (\(Fmt.range(current.startDate, current.endDate))) and added you on Valise. Get the app and sign up with your number — the trip and packing list will be waiting. — \(me)")
+        return .invited(name, message)
     }
 
     // MARK: Прогноза — се освежува при секое отворање

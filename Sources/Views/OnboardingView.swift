@@ -6,6 +6,8 @@ struct OnboardingView: View {
     @State private var name: String = ""
     @State private var appeared = false
     @FocusState private var focused: Bool
+    @EnvironmentObject private var account: AccountService
+    @State private var showSignIn = false
 
     var body: some View {
         ZStack {
@@ -74,6 +76,17 @@ struct OnboardingView: View {
                     .buttonStyle(PrimaryButtonStyle())
                     .disabled(trimmed.isEmpty)
 
+                    Button {
+                        showSignIn = true
+                    } label: {
+                        Text(L("Веќе имаш акаунт? Најави се", "Already have an account? Sign in"))
+                            .font(.sans(14, .medium))
+                            .foregroundStyle(Theme.navy)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 16)
+                    }
+                    .buttonStyle(.plain)
+
                     Spacer(minLength: 40)
                 }
                 .padding(.horizontal, 26)
@@ -84,6 +97,15 @@ struct OnboardingView: View {
                 .offset(y: appeared ? 0 : 16)
             }
             .scrollDismissesKeyboard(.interactively)
+        }
+        .sheet(isPresented: $showSignIn) {
+            AccountView(startWith: .signIn)
+                .environmentObject(account)
+        }
+        .onChange(of: account.profile) { _, profile in
+            if let profile, !profile.name.isEmpty, userName.isEmpty {
+                userName = profile.name
+            }
         }
         .onAppear {
             withAnimation(.easeOut(duration: 0.9)) { appeared = true }

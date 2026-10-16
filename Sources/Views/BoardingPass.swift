@@ -279,3 +279,133 @@ struct TicketRow: View {
         )
     }
 }
+
+// MARK: - Пас (плочка во мрежа на почетна)
+
+struct PassTile: View {
+    let trip: Trip
+    var dimmed: Bool = false
+
+    static let height: CGFloat = 206
+
+    private var color: Color { Theme.ticket(trip.tint) }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            top
+                .frame(height: 124)
+                .background(TicketHalf(side: .top, cornerRadius: 18, notch: 8).fill(color))
+                .overlay(alignment: .bottom) {
+                    DashedLine()
+                        .stroke(Theme.goldLight.opacity(0.45), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                        .frame(height: 1)
+                        .padding(.horizontal, 12)
+                }
+            bottom
+                .frame(height: Self.height - 124)
+                .background(TicketHalf(side: .bottom, cornerRadius: 18, notch: 8).fill(color))
+        }
+        .compositingGroup()
+        .shadow(color: Theme.navy.opacity(dimmed ? 0.06 : 0.16), radius: 14, x: 0, y: 8)
+        .saturation(dimmed ? 0.35 : 1)
+        .opacity(dimmed ? 0.75 : 1)
+    }
+
+    private var top: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("VALISE")
+                    .font(.sans(8, .semibold))
+                    .tracking(2.4)
+                Spacer()
+                Text(trip.countdownText.uppercased())
+                    .font(.sans(8, .semibold))
+                    .tracking(1.2)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+            .foregroundStyle(Theme.goldLight)
+
+            Spacer(minLength: 6)
+
+            HStack(spacing: 5) {
+                Text(trip.originCode)
+                    .font(.codes(13))
+                    .foregroundStyle(Theme.ticketText.opacity(0.7))
+                Image(systemName: trip.transport.icon)
+                    .font(.system(size: 8, weight: .light))
+                    .foregroundStyle(Theme.goldLight)
+            }
+            Text(trip.destinationCode)
+                .font(.codes(40))
+                .foregroundStyle(Theme.ticketText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+            Text(trip.destination.name)
+                .font(.sans(11, .medium))
+                .foregroundStyle(Theme.ticketText.opacity(0.75))
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 14)
+        .padding(.bottom, 12)
+    }
+
+    private var bottom: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("\(Fmt.ticketDate(trip.startDate)) — \(Fmt.ticketDate(trip.endDate))")
+                    .font(.codes(13))
+                    .foregroundStyle(Theme.ticketText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                Spacer(minLength: 4)
+                Text("\(Int((trip.progress * 100).rounded()))%")
+                    .font(.codes(13))
+                    .foregroundStyle(Theme.goldLight)
+            }
+            BarcodeView(seed: trip.id.uuidString)
+                .frame(height: 20)
+            if !trip.travelers.isEmpty {
+                HStack(spacing: 3) {
+                    Image(systemName: "person.2.fill")
+                        .font(.system(size: 8))
+                    Text("+\(trip.travelers.count)")
+                        .font(.sans(9, .semibold))
+                }
+                .foregroundStyle(Theme.ticketText.opacity(0.6))
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 12)
+        .padding(.bottom, 12)
+        .frame(maxHeight: .infinity, alignment: .top)
+    }
+}
+
+/// Празна плочка „Ново патување“.
+struct NewPassTile: View {
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "plus")
+                .font(.system(size: 18, weight: .light))
+                .foregroundStyle(Theme.navy)
+                .frame(width: 46, height: 46)
+                .overlay(Circle().strokeBorder(Theme.navy.opacity(0.3), lineWidth: 0.75))
+            Text(L("Ново патување", "New trip").uppercased())
+                .font(.sans(10, .semibold))
+                .tracking(1.6)
+                .foregroundStyle(Theme.navy)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: PassTile.height)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Theme.surface.opacity(0.6))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(Theme.navy.opacity(0.25), style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
+        )
+    }
+}

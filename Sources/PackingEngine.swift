@@ -399,8 +399,10 @@ enum PackingEngine {
         var fresh = generate(for: trip).map { item -> PackingItem in
             var copy = item
             if let old = previous[item.identity] ?? previous[item.displayName.lowercased()] {
+                copy.id = old.id
                 copy.isPacked = old.isPacked
                 copy.assignee = old.assignee
+                copy.packedBy = old.packedBy
             }
             return copy
         }
