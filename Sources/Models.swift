@@ -231,10 +231,9 @@ struct PackingItem: Codable, Identifiable, Hashable {
     /// Клуч од каталогот — името се преведува при приказ.
     var key: String?
     var noteKey: String?
-    /// Кој го носи (id на сопатник). nil = локално „јас“, кај заедничко патување „секој свое“.
+    /// Само за делот „Заедно“: кој го носи (id на сопатник).
+    /// nil = локално „јас“, кај патување со акаунти „уште не е одлучено“.
     var assignee: UUID?
-    /// Заедничко патување: кои акаунти (uid) го спакувале.
-    var packedBy: [String]?
 
     /// Парчиња во торбата (без облеченото).
     var bagUnits: Int { max(0, quantity - wornCount) }
@@ -386,7 +385,10 @@ struct Trip: Codable, Identifiable, Hashable {
     var activities: [Activity]
     var style: TravelerStyle
     var hasLaundry: Bool
+    /// Мојата лична листа.
     var items: [PackingItem] = []
+    /// Заедничките работи (шампон, паста…) — со избор кој носи. nil = нема делот.
+    var together: [PackingItem]?
     var exitChecklist: [ChecklistItem] = []
     var weather: [WeatherDay] = []
     var weatherSource: WeatherSource = .none
@@ -421,10 +423,21 @@ struct Trip: Codable, Identifiable, Hashable {
         return travelers.first { $0.id == id }?.firstName
     }
 
-    /// Дали предметот оди во мојот багаж.
-    func isInMyBag(_ item: PackingItem) -> Bool {
-        guard let assignee = item.assignee else { return true }
-        return assignee == myCompanionID
+    /// Заедничките работи.
+    var togetherItems: [PackingItem] { together ?? [] }
+
+    /// Дали заедничкиот предмет го носам јас.
+    func isMine(_ item: PackingItem) -> Bool {
+        if isCloud { return item.assignee != nil && item.assignee == myCompanionID }
+        return item.assignee == nil
+    }
+
+    /// Мојата листа + заедничкото што го носам јас.
+    var myItems: [PackingItem] { items + togetherItems.filter { isMine($0) } }
+
+    /// Заеднички работи за кои уште не е одлучено кој носи.
+    var undecidedCount: Int {
+        isCloud ? togetherItems.filter { $0.assignee == nil }.count : 0
     }
 
     /// Имиња за картата: јас + сопатниците.
@@ -454,8 +467,9 @@ struct Trip: Codable, Identifiable, Hashable {
         return L("За \(Fmt.days(daysUntil))", "In \(Fmt.days(daysUntil))")
     }
 
-    var packedCount: Int { items.filter(\.isPacked).count }
-    var progress: Double { items.isEmpty ? 0 : Double(packedCount) / Double(items.count) }
+    var packedCount: Int { myItems.filter(\.isPacked).count }
+    var totalCount: Int { myItems.count }
+    var progress: Double { totalCount == 0 ? 0 : Double(packedCount) / Double(totalCount) }
 
     var airline: Airline? { Airlines.find(airlineID) }
 
@@ -468,11 +482,11 @@ struct Trip: Codable, Identifiable, Hashable {
     var destinationCode: String { destination.code }
 
     var packedVolume: Double {
-        items.reduce(0) { isInMyBag($1) ? $0 + Double($1.bagUnits) * $1.unitVolume : $0 }
+        myItems.reduce(0) { $0 + Double($1.bagUnits) * $1.unitVolume }
     }
 
     var packedWeight: Double {
-        items.reduce(bag.kind.tare) { isInMyBag($1) ? $0 + Double($1.bagUnits) * $1.unitWeight : $0 }
+        myItems.reduce(bag.kind.tare) { $0 + Double($1.bagUnits) * $1.unitWeight }
     }
 
     var fillRatio: Double {
@@ -496,6 +510,23 @@ struct Trip: Codable, Identifiable, Hashable {
         lines.append("✈︎ \(originCode) → \(destinationCode) · \(destination.name) \(destination.flag)")
         lines.append("\(Fmt.range(startDate, endDate)) · \(Fmt.days(dayCount))")
         lines.append(L("Багаж", "Bag") + ": \(bag.displayTitle) (\(bag.limitText))")
+        if !togetherItems.isEmpty {
+            lines.append("")
+            lines.append(L("ЗАЕДНО", "TOGETHER"))
+            for item in togetherItems {
+                let box = item.isPacked ? "☑︎" : "☐"
+                let qty = item.quantity > 1 ? " ×\(item.quantity)" : ""
+                let who: String
+                if isMine(item) {
+                    who = L(" (јас)", " (me)")
+                } else if let name = companionName(item.assignee) {
+                    who = " (\(name))"
+                } else {
+                    who = " (?)"
+                }
+                lines.append("\(box) \(item.displayName)\(qty)\(who)")
+            }
+        }
         for category in ItemCategory.allCases {
             let group = items.filter { $0.category == category }
             guard !group.isEmpty else { continue }
@@ -504,8 +535,7 @@ struct Trip: Codable, Identifiable, Hashable {
             for item in group {
                 let box = item.isPacked ? "☑︎" : "☐"
                 let qty = item.quantity > 1 ? " ×\(item.quantity)" : ""
-                let who = companionName(item.assignee).map { " (\($0))" } ?? ""
-                lines.append("\(box) \(item.displayName)\(qty)\(who)")
+                lines.append("\(box) \(item.displayName)\(qty)")
             }
         }
         lines.append("")
@@ -515,14 +545,14 @@ struct Trip: Codable, Identifiable, Hashable {
 
     /// Порака за сопатник: што носи тој/таа.
     func shareText(for companion: Companion, from me: String) -> String {
-        let mine = items.filter { $0.assignee == companion.id }
+        let mine = togetherItems.filter { $0.assignee == companion.id }
         var lines: [String] = []
         lines.append(L("Здраво \(companion.firstName)! ✈︎ \(destination.name), \(Fmt.range(startDate, endDate))",
                        "Hi \(companion.firstName)! ✈︎ \(destination.name), \(Fmt.range(startDate, endDate))"))
         lines.append("")
         if mine.isEmpty {
-            lines.append(L("Уште немаме поделено кој што носи. Ова е мојата листа:", "We haven't split anything yet. Here's my list:"))
-            for item in items.prefix(40) {
+            lines.append(L("Уште немаме поделено кој што носи. Ова е заедничкото:", "We haven't split anything yet. Here's what we share:"))
+            for item in (togetherItems.isEmpty ? items : togetherItems).prefix(40) {
                 let qty = item.quantity > 1 ? " ×\(item.quantity)" : ""
                 lines.append("• \(item.displayName)\(qty)")
             }

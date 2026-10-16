@@ -155,6 +155,7 @@ final class TripStore: ObservableObject {
                 var members = t.memberUIDs ?? []
                 if !members.contains(uid) { members.append(uid) }
                 t.memberUIDs = members
+                PackingEngine.ensureTogether(&t)
             }
             return .joined(name)
         }
@@ -163,6 +164,7 @@ final class TripStore: ObservableObject {
             var list = t.companions ?? []
             list.append(Companion(name: name, inviteKey: keys.first))
             t.companions = list
+            PackingEngine.ensureTogether(&t)
         }
         let me = UserDefaults.standard.string(forKey: "userName") ?? ""
         if let latest = trip(tripID) {

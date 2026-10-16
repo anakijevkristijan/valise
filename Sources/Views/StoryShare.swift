@@ -256,13 +256,7 @@ struct StorySheet: View {
             if let image = images[url] {
                 Image(uiImage: image).resizable().scaledToFill()
             } else {
-                AsyncImage(url: url, transaction: Transaction(animation: .easeIn(duration: 0.2))) { phase in
-                    if let image = phase.image {
-                        image.resizable().scaledToFill()
-                    } else {
-                        Theme.stone
-                    }
-                }
+                Theme.stone
             }
         }
     }
@@ -270,21 +264,25 @@ struct StorySheet: View {
     // MARK: Логика
 
     @MainActor
+    /// Секоја фотографија прво се проверува (без луѓе) и дури потоа се појавува во лентата.
     private func loadOptions() async {
+        render()
         let urls = await PhotoService.candidates(for: trip.destination)
-        isLoadingList = false
-        let remote = urls.map { Option.remote($0) }
-        var list: [Option] = []
-        if importedImage != nil { list.append(.imported) }
-        list += remote
-        list.append(.blank)
-        options = list
-
-        if selected == .blank, let first = remote.first {
-            await choose(first)
-        } else {
-            render()
+        for url in urls {
+            guard let image = await PhotoService.image(at: url) else { continue }
+            images[url] = image
+            let option = Option.remote(url)
+            if let blankIndex = options.firstIndex(of: .blank) {
+                options.insert(option, at: blankIndex)
+            } else {
+                options.append(option)
+            }
+            if selected == .blank && importedImage == nil {
+                selected = option
+                render()
+            }
         }
+        isLoadingList = false
     }
 
     @MainActor

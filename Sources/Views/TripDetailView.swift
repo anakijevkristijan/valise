@@ -13,6 +13,7 @@ struct TripDetailView: View {
 
     @State private var tab: Tab = .packing
     @State private var addItemCategory: ItemCategory?
+    @State private var addTogether = false
     @State private var showAddExit = false
     @State private var newExitTitle = ""
     @State private var confirmDelete = false
@@ -89,8 +90,19 @@ struct TripDetailView: View {
         .sensoryFeedback(.selection, trigger: trip.packedCount)
         .sensoryFeedback(.success, trigger: trip.items.count > 0 && trip.packedCount == trip.items.count)
         .sheet(item: $addItemCategory) { category in
-            AddItemSheet(initialCategory: category) { item in
-                store.mutate(tripID) { $0.items.append(item) }
+            AddItemSheet(initialCategory: category, isShared: addTogether) { item in
+                let shared = addTogether
+                store.mutate(tripID) { t in
+                    if shared {
+                        var copy = item
+                        copy.assignee = t.isCloud ? t.myCompanionID : nil
+                        var list = t.together ?? []
+                        list.append(copy)
+                        t.together = list
+                    } else {
+                        t.items.append(item)
+                    }
+                }
             }
             .presentationDetents([.medium, .large])
             .presentationCornerRadius(28)
@@ -122,6 +134,7 @@ struct TripDetailView: View {
                         var list = t.companions ?? []
                         list.append(Companion(name: name))
                         t.companions = list
+                        PackingEngine.ensureTogether(&t)
                     }
                 }
                 newCompanionName = ""
@@ -156,7 +169,7 @@ struct TripDetailView: View {
             Button(L("Состави повторно", "Rebuild")) {
                 withAnimation {
                     store.mutate(tripID) {
-                        $0.items = PackingEngine.regenerate($0)
+                        PackingEngine.rebuild(&$0)
                         $0.dismissedSuggestions = []
                     }
                 }
@@ -257,9 +270,13 @@ struct TripDetailView: View {
                                             if let uid = companion.uid {
                                                 t.memberUIDs = (t.memberUIDs ?? []).filter { $0 != uid }
                                             }
-                                            for i in t.items.indices where t.items[i].assignee == companion.id {
-                                                t.items[i].assignee = nil
+                                            if var together = t.together {
+                                                for i in together.indices where together[i].assignee == companion.id {
+                                                    together[i].assignee = nil
+                                                }
+                                                t.together = together
                                             }
+                                            PackingEngine.dissolveTogether(&t)
                                         }
                                     }
                                 }
@@ -328,8 +345,8 @@ struct TripDetailView: View {
             .scrollIndicators(.hidden)
 
             if !trip.travelers.isEmpty {
-                Text(L("Кај заедничките предмети избери кој носи со копчето десно. Тоа што го носи пријател не зафаќа место во твојот багаж.",
-                       "On shared items, pick who brings it with the button on the right. What a friend carries doesn't take space in your bag."))
+                Text(L("Секој ја гледа само својата листа. Заедничките работи се во „Заедно“ — таму избирате кој што носи.",
+                       "Everyone sees only their own list. Shared things live in “Together” — that's where you pick who brings what."))
                     .font(.sans(12))
                     .foregroundStyle(Theme.muted)
                     .fixedSize(horizontal: false, vertical: true)
@@ -470,9 +487,9 @@ struct TripDetailView: View {
         VStack(alignment: .leading, spacing: 24) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .firstTextBaseline) {
-                    Text(trip.packedCount == trip.items.count && !trip.items.isEmpty
+                    Text(trip.packedCount == trip.totalCount && trip.totalCount > 0
                          ? L("Сè е спакувано.", "All packed.")
-                         : L("\(trip.packedCount) од \(trip.items.count) спакувани", "\(trip.packedCount) of \(trip.items.count) packed"))
+                         : L("\(trip.packedCount) од \(trip.totalCount) спакувани", "\(trip.packedCount) of \(trip.totalCount) packed"))
                         .font(.serif(22))
                         .foregroundStyle(Theme.ink)
                     Spacer()
@@ -487,13 +504,35 @@ struct TripDetailView: View {
             if !suggestions.isEmpty {
                 SuggestionsCard(items: suggestions,
                                 onAdd: { item in
-                                    withAnimation { store.mutate(tripID) { $0.items.append(item) } }
+                                    withAnimation {
+                                        store.mutate(tripID) { t in
+                                            if t.together != nil && item.isShareable {
+                                                var copy = item
+                                                copy.assignee = t.isCloud ? t.myCompanionID : nil
+                                                t.together?.append(copy)
+                                            } else {
+                                                t.items.append(item)
+                                            }
+                                        }
+                                    }
                                 },
                                 onDismissAll: {
                                     withAnimation {
                                         store.mutate(tripID) { $0.dismissedSuggestions.append(contentsOf: suggestions.map(\.identity)) }
                                     }
                                 })
+            }
+
+            if trip.together != nil {
+                togetherBlock(trip)
+            }
+
+            if trip.together != nil {
+                Text(L("МОЈА ЛИСТА", "MY LIST"))
+                    .font(.sans(11, .semibold))
+                    .tracking(2.4)
+                    .foregroundStyle(Theme.gold)
+                    .padding(.top, 4)
             }
 
             ForEach(ItemCategory.allCases) { category in
@@ -504,6 +543,7 @@ struct TripDetailView: View {
             }
 
             Button {
+                addTogether = false
                 addItemCategory = .accessories
             } label: {
                 HStack(spacing: 8) {
@@ -515,12 +555,84 @@ struct TripDetailView: View {
             }
             .buttonStyle(SecondaryButtonStyle())
 
-            Text(L("Допри за спакувано. Држи подолго за количина, бришење или кој носи.",
-                   "Tap to mark as packed. Long-press for quantity, removal or who brings it."))
+            Text(L("Допри за спакувано. Држи подолго за количина или бришење.",
+                   "Tap to mark as packed. Long-press for quantity or removal."))
                 .font(.sans(12))
                 .foregroundStyle(Theme.muted)
                 .frame(maxWidth: .infinity)
                 .multilineTextAlignment(.center)
+        }
+    }
+
+    /// „Заедно“ — единствениот заеднички дел: кој што носи, синхронизирано кај сите.
+    private func togetherBlock(_ trip: Trip) -> some View {
+        let items = trip.togetherItems
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Image(systemName: "person.2")
+                    .font(.system(size: 13, weight: .light))
+                    .foregroundStyle(Theme.gold)
+                Text(L("ЗАЕДНО", "TOGETHER"))
+                    .font(.sans(12, .semibold))
+                    .tracking(2.4)
+                    .foregroundStyle(Theme.navy)
+                Spacer()
+                if trip.undecidedCount > 0 {
+                    Text(L("\(trip.undecidedCount) неодлучени", "\(trip.undecidedCount) undecided"))
+                        .font(.sans(11, .semibold))
+                        .foregroundStyle(Theme.terracotta)
+                }
+            }
+            Text(L("Работи што ги делите — изберете кој што носи. Се гледа и штиклира кај сите.",
+                   "Things you share — choose who brings what. Everyone sees and ticks the same list."))
+                .font(.sans(12))
+                .foregroundStyle(Theme.muted)
+                .fixedSize(horizontal: false, vertical: true)
+
+            VStack(spacing: 0) {
+                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                    PackingRow(item: item,
+                               companions: trip.travelers,
+                               assigneeName: trip.companionName(item.assignee),
+                               meID: trip.myCompanionID,
+                               isCloud: trip.isCloud,
+                               showsWho: true,
+                               onAssign: { assign(item, to: $0) },
+                               onToggle: { toggle(item) },
+                               onIncrease: { changeQuantity(item, by: 1) },
+                               onDecrease: { changeQuantity(item, by: -1) },
+                               onDelete: { remove(item) })
+                    if index < items.count - 1 {
+                        Hairline().padding(.leading, 50)
+                    }
+                }
+                if !items.isEmpty { Hairline() }
+                Button {
+                    addTogether = true
+                    addItemCategory = .toiletries
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 11, weight: .semibold))
+                            .frame(width: 18)
+                        Text(L("Додај заедничко", "Add shared item"))
+                            .font(.sans(12, .semibold))
+                            .tracking(1.2)
+                            .textCase(.uppercase)
+                        Spacer()
+                    }
+                    .foregroundStyle(Theme.gold)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 13)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+            .luxCard(padding: 0, fill: Theme.surface, radius: 16)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(Theme.gold.opacity(0.45), lineWidth: 1)
+            )
         }
     }
 
@@ -541,11 +653,6 @@ struct TripDetailView: View {
             VStack(spacing: 0) {
                 ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                     PackingRow(item: item,
-                               companions: trip.travelers,
-                               assigneeName: trip.companionName(item.assignee),
-                               meID: trip.myCompanionID,
-                               isCloud: trip.isCloud,
-                               onAssign: { assign(item, to: $0) },
                                onToggle: { toggle(item) },
                                onIncrease: { changeQuantity(item, by: 1) },
                                onDecrease: { changeQuantity(item, by: -1) },
@@ -556,6 +663,7 @@ struct TripDetailView: View {
                 }
                 Hairline()
                 Button {
+                    addTogether = false
                     addItemCategory = category
                 } label: {
                     HStack(spacing: 10) {
@@ -579,33 +687,35 @@ struct TripDetailView: View {
         }
     }
 
+    /// Промена на предмет — било во мојата листа или во „Заедно“.
+    private func updateItem(_ id: UUID, _ change: @escaping (inout PackingItem) -> Void) {
+        store.mutate(tripID) { trip in
+            if let i = trip.items.firstIndex(where: { $0.id == id }) {
+                change(&trip.items[i])
+            } else if var together = trip.together, let i = together.firstIndex(where: { $0.id == id }) {
+                change(&together[i])
+                trip.together = together
+            }
+        }
+    }
+
     private func toggle(_ item: PackingItem) {
         withAnimation(.easeInOut(duration: 0.2)) {
-            store.mutate(tripID) { trip in
-                if let i = trip.items.firstIndex(where: { $0.id == item.id }) {
-                    trip.items[i].isPacked.toggle()
-                }
-            }
+            updateItem(item.id) { $0.isPacked.toggle() }
         }
     }
 
     private func assign(_ item: PackingItem, to companion: UUID?) {
         withAnimation(.easeInOut(duration: 0.2)) {
-            store.mutate(tripID) { trip in
-                if let i = trip.items.firstIndex(where: { $0.id == item.id }) {
-                    trip.items[i].assignee = companion
-                }
-            }
+            updateItem(item.id) { $0.assignee = companion }
         }
     }
 
     private func changeQuantity(_ item: PackingItem, by delta: Int) {
-        store.mutate(tripID) { trip in
-            if let i = trip.items.firstIndex(where: { $0.id == item.id }) {
-                let newValue = max(1, trip.items[i].quantity + delta)
-                trip.items[i].quantity = newValue
-                trip.items[i].wornCount = min(trip.items[i].wornCount, newValue)
-            }
+        updateItem(item.id) { entry in
+            let newValue = max(1, entry.quantity + delta)
+            entry.quantity = newValue
+            entry.wornCount = min(entry.wornCount, newValue)
         }
     }
 
@@ -613,6 +723,7 @@ struct TripDetailView: View {
         withAnimation {
             store.mutate(tripID) { trip in
                 trip.items.removeAll { $0.id == item.id }
+                trip.together?.removeAll { $0.id == item.id }
                 if !item.isCustom { trip.dismissedSuggestions.append(item.identity) }
             }
         }
@@ -718,22 +829,21 @@ struct PackingRow: View {
     var assigneeName: String?
     var meID: UUID? = nil
     var isCloud: Bool = false
+    var showsWho: Bool = false
     var onAssign: (UUID?) -> Void = { _ in }
     let onToggle: () -> Void
     let onIncrease: () -> Void
     let onDecrease: () -> Void
     let onDelete: () -> Void
 
-    private var showsWhoPicker: Bool {
-        !companions.isEmpty && (item.isShareable || item.assignee != nil)
-    }
+    private var showsWhoPicker: Bool { showsWho }
 
     private var isMine: Bool { item.assignee != nil && item.assignee == meID }
     private var isAssignedToOther: Bool { item.assignee != nil && item.assignee != meID }
 
     /// Што пишува на копчето „кој носи“.
     private var whoLabel: String {
-        if item.assignee == nil { return isCloud ? L("Секој", "Each") : L("Јас", "Me") }
+        if item.assignee == nil { return isCloud ? L("Кој?", "Who?") : L("Јас", "Me") }
         if isMine { return L("Јас", "Me") }
         return assigneeName ?? "?"
     }
@@ -748,11 +858,7 @@ struct PackingRow: View {
                 onAssign(companion.id)
             }
         }
-        if isCloud {
-            Button(L("Секој свое", "Each brings their own"), systemImage: item.assignee == nil ? "checkmark" : "person.2") {
-                onAssign(nil)
-            }
-        }
+
     }
 
     var body: some View {
@@ -778,12 +884,7 @@ struct PackingRow: View {
                             .strikethrough(item.isPacked, color: Theme.muted.opacity(0.6))
                             .font(.sans(15))
                             .foregroundStyle(item.isPacked ? Theme.muted : Theme.ink)
-                        if showsWhoPicker && item.assignee == nil {
-                            Text(L("ЗАЕДНИЧКО", "SHARED"))
-                                .font(.sans(9, .semibold))
-                                .tracking(1.4)
-                                .foregroundStyle(Theme.sage)
-                        }
+
                         if let detail = item.detailText {
                             Text(detail)
                                 .font(.sans(12))
@@ -809,7 +910,7 @@ struct PackingRow: View {
                         Image(systemName: "chevron.down")
                             .font(.system(size: 8, weight: .bold))
                     }
-                    .foregroundStyle(isAssignedToOther ? Theme.goldLight : Theme.navy)
+                    .foregroundStyle(isAssignedToOther ? Theme.goldLight : (isCloud && item.assignee == nil ? Theme.terracotta : Theme.navy))
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .background(Capsule().fill(isAssignedToOther ? Theme.navy : Color.clear))
@@ -827,7 +928,7 @@ struct PackingRow: View {
         .padding(.vertical, 13)
         .contentShape(Rectangle())
         .contextMenu {
-            if !companions.isEmpty {
+            if showsWho && !companions.isEmpty {
                 Menu(L("Кој го носи", "Who brings it"), systemImage: "person.2") {
                     whoMenu
                 }
@@ -1008,6 +1109,7 @@ struct SuggestionsCard: View {
 
 struct AddItemSheet: View {
     let initialCategory: ItemCategory
+    var isShared: Bool = false
     let onAdd: (PackingItem) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -1023,7 +1125,7 @@ struct AddItemSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
                     HStack {
-                        Eyebrow(L("Нов предмет", "New item"), color: Theme.gold)
+                        Eyebrow(isShared ? L("Заедничко", "Shared item") : L("Нов предмет", "New item"), color: Theme.gold)
                         Spacer()
                         CircleIconButton(systemName: "xmark") { dismiss() }
                     }

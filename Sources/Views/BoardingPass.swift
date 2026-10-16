@@ -105,7 +105,13 @@ struct BoardingPassCard: View {
     var body: some View {
         VStack(spacing: 0) {
             topHalf
-                .background(TicketHalf(side: .top).fill(color))
+                .background(
+                    ZStack {
+                        TicketHalf(side: .top).fill(color)
+                        MotifPattern(motif: Theme.current.motif, color: Theme.ticketText.opacity(0.09), spacing: 44, size: 11)
+                            .clipShape(TicketHalf(side: .top))
+                    }
+                )
                 .overlay(alignment: .bottom) {
                     DashedLine()
                         .stroke(Theme.goldLight.opacity(0.45), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
@@ -117,6 +123,9 @@ struct BoardingPassCard: View {
         }
         .compositingGroup()
         .shadow(color: Theme.navy.opacity(0.22), radius: 22, x: 0, y: 14)
+        .overlay(alignment: Theme.current.motif == .bows ? .top : .topTrailing) {
+            TicketOrnament(compact: isStory)
+        }
     }
 
     private var topHalf: some View {
@@ -294,7 +303,13 @@ struct PassTile: View {
         VStack(spacing: 0) {
             top
                 .frame(height: 124)
-                .background(TicketHalf(side: .top, cornerRadius: 18, notch: 8).fill(color))
+                .background(
+                    ZStack {
+                        TicketHalf(side: .top, cornerRadius: 18, notch: 8).fill(color)
+                        MotifPattern(motif: Theme.current.motif, color: Theme.ticketText.opacity(0.1), spacing: 34, size: 9)
+                            .clipShape(TicketHalf(side: .top, cornerRadius: 18, notch: 8))
+                    }
+                )
                 .overlay(alignment: .bottom) {
                     DashedLine()
                         .stroke(Theme.goldLight.opacity(0.45), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
@@ -307,6 +322,9 @@ struct PassTile: View {
         }
         .compositingGroup()
         .shadow(color: Theme.navy.opacity(dimmed ? 0.06 : 0.16), radius: 14, x: 0, y: 8)
+        .overlay(alignment: Theme.current.motif == .bows ? .top : .topTrailing) {
+            TicketOrnament(compact: true)
+        }
         .saturation(dimmed ? 0.35 : 1)
         .opacity(dimmed ? 0.75 : 1)
     }

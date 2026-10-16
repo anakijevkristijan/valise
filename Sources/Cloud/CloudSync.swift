@@ -3,11 +3,13 @@ import FirebaseFirestore
 
 // MARK: - Претворање Trip ⇄ Firestore
 
-/// Патувањето се чува како еден документ во `trips/{id}`.
-/// Предметите се мапа по id — за промена на едно поле без да се препишува целата листа.
+/// Едно патување = еден документ `trips/{id}`:
+/// • заеднички податоци (дестинација, датуми, сопатници…)
+/// • `together` — заедничките работи, синхронизирани кај сите (кој носи + спакувано)
+/// • `lists.{uid}` — личната листа на секој патник; секој ја гледа само својата
 enum CloudCodec {
 
-    /// Лични работи што не се споделуваат (секој ги има свои).
+    /// Лични работи што воопшто не одат во облакот.
     static let personalKeys: Set<String> = [
         "exitChecklist", "dismissedSuggestions", "weather", "weatherSource", "weatherUpdatedAt"
     ]
@@ -17,41 +19,51 @@ enum CloudCodec {
               var dict = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return nil }
         for key in personalKeys { dict.removeValue(forKey: key) }
 
-        if let items = dict["items"] as? [[String: Any]] {
-            var map: [String: Any] = [:]
-            for (index, raw) in items.enumerated() {
-                var item = raw
-                guard let id = item["id"] as? String else { continue }
-                let packed = (item["isPacked"] as? Bool) ?? false
-                if item["packedBy"] == nil {
-                    item["packedBy"] = packed ? [myUID] : []
-                }
-                item.removeValue(forKey: "isPacked")
-                item["order"] = index
-                map[id] = item
-            }
-            dict["items"] = map
+        let mine = (dict["items"] as? [[String: Any]]) ?? []
+        dict.removeValue(forKey: "items")
+        dict["lists"] = [myUID: itemMap(mine)]
+
+        if let together = dict["together"] as? [[String: Any]] {
+            dict["together"] = itemMap(together)
         }
         return dict
     }
 
-    /// Документ од Firestore → Trip, со моите лични работи од локалната копија.
-    static func decode(_ data: [String: Any], local: Trip?, myUID: String) -> Trip? {
+    private static func itemMap(_ items: [[String: Any]]) -> [String: Any] {
+        var map: [String: Any] = [:]
+        for (index, raw) in items.enumerated() {
+            guard let id = raw["id"] as? String else { continue }
+            var item = raw
+            item["order"] = index
+            map[id] = item
+        }
+        return map
+    }
+
+    private static func itemList(_ map: Any?) -> [[String: Any]] {
+        guard let map = map as? [String: Any] else { return [] }
+        return map.values
+            .compactMap { $0 as? [String: Any] }
+            .sorted { (($0["order"] as? Int) ?? 0) < (($1["order"] as? Int) ?? 0) }
+            .map { raw in
+                var item = raw
+                item.removeValue(forKey: "order")
+                return item
+            }
+    }
+
+    /// Документ од Firestore → Trip (мојата листа + заедничкото), со моите лични работи од телефонот.
+    /// `hasMyList` = false кога штотуку сум се приклучил и уште немам своја листа.
+    static func decode(_ data: [String: Any], local: Trip?, myUID: String) -> (trip: Trip, hasMyList: Bool)? {
         guard var dict = sanitize(data) as? [String: Any] else { return nil }
 
-        if let map = dict["items"] as? [String: Any] {
-            let list = map.values
-                .compactMap { $0 as? [String: Any] }
-                .sorted { (($0["order"] as? Int) ?? 0) < (($1["order"] as? Int) ?? 0) }
-                .map { raw -> [String: Any] in
-                    var item = raw
-                    item.removeValue(forKey: "order")
-                    item["isPacked"] = false
-                    return item
-                }
-            dict["items"] = list
-        } else {
-            dict["items"] = [Any]()
+        let lists = dict["lists"] as? [String: Any]
+        let hasMyList = lists?[myUID] != nil
+        dict["items"] = itemList(lists?[myUID])
+        dict.removeValue(forKey: "lists")
+
+        if dict["together"] != nil {
+            dict["together"] = itemList(dict["together"])
         }
 
         // Задолжителни полиња што не се во облакот
@@ -64,12 +76,6 @@ enum CloudCodec {
               let json = try? JSONSerialization.data(withJSONObject: dict),
               var trip = try? JSONDecoder().decode(Trip.self, from: json) else { return nil }
 
-        // Спакувано — гледано од мене
-        for i in trip.items.indices {
-            let by = trip.items[i].packedBy ?? []
-            trip.items[i].isPacked = trip.items[i].assignee == nil ? by.contains(myUID) : !by.isEmpty
-        }
-
         if let local {
             trip.exitChecklist = local.exitChecklist
             trip.dismissedSuggestions = local.dismissedSuggestions
@@ -79,54 +85,61 @@ enum CloudCodec {
         } else {
             trip.exitChecklist = PackingEngine.defaultExitChecklist()
         }
-        return trip
+        return (trip, hasMyList)
     }
 
-    /// Само промените, како патеки на полиња (`items.<id>.quantity` …).
+    /// Мојата листа како мапа (за прво качување кога ќе се приклучам).
+    static func listMap(_ items: [PackingItem]) -> [String: Any] {
+        guard let data = try? JSONEncoder().encode(items),
+              let list = (try? JSONSerialization.jsonObject(with: data)) as? [[String: Any]] else { return [:] }
+        return itemMap(list)
+    }
+
+    /// Само промените, како патеки на полиња (`together.<id>.assignee`, `lists.<uid>.<id>.isPacked` …).
     static func updates(old: Trip, new: Trip, myUID: String) -> [AnyHashable: Any] {
         guard let o = encode(old, myUID: myUID), let n = encode(new, myUID: myUID) else { return [:] }
         var result: [AnyHashable: Any] = [:]
 
-        let topKeys = Set(o.keys).union(n.keys).subtracting(["items"])
+        let topKeys = Set(o.keys).union(n.keys).subtracting(["lists", "together"])
         for key in topKeys where !same(o[key], n[key]) {
             result[key] = n[key] ?? FieldValue.delete()
         }
 
-        let oldItems = (o["items"] as? [String: Any]) ?? [:]
-        let newItems = (n["items"] as? [String: Any]) ?? [:]
-        for id in Set(oldItems.keys).union(newItems.keys) {
-            guard let newItem = newItems[id] as? [String: Any] else {
-                result["items.\(id)"] = FieldValue.delete()
-                continue
-            }
-            guard let oldItem = oldItems[id] as? [String: Any] else {
-                result["items.\(id)"] = newItem
-                continue
-            }
-            let fields = Set(oldItem.keys).union(newItem.keys).subtracting(["packedBy"])
-            for field in fields where !same(oldItem[field], newItem[field]) {
-                result["items.\(id).\(field)"] = newItem[field] ?? FieldValue.delete()
-            }
-        }
+        let oldMine = ((o["lists"] as? [String: Any])?[myUID] as? [String: Any]) ?? [:]
+        let newMine = ((n["lists"] as? [String: Any])?[myUID] as? [String: Any]) ?? [:]
+        diffMap(prefix: "lists.\(myUID)", old: oldMine, new: newMine, into: &result)
 
-        // Штиклирање: секој за себе, освен кога предметот е доделен некому
-        let oldByID = Dictionary(old.items.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-        for item in new.items {
-            guard let before = oldByID[item.id], before.isPacked != item.isPacked else { continue }
-            let path = "items.\(item.id.uuidString).packedBy"
-            if item.isPacked {
-                result[path] = FieldValue.arrayUnion([myUID])
-            } else if item.assignee == nil {
-                result[path] = FieldValue.arrayRemove([myUID])
-            } else {
-                result[path] = [String]()
-            }
+        switch (o["together"] as? [String: Any], n["together"] as? [String: Any]) {
+        case let (oldTogether?, newTogether?):
+            diffMap(prefix: "together", old: oldTogether, new: newTogether, into: &result)
+        case (nil, let newTogether?):
+            result["together"] = newTogether
+        case (_?, nil):
+            result["together"] = FieldValue.delete()
+        case (nil, nil):
+            break
         }
 
         if !result.isEmpty {
             result["updatedAt"] = Date().timeIntervalSince1970
         }
         return result
+    }
+
+    private static func diffMap(prefix: String, old: [String: Any], new: [String: Any], into result: inout [AnyHashable: Any]) {
+        for id in Set(old.keys).union(new.keys) {
+            guard let newItem = new[id] as? [String: Any] else {
+                result["\(prefix).\(id)"] = FieldValue.delete()
+                continue
+            }
+            guard let oldItem = old[id] as? [String: Any] else {
+                result["\(prefix).\(id)"] = newItem
+                continue
+            }
+            for field in Set(oldItem.keys).union(newItem.keys) where !same(oldItem[field], newItem[field]) {
+                result["\(prefix).\(id).\(field)"] = newItem[field] ?? FieldValue.delete()
+            }
+        }
     }
 
     private static func same(_ a: Any?, _ b: Any?) -> Bool {
@@ -191,9 +204,18 @@ final class CloudSync {
                     switch change.type {
                     case .added, .modified:
                         let local = self.store?.trip(id)
-                        if let trip = CloudCodec.decode(change.document.data(), local: local, myUID: self.uid) {
-                            self.store?.applyRemote(trip)
+                        guard let decoded = CloudCodec.decode(change.document.data(), local: local, myUID: self.uid) else { continue }
+                        var trip = decoded.trip
+                        if !decoded.hasMyList {
+                            // Штотуку се приклучив: правам своја лична листа
+                            if let existing = local?.items, !existing.isEmpty {
+                                trip.items = existing.filter { !$0.isShareable }
+                            } else {
+                                trip.items = PackingEngine.personalList(for: trip)
+                            }
+                            self.uploadMyList(trip)
                         }
+                        self.store?.applyRemote(trip)
                     case .removed:
                         self.store?.removeLocal(id)
                     @unknown default:
@@ -220,15 +242,35 @@ final class CloudSync {
             list.insert(Companion(name: myName.isEmpty ? "Me" : myName, uid: uid), at: 0)
         }
         trip.companions = list
+        // Локално „nil = јас“ → кај акаунти го означуваме експлицитно
+        if let me = list.first(where: { $0.uid == uid })?.id, let together = trip.together {
+            trip.together = together.map { item in
+                var copy = item
+                if copy.assignee == nil { copy.assignee = me }
+                return copy
+            }
+        }
     }
 
+    /// Качување на целото патување (спојување — туѓите листи остануваат).
     func upload(_ trip: Trip) async {
         guard var data = CloudCodec.encode(trip, myUID: uid) else { return }
         data["updatedAt"] = Date().timeIntervalSince1970
         do {
-            try await ref(trip.id).setData(data)
+            try await ref(trip.id).setData(data, merge: true)
         } catch {
             print("Valise: upload failed — \(error)")
+        }
+    }
+
+    /// Само мојата лична листа.
+    func uploadMyList(_ trip: Trip) {
+        let map = CloudCodec.listMap(trip.items)
+        Task {
+            try? await ref(trip.id).updateData([
+                "lists.\(uid)": map,
+                "updatedAt": Date().timeIntervalSince1970
+            ])
         }
     }
 
@@ -259,6 +301,7 @@ final class CloudSync {
             try? await ref(trip.id).updateData([
                 "memberUIDs": FieldValue.arrayRemove([uid]),
                 "companions": encoded,
+                "lists.\(uid)": FieldValue.delete(),
                 "updatedAt": Date().timeIntervalSince1970
             ])
         }

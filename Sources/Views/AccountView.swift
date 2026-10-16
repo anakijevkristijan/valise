@@ -6,7 +6,10 @@ struct AccountView: View {
     @EnvironmentObject private var account: AccountService
     @Environment(\.dismiss) private var dismiss
 
-    enum Mode { case signIn, signUp }
+    enum Mode: String, Identifiable {
+        case signIn, signUp
+        var id: String { rawValue }
+    }
 
     @State private var mode: Mode
     @State private var name = UserDefaults.standard.string(forKey: "userName") ?? ""

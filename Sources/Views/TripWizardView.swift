@@ -569,7 +569,10 @@ struct TripWizardView: View {
         trip.weatherSource = weatherSource
         trip.tint = editing?.tint ?? (store.trips.count % Theme.ticketColors.count)
         trip.companions = draft.companions.isEmpty ? nil : draft.companions
-        if let editing { trip.items = editing.items }
+        if let editing {
+            trip.items = editing.items
+            trip.together = editing.together
+        }
         return trip
     }
 
@@ -756,13 +759,18 @@ struct TripWizardView: View {
             updated.weatherUpdatedAt = nil
         }
 
-        let validCompanions = Set(updated.travelers.map(\.id))
-        updated.items = original.items.map { item in
-            var copy = item
-            if let who = copy.assignee, !validCompanions.contains(who) { copy.assignee = nil }
-            return copy
+        let validCompanions = Set((updated.companions ?? []).map(\.id))
+        updated.items = original.items
+        updated.together = original.together.map { list in
+            list.map { item in
+                var copy = item
+                if let who = copy.assignee, !validCompanions.contains(who) { copy.assignee = nil }
+                return copy
+            }
         }
-        updated.items = PackingEngine.regenerate(updated)
+        PackingEngine.ensureTogether(&updated)
+        PackingEngine.dissolveTogether(&updated)
+        PackingEngine.rebuild(&updated)
 
         let finalTrip = updated
         store.mutate(original.id) { $0 = finalTrip }
@@ -776,6 +784,7 @@ struct TripWizardView: View {
         guard var trip = previewTrip else { return }
         trip.weatherUpdatedAt = weather.isEmpty ? nil : Date()
         trip.items = PackingEngine.generate(for: trip)
+        PackingEngine.ensureTogether(&trip)
         trip.exitChecklist = PackingEngine.defaultExitChecklist()
 
         LastOrigin.save(draft.origin)

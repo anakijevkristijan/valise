@@ -23,8 +23,8 @@ enum Catalog {
     }
 
     private static let shareable: Set<String> = [
-        "shampoo", "sunscreen", "afterSun", "firstAid", "umbrella", "booking", "tollCash",
-        "carCharger", "waterSnacks", "wrinkleSpray", "tripod", "snacks", "powerbank", "usbHub"
+        "shampoo", "toothpaste", "sunscreen", "afterSun", "firstAid", "umbrella", "booking",
+        "tollCash", "carCharger", "waterSnacks", "wrinkleSpray", "tripod", "snacks", "usbHub", "cream"
     ]
 
     static func exitTitle(_ key: String) -> String? {
@@ -71,7 +71,8 @@ enum Catalog {
         "trainingShoes": ("Патики за тренинг", "Training shoes"),
         "hikingBoots": ("Планинарски чевли", "Hiking boots"),
         // Хигиена
-        "toothbrush": ("Четка и паста за заби", "Toothbrush and toothpaste"),
+        "toothbrush": ("Четка за заби", "Toothbrush"),
+        "toothpaste": ("Паста за заби", "Toothpaste"),
         "deodorant": ("Дезодоранс", "Deodorant"),
         "shampoo": ("Шампон и гел за туширање", "Shampoo and shower gel"),
         "cream": ("Крема за лице и тело", "Face and body cream"),
@@ -267,7 +268,8 @@ enum PackingEngine {
         if warm || acts.contains(.beach) { b.add("sandals", .shoes, vol: 1.5, kg: 0.4) }
 
         // Хигиена
-        b.add("toothbrush", .toiletries, vol: 0.2, kg: 0.12)
+        b.add("toothbrush", .toiletries, vol: 0.1, kg: 0.04)
+        b.add("toothpaste", .toiletries, vol: 0.1, kg: 0.08, note: liquids)
         b.add("deodorant", .toiletries, vol: 0.2, kg: 0.12, note: liquids)
         b.add("shampoo", .toiletries, vol: carryOnOnly ? 0.25 : 0.5, kg: carryOnOnly ? 0.2 : 0.5, note: carryOnOnly ? "travelSizes" : nil)
         b.add("cream", .toiletries, vol: 0.15, kg: 0.12, note: liquids)
@@ -379,9 +381,10 @@ enum PackingEngine {
 
     // MARK: Предлози и регенерирање
 
-    /// Предмети што логиката сега би ги додала, а ги нема во листата.
+    /// Предмети што логиката сега би ги додала, а ги нема ниту во мојата листа ниту во „Заедно“.
     static func suggestions(for trip: Trip) -> [PackingItem] {
-        let existing = Set(trip.items.map(\.identity) + trip.items.map { $0.displayName.lowercased() })
+        let all = trip.items + trip.togetherItems
+        let existing = Set(all.map(\.identity) + all.map { $0.displayName.lowercased() })
         let dismissed = Set(trip.dismissedSuggestions.map { $0.lowercased() })
         return generate(for: trip).filter {
             !existing.contains($0.identity) && !dismissed.contains($0.identity)
@@ -390,25 +393,62 @@ enum PackingEngine {
     }
 
     /// Нова листа; спакуваното, кој што носи и рачно додаденото остануваат.
-    static func regenerate(_ trip: Trip) -> [PackingItem] {
+    static func rebuild(_ trip: inout Trip) {
         var previous: [String: PackingItem] = [:]
-        for item in trip.items {
+        for item in trip.items + trip.togetherItems {
             previous[item.identity] = item
             previous[item.displayName.lowercased()] = item
         }
-        var fresh = generate(for: trip).map { item -> PackingItem in
+        let fresh = generate(for: trip).map { item -> PackingItem in
             var copy = item
             if let old = previous[item.identity] ?? previous[item.displayName.lowercased()] {
                 copy.id = old.id
                 copy.isPacked = old.isPacked
                 copy.assignee = old.assignee
-                copy.packedBy = old.packedBy
             }
             return copy
         }
+        let customPersonal = trip.items.filter { $0.isCustom }
+        let customTogether = trip.togetherItems.filter { $0.isCustom }
         let freshIDs = Set(fresh.map(\.identity))
-        fresh.append(contentsOf: trip.items.filter { $0.isCustom && !freshIDs.contains($0.identity) })
-        return fresh
+
+        if trip.together != nil {
+            trip.items = fresh.filter { !$0.isShareable }
+                + customPersonal.filter { !freshIDs.contains($0.identity) }
+            trip.together = fresh.filter { $0.isShareable }
+                + customTogether.filter { !freshIDs.contains($0.identity) }
+        } else {
+            trip.items = fresh + customPersonal.filter { !freshIDs.contains($0.identity) }
+        }
+    }
+
+    /// Кога ќе се додаде прв сопатник: заедничките работи се селат во „Заедно“.
+    /// Ги носам јас додека не се одлучи поинаку.
+    static func ensureTogether(_ trip: inout Trip) {
+        guard trip.together == nil, !trip.travelers.isEmpty else { return }
+        let me = trip.isCloud ? trip.myCompanionID : nil
+        var moved = trip.items.filter { $0.isShareable }
+        for i in moved.indices { moved[i].assignee = me }
+        trip.items.removeAll { $0.isShareable }
+        trip.together = moved
+    }
+
+    /// Кога нема повеќе сопатници: „Заедно“ се враќа во мојата листа.
+    static func dissolveTogether(_ trip: inout Trip) {
+        guard trip.travelers.isEmpty, let together = trip.together else { return }
+        trip.items += together.map { item in
+            var copy = item
+            copy.assignee = nil
+            return copy
+        }
+        trip.together = nil
+    }
+
+    /// Лична листа за некој што се приклучил на туѓо патување (без заедничкото).
+    static func personalList(for trip: Trip) -> [PackingItem] {
+        var neutral = trip
+        neutral.style = .neutral
+        return generate(for: neutral).filter { !$0.isShareable }
     }
 
     // MARK: Штекери

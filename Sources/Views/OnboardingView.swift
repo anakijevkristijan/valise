@@ -6,8 +6,6 @@ struct OnboardingView: View {
     @State private var name: String = ""
     @State private var appeared = false
     @FocusState private var focused: Bool
-    @EnvironmentObject private var account: AccountService
-    @State private var showSignIn = false
 
     var body: some View {
         ZStack {
@@ -76,17 +74,6 @@ struct OnboardingView: View {
                     .buttonStyle(PrimaryButtonStyle())
                     .disabled(trimmed.isEmpty)
 
-                    Button {
-                        showSignIn = true
-                    } label: {
-                        Text(L("Веќе имаш акаунт? Најави се", "Already have an account? Sign in"))
-                            .font(.sans(14, .medium))
-                            .foregroundStyle(Theme.navy)
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, 16)
-                    }
-                    .buttonStyle(.plain)
-
                     Spacer(minLength: 40)
                 }
                 .padding(.horizontal, 26)
@@ -97,15 +84,6 @@ struct OnboardingView: View {
                 .offset(y: appeared ? 0 : 16)
             }
             .scrollDismissesKeyboard(.interactively)
-        }
-        .sheet(isPresented: $showSignIn) {
-            AccountView(startWith: .signIn)
-                .environmentObject(account)
-        }
-        .onChange(of: account.profile) { _, profile in
-            if let profile, !profile.name.isEmpty, userName.isEmpty {
-                userName = profile.name
-            }
         }
         .onAppear {
             withAnimation(.easeOut(duration: 0.9)) { appeared = true }
@@ -285,5 +263,145 @@ struct LanguagePickerView: View {
             .luxCard(padding: 0, radius: 20)
         }
         .buttonStyle(PressableStyle())
+    }
+}
+
+
+/// Трет чекор: акаунт (по избор).
+struct AccountChoiceView: View {
+    @EnvironmentObject private var account: AccountService
+    @AppStorage("accountStepDone") private var accountStepDone: Bool = false
+    @AppStorage("userName") private var userName: String = ""
+
+    @State private var sheetMode: AccountView.Mode?
+    @State private var error: String?
+    @State private var appeared = false
+
+    var body: some View {
+        ZStack {
+            PaperBackground()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("VALISE")
+                        .font(.sans(12, .semibold))
+                        .tracking(4)
+                        .foregroundStyle(Theme.navy)
+                        .padding(.top, 20)
+                        .padding(.bottom, 40)
+
+                    Eyebrow(L("Последен чекор", "One last step"), color: Theme.gold)
+                        .padding(.bottom, 12)
+
+                    Text(L("\(firstName), да ги чуваме\nтвоите патувања?", "\(firstName), shall we keep\nyour trips safe?"))
+                        .font(.serif(34))
+                        .foregroundStyle(Theme.ink)
+                        .lineSpacing(2)
+                        .padding(.bottom, 24)
+
+                    VStack(alignment: .leading, spacing: 16) {
+                        benefit("icloud", L("Резервна копија — ништо не се губи", "Backed up — nothing gets lost"))
+                        benefit("ipad.and.iphone", L("Истите патувања на секој уред", "The same trips on every device"))
+                        benefit("person.2", L("Патувај со пријатели — заедничка листа", "Travel with friends — a shared list"))
+                    }
+                    .padding(.bottom, 36)
+
+                    VStack(spacing: 12) {
+                        Button {
+                            Task {
+                                error = await account.signInWithGoogle()
+                                if account.isSignedIn { accountStepDone = true }
+                            }
+                        } label: {
+                            HStack(spacing: 10) {
+                                if account.isWorking { ProgressView().tint(Theme.goldLight) }
+                                Text(L("Продолжи со Google", "Continue with Google"))
+                            }
+                        }
+                        .buttonStyle(PrimaryButtonStyle())
+                        .disabled(account.isWorking)
+
+                        Button {
+                            sheetMode = .signUp
+                        } label: {
+                            Text(L("Создај акаунт со е-пошта", "Create an account with email"))
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(SecondaryButtonStyle())
+
+                        Button {
+                            sheetMode = .signIn
+                        } label: {
+                            Text(L("Веќе имам акаунт — најави се", "I already have an account — sign in"))
+                                .font(.sans(14, .medium))
+                                .foregroundStyle(Theme.navy)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    if let error {
+                        Text(error)
+                            .font(.sans(13, .medium))
+                            .foregroundStyle(Theme.terracotta)
+                            .padding(.top, 12)
+                    }
+
+                    Hairline().padding(.vertical, 24)
+
+                    Button {
+                        accountStepDone = true
+                    } label: {
+                        VStack(spacing: 4) {
+                            Text(L("Продолжи без акаунт", "Continue without an account"))
+                                .font(.sans(14, .semibold))
+                                .foregroundStyle(Theme.inkSoft)
+                            Text(L("Патувањата ќе бидат само на овој телефон. Акаунт можеш да направиш подоцна во Профил.",
+                                   "Your trips stay on this phone only. You can create an account later in Profile."))
+                                .font(.sans(12))
+                                .foregroundStyle(Theme.muted)
+                                .multilineTextAlignment(.center)
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.plain)
+
+                    Spacer(minLength: 40)
+                }
+                .padding(.horizontal, 26)
+                .frame(maxWidth: 560)
+                .frame(maxWidth: .infinity)
+                .containerRelativeFrame(.horizontal)
+                .opacity(appeared ? 1 : 0)
+                .offset(y: appeared ? 0 : 16)
+            }
+        }
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.9)) { appeared = true }
+        }
+        .sheet(item: $sheetMode) { mode in
+            AccountView(startWith: mode)
+                .environmentObject(account)
+        }
+        .onChange(of: account.isSignedIn) { _, signedIn in
+            if signedIn { accountStepDone = true }
+        }
+    }
+
+    private var firstName: String {
+        userName.split(separator: " ").first.map(String.init) ?? userName
+    }
+
+    private func benefit(_ icon: String, _ text: String) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .light))
+                .foregroundStyle(Theme.gold)
+                .frame(width: 24)
+            Text(text)
+                .font(.sans(15))
+                .foregroundStyle(Theme.ink)
+        }
     }
 }

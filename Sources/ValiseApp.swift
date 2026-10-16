@@ -30,16 +30,20 @@ struct ValiseApp: App {
 struct RootView: View {
     @EnvironmentObject private var store: TripStore
     @EnvironmentObject private var premium: PremiumStore
+    @EnvironmentObject private var account: AccountService
     @Environment(\.scenePhase) private var scenePhase
+    @AppStorage("accountStepDone") private var accountStepDone: Bool = false
     @AppStorage("userName") private var userName: String = ""
     @AppStorage("languageChosen") private var languageChosen: Bool = false
     @AppStorage(AppLanguage.storageKey) private var language: String = AppLanguage.mk.rawValue
     @AppStorage(Theme.storageKey) private var themeID: String = Palette.classic.id
 
-    /// 0 = јазик, 1 = име, 2 = почетна
+    /// 0 = јазик, 1 = име, 2 = акаунт, 3 = почетна
     private var stage: Int {
-        if !userName.isEmpty { return 2 }
-        return languageChosen ? 1 : 0
+        if !languageChosen { return 0 }
+        if userName.isEmpty { return 1 }
+        if !accountStepDone && !account.isSignedIn { return 2 }
+        return 3
     }
 
     var body: some View {
@@ -51,6 +55,9 @@ struct RootView: View {
                     .transition(.opacity)
             case 1:
                 OnboardingView()
+                    .transition(.opacity)
+            case 2:
+                AccountChoiceView()
                     .transition(.opacity)
             default:
                 HomeView()

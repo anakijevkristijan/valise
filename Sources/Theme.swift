@@ -35,6 +35,7 @@ struct Palette: Identifiable, Equatable {
     let terracotta: Color
     let rain: Color
     let tickets: [Color]
+    var motif: Motif = .none
 
     var name: String { L(nameMK, nameEN) }
     var mood: String { L(moodMK, moodEN) }
@@ -115,7 +116,33 @@ extension Palette {
         tickets: [Color(hex: 0x1F4E79), Color(hex: 0x2C6E8F), Color(hex: 0x17405F), Color(hex: 0x3B5F7A)]
     )
 
-    static let all: [Palette] = [.classic, .rose, .lavender, .emerald, .noir, .azur]
+    static let coquette = Palette(
+        id: "coquette", isPremium: true,
+        nameMK: "Машнички", nameEN: "Coquette",
+        moodMK: "Розеви машнички и бисер", moodEN: "Pink bows and pearls",
+        paper: Color(hex: 0xFFF4F7), stone: Color(hex: 0xFBE4EC), hairline: Color(hex: 0xF5D3DF),
+        ink: Color(hex: 0x4A2534), inkSoft: Color(hex: 0x7A5162), muted: Color(hex: 0xB48A9B),
+        primary: Color(hex: 0xC2477A), ticketText: Color(hex: 0xFFF6F9),
+        gold: Color(hex: 0xD98AAE), goldLight: Color(hex: 0xFFD9E8), goldPale: Color(hex: 0xFFE9F1),
+        sage: Color(hex: 0x8DAA91), terracotta: Color(hex: 0xC4533F), rain: Color(hex: 0x8C9BC4),
+        tickets: [Color(hex: 0xD35C8E), Color(hex: 0xB83E74), Color(hex: 0xC9668F), Color(hex: 0xA34A7E)],
+        motif: .bows
+    )
+
+    static let blossom = Palette(
+        id: "blossom", isPremium: true,
+        nameMK: "Цветна", nameEN: "Blossom",
+        moodMK: "Пастелни цвеќиња и праска", moodEN: "Pastel blooms and peach",
+        paper: Color(hex: 0xFFF8F3), stone: Color(hex: 0xFDEBE3), hairline: Color(hex: 0xF6DCD0),
+        ink: Color(hex: 0x4A2C2A), inkSoft: Color(hex: 0x7B5A55), muted: Color(hex: 0xB39189),
+        primary: Color(hex: 0xD9667A), ticketText: Color(hex: 0xFFF8F5),
+        gold: Color(hex: 0xE39A86), goldLight: Color(hex: 0xFFE1D6), goldPale: Color(hex: 0xFFEDE5),
+        sage: Color(hex: 0x8FB39A), terracotta: Color(hex: 0xC4533F), rain: Color(hex: 0x8EA3C9),
+        tickets: [Color(hex: 0xD9667A), Color(hex: 0xC65D86), Color(hex: 0xD98468), Color(hex: 0xA86FA6)],
+        motif: .flowers
+    )
+
+    static let all: [Palette] = [.classic, .coquette, .blossom, .rose, .lavender, .emerald, .noir, .azur]
 
     static func find(_ id: String?) -> Palette {
         all.first { $0.id == id } ?? .classic
@@ -195,7 +222,13 @@ extension Font {
 
 struct PaperBackground: View {
     var body: some View {
-        Theme.paper.ignoresSafeArea()
+        ZStack {
+            Theme.paper
+            if Theme.current.motif != .none {
+                MotifPattern(motif: Theme.current.motif, color: Theme.gold.opacity(0.14), spacing: 66, size: 17)
+            }
+        }
+        .ignoresSafeArea()
     }
 }
 

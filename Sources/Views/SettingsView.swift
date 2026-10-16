@@ -82,7 +82,7 @@ struct SettingsView: View {
                     }
                     .buttonStyle(SecondaryButtonStyle())
 
-                    Text("VALISE 1.6")
+                    Text("VALISE 1.7")
                         .font(.sans(10, .semibold))
                         .tracking(3)
                         .foregroundStyle(Theme.muted)
@@ -258,7 +258,27 @@ struct ThemeSwatch: View {
                     .background(TicketHalf(side: .bottom, cornerRadius: 9, notch: 4).fill(palette.tickets[0]))
                 }
                 .padding(8)
-                .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(palette.paper))
+                .background(
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous).fill(palette.paper)
+                        MotifPattern(motif: palette.motif, color: palette.gold.opacity(0.25), spacing: 22, size: 8)
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                )
+                .overlay(alignment: .top) {
+                    switch palette.motif {
+                    case .bows:
+                        BowView(color: palette.goldLight, shade: palette.gold)
+                            .frame(width: 22, height: 16)
+                            .offset(y: 2)
+                    case .flowers:
+                        FlowerView(petal: palette.goldLight, center: palette.gold)
+                            .frame(width: 16, height: 16)
+                            .offset(x: 26, y: 4)
+                    case .none:
+                        EmptyView()
+                    }
+                }
 
                 if isLocked {
                     Image(systemName: "lock.fill")
@@ -325,15 +345,15 @@ struct PremiumSheet: View {
                         Text(L("Направи го свое.", "Make it yours."))
                             .font(.serif(34))
                             .foregroundStyle(Theme.ink)
-                        Text(L("Пет ексклузивни теми — од Ривиера роза до Ноар. Секоја ги менува картите, бојата на апликацијата и Story сликите.",
-                               "Five exclusive themes — from Riviera Rose to Noir. Each one restyles your passes, the whole app and your Story images."))
+                        Text(L("Ексклузивни теми — од машнички и цвеќиња до Ноар. Секоја ги менува пасовите, целата апликација и Story сликите.",
+                               "Exclusive themes — from bows and blossoms to Noir. Each one restyles your passes, the whole app and your Story images."))
                             .font(.sans(15))
                             .foregroundStyle(Theme.inkSoft)
                             .lineSpacing(3)
                     }
 
                     VStack(alignment: .leading, spacing: 14) {
-                        benefit("paintpalette", L("5 премиум теми", "5 premium themes"))
+                        benefit("paintpalette", L("7 премиум теми, вклучително Машнички и Цветна", "7 premium themes, including Coquette and Blossom"))
                         benefit("camera.aperture", L("Story во боите на темата", "Stories in your theme's colours"))
                         benefit("sparkles", L("Сите идни теми, без доплата", "All future themes included"))
                     }

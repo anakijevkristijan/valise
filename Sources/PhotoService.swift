@@ -1,22 +1,27 @@
 import UIKit
+import Vision
 
 /// Фотографии од дестинацијата, бесплатно и без клуч:
 /// Wikidata (според GeoNames ID) → главна слика (P18) + категорија на Wikimedia Commons (P373).
 /// Сè се чува во меморија и на диск.
+/// Секоја слика се проверува на самиот телефон (Vision) — ако има лице или човек, не се прикажува.
 enum PhotoService {
 
     private static let userAgent = "Valise/1.4 (iOS packing app)"
     private static let maxCandidates = 12
 
     @MainActor private static var imageMemory: [URL: UIImage] = [:]
+    @MainActor private static var rejected: Set<String> = PhotoService.loadRejected()
     @MainActor private static var candidateMemory: [Int: [URL]] = [:]
 
     // MARK: Јавно
 
-    /// Главната фотографија (прва од кандидатите).
+    /// Главната фотографија: првата од кандидатите без луѓе.
     static func photo(for place: Place) async -> UIImage? {
-        guard let first = await candidates(for: place).first else { return nil }
-        return await image(at: first)
+        for url in await candidates(for: place).prefix(6) {
+            if let image = await image(at: url) { return image }
+        }
+        return nil
     }
 
     /// Фотографија, но најмногу `timeout` секунди чекање.
@@ -74,8 +79,9 @@ enum PhotoService {
         return urls
     }
 
-    /// Една фотографија од URL (кеширана).
+    /// Една фотографија од URL (кеширана). nil ако не се вчита или ако на неа има луѓе.
     static func image(at url: URL) async -> UIImage? {
+        if await isRejected(url) { return nil }
         if let cached = await cachedImage(url) { return cached }
         let file = cacheFile(for: url)
         if let data = try? Data(contentsOf: file), let image = UIImage(data: data) {
@@ -83,9 +89,57 @@ enum PhotoService {
             return image
         }
         guard let data = await get(url, timeout: 12), let image = UIImage(data: data) else { return nil }
+        if await containsPeople(image) {
+            await reject(url)
+            return nil
+        }
         try? data.write(to: file, options: .atomic)
         await remember(image, for: url)
         return image
+    }
+
+    // MARK: Без луѓе (Vision, на телефонот)
+
+    /// true ако има лице (било која големина) или човечка фигура поголема од ~1.5% од сликата.
+    static func containsPeople(_ image: UIImage) async -> Bool {
+        guard let cgImage = image.cgImage else { return false }
+        return await Task.detached(priority: .userInitiated) { () -> Bool in
+            let faces = VNDetectFaceRectanglesRequest()
+            let humans = VNDetectHumanRectanglesRequest()
+            let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+            do {
+                try handler.perform([faces, humans])
+            } catch {
+                return false
+            }
+            if let found = faces.results, !found.isEmpty { return true }
+            let people = (humans.results ?? []).filter { observation in
+                observation.confidence > 0.3 &&
+                observation.boundingBox.width * observation.boundingBox.height > 0.015
+            }
+            return !people.isEmpty
+        }.value
+    }
+
+    @MainActor private static func isRejected(_ url: URL) -> Bool {
+        rejected.contains(url.absoluteString)
+    }
+
+    @MainActor private static func reject(_ url: URL) {
+        rejected.insert(url.absoluteString)
+        if let data = try? JSONEncoder().encode(Array(rejected)) {
+            try? data.write(to: rejectedFile, options: .atomic)
+        }
+    }
+
+    private static var rejectedFile: URL {
+        cacheFolder.appendingPathComponent("rejected.json")
+    }
+
+    private static func loadRejected() -> Set<String> {
+        guard let data = try? Data(contentsOf: rejectedFile),
+              let list = try? JSONDecoder().decode([String].self, from: data) else { return [] }
+        return Set(list)
     }
 
     // MARK: Wikidata
@@ -185,7 +239,12 @@ enum PhotoService {
         return await commonsImages(url)
     }
 
-    private static let excluded = ["map", "flag", "coat", "logo", "emblem", "plan", "diagram", "karta", "grb", "zname"]
+    private static let excluded = [
+        "map", "flag", "coat", "logo", "emblem", "plan", "diagram", "karta", "grb", "zname",
+        "portrait", "people", "person", "selfie", "wedding", "festival", "concert", "family",
+        "man ", "woman", "girl", "boy", "child", "kids", "crowd", "tourists", "player", "team",
+        "mayor", "president", "minister", "meeting", "visit", "ceremony", "parade", "protest"
+    ]
 
     private static func commonsImages(_ url: URL?) async -> [URL] {
         guard let url, let data = await get(url, timeout: 8),
@@ -233,7 +292,7 @@ enum PhotoService {
 
     private static var cacheFolder: URL {
         let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("photos", isDirectory: true)
+            .appendingPathComponent("photos-v2", isDirectory: true)
         try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
         return base
     }
