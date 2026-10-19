@@ -85,10 +85,11 @@ enum WardrobeCategory: String, Codable, CaseIterable, Identifiable {
     /// Општите предмети од листата за пакување што ги покрива оваа категорија.
     var packingKeys: [String] {
         switch self {
-        case .top: return ["tshirts", "shirt"]
+        case .top: return ["tshirts", "shirt", "sweater"]
         case .bottom: return ["trousers", "shorts", "longTrousers", "smartTrousers"]
         case .dress: return ["dress", "eveningDress"]
         case .outerwear: return ["lightJacket", "warmJacket"]
+        case .shoes: return ["sneakers", "sandals", "smartShoes", "dressShoes", "trainingShoes", "hikingBoots"]
         default: return []
         }
     }
@@ -116,6 +117,44 @@ enum WardrobeCategory: String, Codable, CaseIterable, Identifiable {
         case .shoes: return 0.8
         case .bag: return 0.5
         case .accessory: return 0.1
+        }
+    }
+}
+
+// MARK: - Цел од листата наспроти аутфитите
+
+/// Листата предлага `need` (пр. 5 маици), аутфитите имаат `have` различни парчиња од тој вид.
+struct ClothingTarget: Identifiable {
+    let category: WardrobeCategory
+    let need: Int
+    let have: Int
+
+    var id: String { category.rawValue }
+    var missing: Int { max(0, need - have) }
+    var over: Int { max(0, have - need) }
+    var isMet: Bool { have >= need }
+
+    /// „Горни дела 3/5“
+    var label: String { "\(category.shortPlural) \(have)/\(need)" }
+
+    /// Поединечни редови во листата: колку од аутфитите паѓаат на секој предмет.
+    struct Share {
+        let have: Int
+        let need: Int
+    }
+}
+
+extension WardrobeCategory {
+    /// Кратко, во множина — за ознаки „Горни дела 3/5“.
+    var shortPlural: String {
+        switch self {
+        case .outerwear: return L("Јакни", "Jackets")
+        case .top: return L("Горни дела", "Tops")
+        case .dress: return L("Фустани", "Dresses")
+        case .bottom: return L("Долни дела", "Bottoms")
+        case .shoes: return L("Обувки", "Shoes")
+        case .bag: return L("Торби", "Bags")
+        case .accessory: return L("Додатоци", "Accessories")
         }
     }
 }

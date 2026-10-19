@@ -293,7 +293,7 @@ struct AccountChoiceView: View {
                     Eyebrow(L("Последен чекор", "One last step"), color: Theme.gold)
                         .padding(.bottom, 12)
 
-                    Text(L("\(firstName), да ги чуваме\nтвоите патувања?", "\(firstName), shall we keep\nyour trips safe?"))
+                    Text(L("\(firstName), најави се\nза да почнеш", "\(firstName), sign in\nto get started"))
                         .font(.serif(34))
                         .foregroundStyle(Theme.ink)
                         .lineSpacing(2)
@@ -302,6 +302,7 @@ struct AccountChoiceView: View {
                     VStack(alignment: .leading, spacing: 16) {
                         benefit("icloud", L("Резервна копија — ништо не се губи", "Backed up — nothing gets lost"))
                         benefit("ipad.and.iphone", L("Истите патувања на секој уред", "The same trips on every device"))
+                        benefit("hanger", L("Гардероба и аутфити — секогаш со тебе", "Wardrobe and outfits — always with you"))
                         benefit("person.2", L("Патувај со пријатели — заедничка листа", "Travel with friends — a shared list"))
                     }
                     .padding(.bottom, 36)
@@ -348,24 +349,12 @@ struct AccountChoiceView: View {
                             .padding(.top, 12)
                     }
 
-                    Hairline().padding(.vertical, 24)
-
-                    Button {
-                        accountStepDone = true
-                    } label: {
-                        VStack(spacing: 4) {
-                            Text(L("Продолжи без акаунт", "Continue without an account"))
-                                .font(.sans(14, .semibold))
-                                .foregroundStyle(Theme.inkSoft)
-                            Text(L("Патувањата ќе бидат само на овој телефон. Акаунт можеш да направиш подоцна во Профил.",
-                                   "Your trips stay on this phone only. You can create an account later in Profile."))
-                                .font(.sans(12))
-                                .foregroundStyle(Theme.muted)
-                                .multilineTextAlignment(.center)
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.plain)
+                    Text(L("Акаунтот е задолжителен: патувањата, гардеробата и аутфитите се чуваат на него — ништо не се губи, а при одјава ништо не останува на телефонот.",
+                           "An account is required: your trips, wardrobe and outfits live in it — nothing gets lost, and nothing stays on the phone after you sign out."))
+                        .font(.sans(12))
+                        .foregroundStyle(Theme.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 24)
 
                     Spacer(minLength: 40)
                 }

@@ -7,10 +7,17 @@ import Vision
 /// Секоја слика се проверува на самиот телефон (Vision) — ако има лице или човек, не се прикажува.
 enum PhotoService {
 
-    private static let userAgent = "Valise/1.4 (iOS packing app)"
-    private static let maxCandidates = 12
+    private static let userAgent = "Valise/2.1 (iOS travel packing app)"
+    private static let maxCandidates = 48
+    /// Колку проверени фотографии бараме за Story (секогаш истиот број ако ги има).
+    static let storyTarget = 8
 
-    @MainActor private static var imageMemory: [URL: UIImage] = [:]
+    /// Во меморија најмногу неколку десетици слики (системот сам ослободува кога треба).
+    private static let imageMemory: NSCache<NSURL, UIImage> = {
+        let cache = NSCache<NSURL, UIImage>()
+        cache.countLimit = 24
+        return cache
+    }()
     @MainActor private static var rejected: Set<String> = PhotoService.loadRejected()
     @MainActor private static var candidateMemory: [Int: [URL]] = [:]
 
@@ -18,8 +25,11 @@ enum PhotoService {
 
     /// Главната фотографија: првата од кандидатите без луѓе.
     static func photo(for place: Place) async -> UIImage? {
-        for url in await candidates(for: place).prefix(6) {
-            if let image = await image(at: url) { return image }
+        for url in loadVerified(place.id).prefix(3) {
+            if let loaded = await PhotoService.image(at: url) { return loaded }
+        }
+        for url in await candidates(for: place).prefix(8) {
+            if let loaded = await PhotoService.image(at: url) { return loaded }
         }
         return nil
     }
@@ -39,36 +49,50 @@ enum PhotoService {
     }
 
     /// Листа со фотографии за дестинацијата (главната прва).
+    /// Извори (паралелно): Wikidata главна слика, категорија на Commons, пребарување по име, фотографии околу координатите.
     static func candidates(for place: Place) async -> [URL] {
         if let cached = await cachedCandidates(place.id) { return cached }
-        if let saved = loadSavedCandidates(place.id), !saved.isEmpty {
+        if let saved = loadSavedCandidates(place.id), saved.count >= storyTarget {
             await remember(saved, for: place.id)
             return saved
         }
 
-        guard let entity = await entityID(geonamesID: place.id) else { return [] }
+        async let geo = geoImages(latitude: place.latitude, longitude: place.longitude)
+        let entity = await entityID(geonamesID: place.id)
 
-        async let mainFile = claimString(entity: entity, property: "P18")
-        async let category = claimString(entity: entity, property: "P373")
-        let (main, cat) = await (mainFile, category)
+        var main: URL?
+        var fromCategory: [URL] = []
+        var fromSearch: [URL] = []
+        if let entity {
+            async let mainFile = claimString(entity: entity, property: "P18")
+            async let category = claimString(entity: entity, property: "P373")
+            async let label = englishLabel(entity: entity)
+            let (file, cat, name) = await (mainFile, category, label)
+            if let file { main = filePathURL(file) }
+            async let catImages = categoryImages(cat)
+            async let searched = searchImages(name ?? place.name)
+            fromCategory = await catImages
+            fromSearch = await searched
+        } else {
+            fromSearch = await searchImages(place.name)
+        }
+        let nearby = await geo
 
+        // Наизменично од секој извор — разновидно, а не 20 слики од иста зграда.
         var urls: [URL] = []
-        if let main, let url = filePathURL(main) { urls.append(url) }
-
-        var more: [URL] = []
-        if let cat {
-            more = await categoryImages(cat)
-        }
-        if more.count < 4, let label = await englishLabel(entity: entity) {
-            more += await searchImages(label)
-        }
-
-        var seen = Set(urls.map { $0.lastPathComponent.lowercased() })
-        for url in more where urls.count < maxCandidates {
+        var seen = Set<String>()
+        func add(_ url: URL) {
             let key = url.lastPathComponent.lowercased()
-            if !seen.contains(key) {
-                seen.insert(key)
-                urls.append(url)
+            guard urls.count < maxCandidates, !seen.contains(key) else { return }
+            seen.insert(key)
+            urls.append(url)
+        }
+        if let main { add(main) }
+        let sources = [fromCategory, fromSearch, nearby]
+        let longest = sources.map(\.count).max() ?? 0
+        for index in 0..<longest {
+            for source in sources where index < source.count {
+                add(source[index])
             }
         }
 
@@ -77,6 +101,53 @@ enum PhotoService {
             saveCandidates(urls, for: place.id)
         }
         return urls
+    }
+
+    /// Проверени фотографии (без луѓе) — до `target`, паралелно, и секогаш истите следниот пат.
+    /// `onFound` се вика за секоја проверена слика веднаш штом е готова.
+    static func verifiedPhotos(for place: Place,
+                               target: Int = storyTarget,
+                               onFound: @escaping @MainActor (URL, UIImage) -> Void) async -> [URL] {
+        var verified: [URL] = []
+
+        // 1. Веќе проверени (од диск) — веднаш
+        for url in loadVerified(place.id) {
+            guard verified.count < target, let loaded = await PhotoService.image(at: url) else { continue }
+            verified.append(url)
+            await onFound(url, loaded)
+        }
+        if verified.count >= target { return verified }
+
+        // 2. Нови кандидати, по 4 истовремено, додека не стигнеме до целта
+        let tried = Set(verified)
+        var pending = await candidates(for: place).filter { !tried.contains($0) }.makeIterator()
+
+        await withTaskGroup(of: (URL, UIImage?).self) { group in
+            for _ in 0..<4 {
+                guard let url = pending.next() else { break }
+                group.addTask { (url, await PhotoService.image(at: url)) }
+            }
+            while let result = await group.next() {
+                if let loaded = result.1 {
+                    verified.append(result.0)
+                    await onFound(result.0, loaded)
+                    saveVerified(verified, for: place.id)
+                    if verified.count >= target {
+                        group.cancelAll()
+                        break
+                    }
+                }
+                if let url = pending.next() {
+                    group.addTask { (url, await PhotoService.image(at: url)) }
+                }
+            }
+        }
+        return verified
+    }
+
+    /// Однапред (кога се отвора патувањето) — Story потоа се отвора веднаш.
+    static func prefetchStory(for place: Place) async {
+        _ = await verifiedPhotos(for: place) { _, _ in }
     }
 
     /// Една фотографија од URL (кеширана). nil ако не се вчита или ако на неа има луѓе.
@@ -219,11 +290,12 @@ enum PhotoService {
         let query: Query?
     }
 
-    private static func categoryImages(_ category: String) async -> [URL] {
+    private static func categoryImages(_ category: String?) async -> [URL] {
+        guard let category else { return [] }
         let url = api("https://commons.wikimedia.org/w/api.php", [
             "action": "query", "generator": "categorymembers",
             "gcmtitle": "Category:\(category)", "gcmtype": "file", "gcmlimit": "40",
-            "prop": "imageinfo", "iiprop": "url|size|mime", "iiurlwidth": "1080",
+            "prop": "imageinfo", "iiprop": "url|size|mime", "iiurlwidth": "1280",
             "format": "json", "formatversion": "2"
         ])
         return await commonsImages(url)
@@ -233,7 +305,19 @@ enum PhotoService {
         let url = api("https://commons.wikimedia.org/w/api.php", [
             "action": "query", "generator": "search", "gsrnamespace": "6",
             "gsrsearch": "\"\(term)\" filetype:bitmap", "gsrlimit": "30",
-            "prop": "imageinfo", "iiprop": "url|size|mime", "iiurlwidth": "1080",
+            "prop": "imageinfo", "iiprop": "url|size|mime", "iiurlwidth": "1280",
+            "format": "json", "formatversion": "2"
+        ])
+        return await commonsImages(url)
+    }
+
+    /// Фотографии снимени околу дестинацијата (до 10 km).
+    private static func geoImages(latitude: Double, longitude: Double) async -> [URL] {
+        let url = api("https://commons.wikimedia.org/w/api.php", [
+            "action": "query", "generator": "geosearch",
+            "ggscoord": "\(latitude)|\(longitude)", "ggsradius": "10000",
+            "ggsnamespace": "6", "ggslimit": "50",
+            "prop": "imageinfo", "iiprop": "url|size|mime", "iiurlwidth": "1280",
             "format": "json", "formatversion": "2"
         ])
         return await commonsImages(url)
@@ -264,7 +348,7 @@ enum PhotoService {
     private static func filePathURL(_ fileName: String) -> URL? {
         let underscored = fileName.replacingOccurrences(of: " ", with: "_")
         guard let encoded = underscored.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else { return nil }
-        return URL(string: "https://commons.wikimedia.org/wiki/Special:FilePath/\(encoded)?width=1080")
+        return URL(string: "https://commons.wikimedia.org/wiki/Special:FilePath/\(encoded)?width=1280")
     }
 
     // MARK: Помошни
@@ -285,8 +369,8 @@ enum PhotoService {
         return result.0
     }
 
-    @MainActor private static func cachedImage(_ url: URL) -> UIImage? { imageMemory[url] }
-    @MainActor private static func remember(_ image: UIImage, for url: URL) { imageMemory[url] = image }
+    @MainActor private static func cachedImage(_ url: URL) -> UIImage? { imageMemory.object(forKey: url as NSURL) }
+    @MainActor private static func remember(_ image: UIImage, for url: URL) { imageMemory.setObject(image, forKey: url as NSURL) }
     @MainActor private static func cachedCandidates(_ id: Int) -> [URL]? { candidateMemory[id] }
     @MainActor private static func remember(_ urls: [URL], for id: Int) { candidateMemory[id] = urls }
 
@@ -304,7 +388,23 @@ enum PhotoService {
     }
 
     private static func listFile(_ id: Int) -> URL {
-        cacheFolder.appendingPathComponent("list-\(id).json")
+        cacheFolder.appendingPathComponent("list-v3-\(id).json")
+    }
+
+    private static func verifiedFile(_ id: Int) -> URL {
+        cacheFolder.appendingPathComponent("verified-\(id).json")
+    }
+
+    private static func saveVerified(_ urls: [URL], for id: Int) {
+        if let data = try? JSONEncoder().encode(urls.map(\.absoluteString)) {
+            try? data.write(to: verifiedFile(id), options: .atomic)
+        }
+    }
+
+    private static func loadVerified(_ id: Int) -> [URL] {
+        guard let data = try? Data(contentsOf: verifiedFile(id)),
+              let strings = try? JSONDecoder().decode([String].self, from: data) else { return [] }
+        return strings.compactMap(URL.init(string:))
     }
 
     private static func saveCandidates(_ urls: [URL], for id: Int) {

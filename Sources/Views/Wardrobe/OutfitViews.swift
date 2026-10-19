@@ -30,7 +30,7 @@ struct OutfitCollage: View {
                     let isPhoto = item.isPhoto ?? false
                     let size = side * slot.size * (isPhoto ? 0.82 : 1)
                     let tilt: Double = isPhoto ? (index % 2 == 0 ? -4 : 4) : (sameBefore == 0 ? 0 : (sameBefore % 2 == 0 ? -6 : 6))
-                    if let image = wardrobe.image(for: item) {
+                    if let image = wardrobe.thumbnail(for: item) {
                         Image(uiImage: image)
                             .resizable()
                             .scaledToFit()
@@ -107,7 +107,7 @@ struct WardrobeItemTile: View {
         VStack(spacing: 8) {
             ZStack(alignment: .topTrailing) {
                 Group {
-                    if let image = wardrobe.image(for: item) {
+                    if let image = wardrobe.thumbnail(for: item) {
                         Image(uiImage: image)
                             .resizable()
                             .scaledToFit()
@@ -194,6 +194,43 @@ struct SeasonFilter: View {
             .padding(.vertical, 1)
         }
         .scrollIndicators(.hidden)
+    }
+}
+
+// MARK: - Листата наспроти аутфитите
+
+/// „Горни дела 3/5 · Долни дела 2/2 …“ — зелено кога е исполнето, црвено кога фали.
+struct TargetChips: View {
+    let targets: [ClothingTarget]
+
+    var body: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: 6) {
+                ForEach(targets) { target in
+                    let color = target.isMet ? Theme.sage : Theme.terracotta
+                    HStack(spacing: 4) {
+                        Image(systemName: target.isMet ? "checkmark" : "exclamationmark")
+                            .font(.system(size: 9, weight: .bold))
+                        Text(target.label)
+                            .font(.sans(11, .semibold))
+                    }
+                    .foregroundStyle(color)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background(Capsule().fill(color.opacity(0.12)))
+                }
+            }
+            .padding(.vertical, 1)
+        }
+        .scrollIndicators(.hidden)
+    }
+}
+
+enum TargetText {
+    /// „2 горни дела, 1 пар обувки“ — или nil ако сè е покриено.
+    static func missing(_ targets: [ClothingTarget]) -> String? {
+        let parts = targets.filter { $0.missing > 0 }.map { $0.category.count($0.missing) }
+        return parts.isEmpty ? nil : parts.joined(separator: ", ")
     }
 }
 
@@ -374,6 +411,15 @@ struct OutfitBuilderView: View {
             }
 
             if let trip {
+                let targets = wardrobe.targets(for: trip, extra: selected, excludingOutfit: existing?.id)
+                if !targets.isEmpty {
+                    TargetChips(targets: targets)
+                    if let missing = TargetText.missing(targets) {
+                        warningLine(L("Според листата уште ти требаат: \(missing).",
+                                      "The list still needs: \(missing)."),
+                                    color: Theme.terracotta)
+                    }
+                }
                 let load = wardrobe.load(for: trip, extra: selected, excludingOutfit: existing?.id)
                 let color = load.level == .over ? Theme.terracotta : (load.level == .tight ? Theme.gold : Theme.sage)
                 HStack(alignment: .firstTextBaseline, spacing: 6) {

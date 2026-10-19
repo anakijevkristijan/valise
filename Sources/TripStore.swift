@@ -68,10 +68,9 @@ final class TripStore: ObservableObject {
     /// Промена што дошла од облакот (без повторно качување).
     func applyRemote(_ trip: Trip) {
         var incoming = trip
-        // Патување што штотуку стигнало (пр. по повторна најава) — врати го мојот план со аутфити
-        if incoming.outfitDays == nil, incoming.outfitPlan == nil, let plan = personal?.cachedPlan(trip.id) {
-            incoming.outfitDays = plan.days.isEmpty ? nil : plan.days
-            incoming.outfitPacked = plan.packed.isEmpty ? nil : plan.packed
+        // Моите лични работи за патувањето (аутфити, спакувано, пред излез) — од акаунтот
+        if let plan = personal?.cachedPlan(trip.id) {
+            Self.overlay(plan, on: &incoming)
         }
         if let index = trips.firstIndex(where: { $0.id == incoming.id }) {
             if trips[index] != incoming { trips[index] = incoming }
@@ -81,13 +80,22 @@ final class TripStore: ObservableObject {
         save()
     }
 
-    /// План со аутфити дојден од акаунтот (без повторно качување).
-    func setPlanFromCloud(_ id: UUID, days: [String: [UUID]], packed: [UUID]) {
+    /// Лични податоци дојдени од акаунтот (без повторно качување).
+    func applyPersonal(_ id: UUID, plan: PersonalCloud.Plan) {
         guard let index = trips.firstIndex(where: { $0.id == id }) else { return }
-        trips[index].outfitPlan = nil
-        trips[index].outfitDays = days.isEmpty ? nil : days
-        trips[index].outfitPacked = packed.isEmpty ? nil : packed
+        var trip = trips[index]
+        Self.overlay(plan, on: &trip)
+        guard trip != trips[index] else { return }
+        trips[index] = trip
         save()
+    }
+
+    private static func overlay(_ plan: PersonalCloud.Plan, on trip: inout Trip) {
+        trip.outfitPlan = nil
+        trip.outfitDays = plan.days.isEmpty ? nil : plan.days
+        trip.outfitPacked = plan.packed.isEmpty ? nil : plan.packed
+        if let exit = plan.exit, !exit.isEmpty { trip.exitChecklist = exit }
+        if let dismissed = plan.dismissed { trip.dismissedSuggestions = dismissed }
     }
 
     func removeLocal(_ id: UUID) {
@@ -119,7 +127,8 @@ final class TripStore: ObservableObject {
         cloud?.push(old: before, new: trips[index])
         let after = trips[index]
         if before.outfitDays != after.outfitDays || before.outfitPlan != after.outfitPlan
-            || before.outfitPacked != after.outfitPacked {
+            || before.outfitPacked != after.outfitPacked || before.exitChecklist != after.exitChecklist
+            || before.dismissedSuggestions != after.dismissedSuggestions {
             personal?.pushPlan(after)
         }
     }
@@ -132,6 +141,14 @@ final class TripStore: ObservableObject {
             Task { await cloud.removeOrLeave(trip) }
         }
         personal?.deletePlan(id)
+    }
+
+    /// По одјава: ништо лично не останува на телефонот (сè е на акаунтот).
+    func wipeLocal() {
+        trips.removeAll()
+        refreshing.removeAll()
+        save()
+        objectWillChange.send()
     }
 
     func deleteAll() {

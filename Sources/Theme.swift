@@ -322,6 +322,7 @@ struct PaperBackground: View {
             Theme.paper
             if Theme.current.motif != .none {
                 MotifPattern(motif: Theme.current.motif, color: Theme.gold, opacity: 0.14, spacing: 66, size: 17)
+                    .equatable()
             }
         }
         .ignoresSafeArea()

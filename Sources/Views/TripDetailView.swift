@@ -5,6 +5,7 @@ struct TripDetailView: View {
 
     @EnvironmentObject private var store: TripStore
     @EnvironmentObject private var account: AccountService
+    @EnvironmentObject private var wardrobe: WardrobeStore
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("userName") private var userName: String = ""
@@ -88,7 +89,7 @@ struct TripDetailView: View {
             .scrollIndicators(.hidden)
             .refreshable { await refreshWeather(force: true) }
         }
-        .task { _ = await PhotoService.photo(for: trip.destination) }
+        .task(priority: .background) { await PhotoService.prefetchStory(for: trip.destination) }
         .sensoryFeedback(.selection, trigger: trip.packedCount)
         .sensoryFeedback(.success, trigger: trip.items.count > 0 && trip.packedCount == trip.items.count)
         .sheet(item: $addItemCategory) { category in
@@ -643,7 +644,11 @@ struct TripDetailView: View {
     }
 
     private func categoryBlock(_ category: ItemCategory, items: [PackingItem], trip: Trip) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        // Облека и обувки: колку од секој предмет веќе е во аутфитите (синхронизирано постојано)
+        let shares: [UUID: ClothingTarget.Share] =
+            (category == .clothing || category == .shoes) && !wardrobe.wearCounts(for: trip).isEmpty
+            ? wardrobe.shares(for: trip) : [:]
+        return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
                 Text(category.title.uppercased())
                     .font(.sans(11, .semibold))
@@ -659,6 +664,7 @@ struct TripDetailView: View {
             VStack(spacing: 0) {
                 ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                     PackingRow(item: item,
+                               outfitShare: shares[item.id],
                                onToggle: { toggle(item) },
                                onIncrease: { changeQuantity(item, by: 1) },
                                onDecrease: { changeQuantity(item, by: -1) },
@@ -836,6 +842,8 @@ struct PackingRow: View {
     var meID: UUID? = nil
     var isCloud: Bool = false
     var showsWho: Bool = false
+    /// Колку од ова е веќе во аутфитите (пр. 3 од 5 маици).
+    var outfitShare: ClothingTarget.Share? = nil
     var onAssign: (UUID?) -> Void = { _ in }
     let onToggle: () -> Void
     let onIncrease: () -> Void
@@ -895,6 +903,21 @@ struct PackingRow: View {
                             Text(detail)
                                 .font(.sans(12))
                                 .foregroundStyle(Theme.muted)
+                        }
+
+                        if let share = outfitShare {
+                            HStack(spacing: 5) {
+                                Image(systemName: share.have >= share.need ? "checkmark.circle.fill" : "hanger")
+                                    .font(.system(size: 10, weight: .semibold))
+                                Text(L("Од аутфитите: \(share.have)/\(share.need)", "From outfits: \(share.have)/\(share.need)"))
+                                    .font(.sans(11, .semibold))
+                                if share.have < share.need {
+                                    Text(L("· фалат \(share.need - share.have)", "· \(share.need - share.have) missing"))
+                                        .font(.sans(11, .medium))
+                                }
+                            }
+                            .foregroundStyle(share.have == share.need ? Theme.sage
+                                             : (share.have < share.need ? Theme.terracotta : Theme.gold))
                         }
                     }
 

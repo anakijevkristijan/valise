@@ -212,6 +212,11 @@ struct TripClosetSummary: View {
                 }
             }
 
+            let targets = wardrobe.targets(for: trip)
+            if !targets.isEmpty {
+                TargetChips(targets: targets)
+            }
+
             if load.capacity > 0 {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
@@ -254,7 +259,7 @@ struct TripClosetSummary: View {
                 ForEach(planned, id: \.item.id) { entry in
                     VStack(spacing: 4) {
                         Group {
-                            if let image = wardrobe.image(for: entry.item) {
+                            if let image = wardrobe.thumbnail(for: entry.item) {
                                 Image(uiImage: image)
                                     .resizable()
                                     .scaledToFit()
@@ -611,14 +616,6 @@ struct OutfitPackingBlock: View {
     @EnvironmentObject private var wardrobe: WardrobeStore
     @State private var pickingDay: TripOutfitsSection.PickDay?
 
-    /// Општ предмет што може да се намали според аутфитите.
-    struct Trim: Identifiable {
-        let id: UUID
-        let name: String
-        let from: Int
-        let to: Int
-    }
-
     var body: some View {
         let planned = wardrobe.plannedItems(for: trip)
         let packed = Set(trip.outfitPacked ?? [])
@@ -660,9 +657,9 @@ struct OutfitPackingBlock: View {
                         .strokeBorder(Theme.gold.opacity(0.35), lineWidth: 1)
                 )
 
-                let suggestions = trims(planned)
-                if !suggestions.isEmpty {
-                    trimCard(suggestions)
+                let targets = wardrobe.targets(for: trip)
+                if !targets.isEmpty {
+                    targetsCard(targets)
                 }
             }
         }
@@ -713,67 +710,32 @@ struct OutfitPackingBlock: View {
         .padding(.horizontal, 2)
     }
 
-    // MARK: Усогласување со општата листа
+    // MARK: Листата наспроти аутфитите (секогаш синхронизирано)
 
-    private func trims(_ planned: [(item: WardrobeItem, times: Int)]) -> [Trim] {
-        var result: [Trim] = []
-        for category in WardrobeCategory.allCases where !category.packingKeys.isEmpty {
-            let need = planned.filter { $0.item.category == category }.count
-            guard need > 0,
-                  let generic = trip.items.first(where: { item in
-                      !item.isCustom && category.packingKeys.contains(item.key ?? "") && item.quantity > need
-                  }) else { continue }
-            result.append(Trim(id: generic.id, name: generic.displayName, from: generic.quantity, to: need))
-        }
-        return result
-    }
-
-    private func trimCard(_ trims: [Trim]) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+    private func targetsCard(_ targets: [ClothingTarget]) -> some View {
+        let missing = TargetText.missing(targets)
+        return VStack(alignment: .leading, spacing: 10) {
+            Text(L("Листата наспроти аутфитите", "The list vs. your outfits"))
+                .font(.sans(12, .semibold))
+                .foregroundStyle(Theme.ink)
+            TargetChips(targets: targets)
             HStack(alignment: .top, spacing: 8) {
-                Image(systemName: "lightbulb")
+                Image(systemName: missing == nil ? "checkmark.circle" : "exclamationmark.triangle")
                     .font(.system(size: 12, weight: .regular))
-                    .foregroundStyle(Theme.gold)
                     .padding(.top, 1)
-                Text(L("Според аутфитите ти треба помалку од општата листа:",
-                       "Your outfits need less than the general list:"))
+                Text(missing.map {
+                    L("Во аутфитите фалат: \($0). Додај ги во некој аутфит или состави нов.",
+                      "Your outfits are missing: \($0). Add them to an outfit or style a new one.")
+                } ?? L("Аутфитите го покриваат сè што предлага листата.",
+                       "Your outfits cover everything the list suggests."))
                     .font(.sans(12, .medium))
-                    .foregroundStyle(Theme.inkSoft)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            ForEach(trims) { trim in
-                HStack(spacing: 6) {
-                    Text(trim.name)
-                        .font(.sans(13, .medium))
-                        .foregroundStyle(Theme.ink)
-                    Spacer()
-                    Text("\(trim.from) → \(trim.to)")
-                        .font(.codes(15))
-                        .foregroundStyle(Theme.navy)
-                }
-            }
-            Button {
-                apply(trims)
-            } label: {
-                Text(L("Усогласи ја облеката", "Match my clothing"))
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(SecondaryButtonStyle())
+            .foregroundStyle(missing == nil ? Theme.sage : Theme.terracotta)
         }
         .padding(14)
-        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Theme.goldPale.opacity(0.6)))
-    }
-
-    private func apply(_ trims: [Trim]) {
-        withAnimation(.easeInOut(duration: 0.25)) {
-            store.mutate(trip.id) { t in
-                for trim in trims {
-                    if let index = t.items.firstIndex(where: { $0.id == trim.id }) {
-                        t.items[index].quantity = trim.to
-                    }
-                }
-            }
-        }
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .fill((missing == nil ? Theme.sage : Theme.terracotta).opacity(0.07)))
     }
 
     // MARK: Ред
@@ -797,7 +759,7 @@ struct OutfitPackingBlock: View {
                 .frame(width: 18, height: 18)
 
                 Group {
-                    if let image = wardrobe.image(for: item) {
+                    if let image = wardrobe.thumbnail(for: item) {
                         Image(uiImage: image)
                             .resizable()
                             .scaledToFit()

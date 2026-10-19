@@ -2,6 +2,7 @@ import Foundation
 import UIKit
 import FirebaseCore
 import FirebaseAuth
+import FirebaseFirestore
 import GoogleSignIn
 
 /// Акаунт преку Firebase (Google или е-пошта и лозинка).
@@ -26,6 +27,9 @@ final class AccountService: ObservableObject {
 
     var isSignedIn: Bool { profile != nil }
 
+    /// Најавен (и веднаш при старт, пред Firebase да јави) — за да нема трепкање на екранот за најава.
+    var hasSession: Bool { profile != nil || Auth.auth().currentUser != nil }
+
     var phone: String {
         UserDefaults.standard.string(forKey: PhoneID.phoneStorageKey) ?? ""
     }
@@ -35,6 +39,7 @@ final class AccountService: ObservableObject {
         self.store = store
         self.wardrobe = wardrobe
         guard handle == nil else { return }
+        if let user = Auth.auth().currentUser { update(user) }
         handle = Auth.auth().addStateDidChangeListener { [weak self] _, user in
             Task { @MainActor in self?.update(user) }
         }
@@ -64,10 +69,18 @@ final class AccountService: ObservableObject {
             currentUID = nil
             Session.uid = nil
             profile = nil
-            // Гардеробата и аутфитите остануваат на телефонот (и се чуваат на акаунтот).
+            // Прво се исклучува облакот (за бришењето да не се прати горе), па сè се брише од телефонот.
+            // Сè е зачувано на акаунтот и се враќа при следна најава.
             personal?.stop()
             personal = nil
             store?.stopSync(previousUID: previous)
+            if previous != nil {
+                store?.wipeLocal()
+                wardrobe?.wipeLocal()
+                for key in ["userName", PhoneID.phoneStorageKey, "lastOrigin"] {
+                    UserDefaults.standard.removeObject(forKey: key)
+                }
+            }
         }
     }
 
@@ -143,9 +156,27 @@ final class AccountService: ObservableObject {
         }
     }
 
+    /// Одјава: прво се чека сè да се качи (најмногу неколку секунди), па се брише од телефонот.
     func signOut() {
-        GIDSignIn.sharedInstance.signOut()
-        try? Auth.auth().signOut()
+        isWorking = true
+        Task {
+            await Self.waitForUploads(timeout: 5)
+            GIDSignIn.sharedInstance.signOut()
+            try? Auth.auth().signOut()
+            isWorking = false
+        }
+    }
+
+    private static func waitForUploads(timeout: Double) async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            let once = Once()
+            Firestore.firestore().waitForPendingWrites { _ in
+                once.run { continuation.resume() }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + timeout) {
+                once.run { continuation.resume() }
+            }
+        }
     }
 
     /// Бришење акаунт (Apple го бара ова во самата апликација).
@@ -219,5 +250,19 @@ final class AccountService: ObservableObject {
         case 17014: return L("Од безбедносни причини, одјави се и најави се повторно, па пробај пак.", "For security, sign out and back in, then try again.")
         default: return L("Нешто не успеа. Обиди се повторно.", "Something went wrong. Try again.")
         }
+    }
+}
+
+/// Повикува нешто само еднаш (прв што ќе стигне: качувањето или истекот на времето).
+private final class Once {
+    private let lock = NSLock()
+    private var done = false
+
+    func run(_ action: () -> Void) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !done else { return }
+        done = true
+        action()
     }
 }

@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import ImageIO
 
 /// Колку облека носиш според аутфитите и дали ќе собере.
 struct OutfitLoad {
@@ -71,8 +72,16 @@ struct OutfitLoad {
 
 /// Гардероба: парчиња (стикери) и аутфити. Се чува локално на телефонот.
 final class WardrobeStore: ObservableObject {
-    @Published private(set) var items: [WardrobeItem] = []
-    @Published private(set) var outfits: [Outfit] = []
+    @Published private(set) var items: [WardrobeItem] = [] {
+        didSet { itemIndex = Dictionary(items.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first }) }
+    }
+    @Published private(set) var outfits: [Outfit] = [] {
+        didSet { outfitIndex = Dictionary(outfits.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first }) }
+    }
+
+    /// Брзо пребарување по id (наместо низ цела листа).
+    private var itemIndex: [UUID: WardrobeItem] = [:]
+    private var outfitIndex: [UUID: Outfit] = [:]
 
     private struct Saved: Codable {
         var items: [WardrobeItem]
@@ -94,16 +103,36 @@ final class WardrobeStore: ObservableObject {
     // MARK: Читање
 
     func item(_ id: UUID) -> WardrobeItem? {
-        items.first { $0.id == id }
+        itemIndex[id]
     }
 
     func outfit(_ id: UUID?) -> Outfit? {
         guard let id else { return nil }
-        return outfits.first { $0.id == id }
+        return outfitIndex[id]
     }
 
     func items(in outfit: Outfit) -> [WardrobeItem] {
         outfit.itemIDs.compactMap { item($0) }
+    }
+
+    /// Мала верзија за мрежи, колажи и листи — многу побрзо од целата слика.
+    func thumbnail(for item: WardrobeItem) -> UIImage? {
+        let key = ("thumb-" + item.imageName) as NSString
+        if let cached = cache.object(forKey: key) { return cached }
+        let url = folder.appendingPathComponent(item.imageName) as CFURL
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: 520
+        ]
+        guard let source = CGImageSourceCreateWithURL(url, nil),
+              let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
+            return image(for: item)
+        }
+        let thumb = UIImage(cgImage: cgImage)
+        cache.setObject(thumb, forKey: key)
+        return thumb
     }
 
     func image(for item: WardrobeItem) -> UIImage? {
@@ -173,6 +202,43 @@ final class WardrobeStore: ObservableObject {
             }
     }
 
+    // MARK: Листата за пакување наспроти аутфитите
+
+    /// За секој вид облека: колку предлага листата (маици 5…) и колку различни парчиња има во аутфитите.
+    /// `extra` — парчиња избрани во составувачот (уште не зачувани).
+    func targets(for trip: Trip, extra: [UUID] = [], excludingOutfit: UUID? = nil) -> [ClothingTarget] {
+        var pieceIDs = Set(wearCounts(for: trip, excludingOutfit: excludingOutfit).keys)
+        for id in extra where item(id) != nil { pieceIDs.insert(id) }
+        let pieces = pieceIDs.compactMap { item($0) }
+
+        return WardrobeCategory.allCases.compactMap { category in
+            let keys = category.packingKeys
+            guard !keys.isEmpty else { return nil }
+            let need = trip.items
+                .filter { keys.contains($0.key ?? "") }
+                .reduce(0) { $0 + $1.quantity }
+            guard need > 0 else { return nil }
+            let have = pieces.filter { $0.category == category }.count
+            return ClothingTarget(category: category, need: need, have: have)
+        }
+    }
+
+    /// Колку од аутфитите паѓа на секој ред во листата (пр. „Маици“ 3/5, „Кошула“ 0/1).
+    func shares(for trip: Trip) -> [UUID: ClothingTarget.Share] {
+        var result: [UUID: ClothingTarget.Share] = [:]
+        for target in targets(for: trip) {
+            let rows = trip.items.filter { target.category.packingKeys.contains($0.key ?? "") }
+            var remaining = target.have
+            for (index, row) in rows.enumerated() {
+                let isLast = index == rows.count - 1
+                let share = isLast ? remaining : min(remaining, row.quantity)
+                remaining -= share
+                result[row.id] = ClothingTarget.Share(have: share, need: row.quantity)
+            }
+        }
+        return result
+    }
+
     /// Колку облека ќе носиш и дали собира во куферот.
     /// `extra` — парчиња што уште не се зачувани (во составувачот).
     func load(for trip: Trip, extra: [UUID] = [], excludingOutfit: UUID? = nil) -> OutfitLoad {
@@ -229,6 +295,7 @@ final class WardrobeStore: ObservableObject {
         guard let item = self.item(id) else { return }
         try? FileManager.default.removeItem(at: folder.appendingPathComponent(item.imageName))
         cache.removeObject(forKey: item.imageName as NSString)
+        cache.removeObject(forKey: ("thumb-" + item.imageName) as NSString)
         items.removeAll { $0.id == id }
         var changed: [Outfit] = []
         for index in outfits.indices where outfits[index].itemIDs.contains(id) {
@@ -292,6 +359,7 @@ final class WardrobeStore: ObservableObject {
         guard let item = self.item(id) else { return }
         try? FileManager.default.removeItem(at: folder.appendingPathComponent(item.imageName))
         cache.removeObject(forKey: item.imageName as NSString)
+        cache.removeObject(forKey: ("thumb-" + item.imageName) as NSString)
         items.removeAll { $0.id == id }
         save()
     }
@@ -309,6 +377,16 @@ final class WardrobeStore: ObservableObject {
     func removeRemoteOutfit(_ id: UUID) {
         guard outfits.contains(where: { $0.id == id }) else { return }
         outfits.removeAll { $0.id == id }
+        save()
+    }
+
+    /// По одјава: гардеробата се брише од телефонот (останува на акаунтот).
+    func wipeLocal() {
+        items = []
+        outfits = []
+        cache.removeAllObjects()
+        try? FileManager.default.removeItem(at: folder)
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         save()
     }
 
@@ -331,6 +409,9 @@ final class WardrobeStore: ObservableObject {
               let saved = try? JSONDecoder().decode(Saved.self, from: data) else { return }
         items = saved.items
         outfits = saved.outfits
+        // (за секој случај — набљудувачите не секогаш се викаат за време на init)
+        itemIndex = Dictionary(items.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        outfitIndex = Dictionary(outfits.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     }
 
     private func save() {

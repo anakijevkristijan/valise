@@ -5,10 +5,10 @@ import FirebaseFirestore
 /// Лични податоци на акаунтот — само ги гледа сопственикот:
 /// users/{uid}/wardrobe   — парчиња (со сликата)
 /// users/{uid}/outfits    — аутфити
-/// users/{uid}/tripPlans  — аутфити по денови и што е спакувано, по патување
+/// users/{uid}/tripPlans  — по патување: аутфити по денови, спакувано, „пред излез“
 ///
-/// При најава: она што е во облакот доаѓа на телефонот, а она што е само на телефонот се качува.
-/// При одјава ништо не се брише од телефонот.
+/// При најава: сè од облакот доаѓа на телефонот (а она што е само на телефонот се качува).
+/// При одјава телефонот се празни — податоците остануваат тука, на акаунтот.
 final class PersonalCloud {
     let uid: String
     private let db = Firestore.firestore()
@@ -20,9 +20,12 @@ final class PersonalCloud {
     private var mergedOutfits = false
     private var mergedPlans = false
 
+    /// Лично за едно патување: аутфити по денови, што е спакувано, „пред излез“, скриени предлози.
     struct Plan: Equatable {
         var days: [String: [UUID]]
         var packed: [UUID]
+        var exit: [ChecklistItem]?
+        var dismissed: [String]?
     }
 
     /// Последно познат план по патување (за патувања што ќе стигнат подоцна).
@@ -204,7 +207,7 @@ final class PersonalCloud {
         }
     }
 
-    // MARK: План по денови (по патување)
+    // MARK: Лично по патување (аутфити, спакувано, пред излез)
 
     private func handlePlans(_ snapshot: QuerySnapshot) {
         guard let trips else { return }
@@ -217,31 +220,22 @@ final class PersonalCloud {
             if let id = UUID(uuidString: change.document.documentID) { plans.removeValue(forKey: id) }
         }
 
-        if !mergedPlans {
-            // Патување без локален план → земи го од облакот.
-            for trip in trips.trips where !Self.hasPlan(trip) {
-                if let plan = plans[trip.id] {
-                    trips.setPlanFromCloud(trip.id, days: plan.days, packed: plan.packed)
-                }
-            }
-            // Првиот вистински одговор од облакот: локалните планови што ги нема горе се качуваат.
-            if !snapshot.metadata.isFromCache {
-                mergedPlans = true
-                for trip in trips.trips where Self.hasPlan(trip) && plans[trip.id] != Self.plan(of: trip) {
-                    pushPlan(trip)
-                }
-            }
-            return
-        }
-
-        // Промена од друг телефон
+        // Облакот има предност (по најава телефонот е празен); моите промени што уште се качуваат се прескокнуваат.
         for change in snapshot.documentChanges where change.type != .removed {
             if change.document.metadata.hasPendingWrites { continue }
             guard let id = UUID(uuidString: change.document.documentID),
                   let plan = plans[id],
                   let trip = trips.trip(id),
                   Self.plan(of: trip) != plan else { continue }
-            trips.setPlanFromCloud(id, days: plan.days, packed: plan.packed)
+            trips.applyPersonal(id, plan: plan)
+        }
+
+        // Првиот вистински одговор: патувањата што немаат лични податоци горе — качи ги.
+        if !mergedPlans && !snapshot.metadata.isFromCache {
+            mergedPlans = true
+            for trip in trips.trips where plans[trip.id] == nil {
+                pushPlan(trip)
+            }
         }
     }
 
@@ -250,18 +244,27 @@ final class PersonalCloud {
         plans[trip.id] = plan
         var days: [String: [String]] = [:]
         for (key, ids) in plan.days { days[key] = ids.map(\.uuidString) }
-        plansRef.document(trip.id.uuidString).setData([
+        var fields: [String: Any] = [
             "outfitDays": days,
             "outfitPacked": plan.packed.map(\.uuidString),
             "updatedAt": Date().timeIntervalSince1970
-        ]) { [weak self] error in
+        ]
+        if let exit = plan.exit,
+           let data = try? JSONEncoder().encode(exit),
+           let json = try? JSONSerialization.jsonObject(with: data) {
+            fields["exitChecklist"] = json
+        }
+        if let dismissed = plan.dismissed {
+            fields["dismissedSuggestions"] = dismissed
+        }
+        plansRef.document(trip.id.uuidString).setData(fields) { [weak self] error in
             if let error { self?.failed(error) }
         }
     }
 
     func cachedPlan(_ id: UUID) -> Plan? { plans[id] }
 
-    /// При бришење на акаунтот: сè лично од облакот (на телефонот останува).
+    /// При бришење на акаунтот: сè лично од облакот.
     func deleteEverything() async {
         for collection in [itemsRef, outfitsRef, plansRef] {
             guard let snapshot = try? await collection.getDocuments() else { continue }
@@ -276,11 +279,7 @@ final class PersonalCloud {
         plansRef.document(id.uuidString).delete()
     }
 
-    private static func hasPlan(_ trip: Trip) -> Bool {
-        trip.outfitDays != nil || trip.outfitPlan != nil || !(trip.outfitPacked ?? []).isEmpty
-    }
-
-    private static func plan(of trip: Trip) -> Plan {
+    static func plan(of trip: Trip) -> Plan {
         var days: [String: [UUID]] = [:]
         for date in trip.days {
             let key = Trip.dayKey(date)
@@ -291,7 +290,10 @@ final class PersonalCloud {
         for (key, ids) in trip.outfitDays ?? [:] where days[key] == nil && !ids.isEmpty {
             days[key] = ids
         }
-        return Plan(days: days, packed: trip.outfitPacked ?? [])
+        return Plan(days: days,
+                    packed: trip.outfitPacked ?? [],
+                    exit: trip.exitChecklist,
+                    dismissed: trip.dismissedSuggestions)
     }
 
     private static func plan(from data: [String: Any]) -> Plan {
@@ -301,6 +303,13 @@ final class PersonalCloud {
             if !ids.isEmpty { days[key] = ids }
         }
         let packed = (data["outfitPacked"] as? [String] ?? []).compactMap(UUID.init(uuidString:))
-        return Plan(days: days, packed: packed)
+        var exit: [ChecklistItem]?
+        if let raw = data["exitChecklist"],
+           JSONSerialization.isValidJSONObject(raw),
+           let json = try? JSONSerialization.data(withJSONObject: raw) {
+            exit = try? JSONDecoder().decode([ChecklistItem].self, from: json)
+        }
+        let dismissed = data["dismissedSuggestions"] as? [String]
+        return Plan(days: days, packed: packed, exit: exit, dismissed: dismissed)
     }
 }

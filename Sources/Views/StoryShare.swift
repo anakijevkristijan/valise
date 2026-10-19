@@ -82,35 +82,73 @@ struct StoryCardView: View {
     }
 }
 
-/// Избор на позадина за Story: фотографии од дестинацијата, своја слика или без слика.
+/// Дизајнирани позадини — секогаш има убав избор, и без фотографии.
+struct StoryBackdrop: View {
+    let kind: Int
+    let trip: Trip
+
+    var body: some View {
+        ZStack {
+            if kind == 0 {
+                LinearGradient(colors: [Theme.ticket(trip.tint), Theme.ticket(trip.tint).opacity(0.82), Theme.navy],
+                               startPoint: .top, endPoint: .bottom)
+                MotifPattern(motif: Theme.current.motif == .none ? .sparkles : Theme.current.motif,
+                             color: Theme.ticketText, opacity: 0.09, spacing: 54, size: 14)
+            } else {
+                LinearGradient(colors: [Theme.gold, Theme.navy], startPoint: .topLeading, endPoint: .bottomTrailing)
+                Text(trip.destinationCode)
+                    .font(.codes(240))
+                    .foregroundStyle(Color.white.opacity(0.08))
+                    .offset(y: -120)
+            }
+        }
+        .frame(width: 360, height: 640)
+        .clipped()
+    }
+}
+
+/// Избор на позадина за Story: фотографии од дестинацијата, дизајнирани позадини, своја слика или без слика.
 struct StorySheet: View {
     let trip: Trip
 
     private enum Option: Hashable {
         case blank
         case imported
+        case styled(Int)
         case remote(URL)
     }
 
     @Environment(\.dismiss) private var dismiss
-    @State private var options: [Option] = [.blank]
-    @State private var selected: Option = .blank
+    @State private var remotes: [URL] = []
+    @State private var selected: Option = .styled(0)
+    @State private var userChose = false
     @State private var images: [URL: UIImage] = [:]
+    @State private var styledImages: [Int: UIImage] = [:]
     @State private var importedImage: UIImage?
     @State private var pickerItem: PhotosPickerItem?
     @State private var rendered: UIImage?
     @State private var isLoadingList = true
-    @State private var loadingURL: URL?
+
+    private var options: [Option] {
+        var list: [Option] = []
+        if importedImage != nil { list.append(.imported) }
+        list += remotes.map { Option.remote($0) }
+        list += [.styled(0), .styled(1), .blank]
+        return list
+    }
 
     private var currentPhoto: UIImage? {
         switch selected {
         case .blank: return nil
         case .imported: return importedImage
+        case .styled(let kind): return styledImages[kind]
         case .remote(let url): return images[url]
         }
     }
 
-    private var photoCount: Int { options.filter { $0 != .blank }.count }
+    private var placeholders: Int {
+        isLoadingList ? max(0, PhotoService.storyTarget - remotes.count) : 0
+    }
 
     var body: some View {
         ZStack {
@@ -125,28 +163,20 @@ struct StorySheet: View {
 
                 GeometryReader { geo in
                     let scale = min(geo.size.width / 360, geo.size.height / 640)
-                    ZStack {
-                        StoryCardView(trip: trip, photo: currentPhoto)
-                            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-                            .shadow(color: Theme.navy.opacity(0.16), radius: 24, x: 0, y: 12)
-                            .scaleEffect(scale)
-                            .frame(width: geo.size.width, height: geo.size.height)
-                            .animation(.easeInOut(duration: 0.3), value: selected)
-
-                        if loadingURL != nil {
-                            ProgressView()
-                                .tint(.white)
-                                .padding(14)
-                                .background(Circle().fill(.black.opacity(0.35)))
-                        }
-                    }
-                    .contentShape(Rectangle())
-                    .onTapGesture { next() }
+                    StoryCardView(trip: trip, photo: currentPhoto)
+                        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                        .shadow(color: Theme.navy.opacity(0.16), radius: 24, x: 0, y: 12)
+                        .scaleEffect(scale)
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .animation(.easeInOut(duration: 0.3), value: selected)
+                        .contentShape(Rectangle())
+                        .onTapGesture { next() }
                 }
 
                 Text(hint)
                     .font(.sans(12))
                     .foregroundStyle(Theme.muted)
+                    .multilineTextAlignment(.center)
 
                 strip
 
@@ -176,16 +206,23 @@ struct StorySheet: View {
             .padding(.top, 24)
             .padding(.bottom, 16)
         }
-        .task { await loadOptions() }
+        .task { await load() }
         .onChange(of: pickerItem) { _, item in
             Task { await importPhoto(item) }
         }
     }
 
     private var hint: String {
-        if isLoadingList { return L("Барам фотографии од \(trip.destination.name)…", "Finding photos of \(trip.destination.name)…") }
-        if photoCount <= 1 { return L("Допри „+“ за своја слика", "Tap “+” to use your own photo") }
-        return L("Допри ја сликата за следна · \(photoCount) фотографии", "Tap the image for the next one · \(photoCount) photos")
+        let name = trip.destination.name
+        if isLoadingList {
+            return L("Барам фотографии од \(name)… \(remotes.count)/\(PhotoService.storyTarget)",
+                     "Finding photos of \(name)… \(remotes.count)/\(PhotoService.storyTarget)")
+        }
+        if remotes.isEmpty {
+            return L("Нема фотографии без луѓе за \(name) — избери позадина или „+“ за своја слика.",
+                     "No people-free photos of \(name) — pick a backdrop or “+” for your own.")
+        }
+        return L("\(remotes.count) фотографии · допри ја сликата за следна", "\(remotes.count) photos · tap the image for the next one")
     }
 
     // MARK: Лента со избор
@@ -209,11 +246,21 @@ struct StorySheet: View {
                     }
 
                     ForEach(options, id: \.self) { option in
-                        Button { select(option) } label: {
+                        Button { choose(option) } label: {
                             thumbFrame(isSelected: option == selected) { thumbContent(option) }
                         }
                         .buttonStyle(PressableStyle())
                         .id(option)
+                    }
+
+                    // Места за фотографиите што уште се проверуваат — бројот не скока
+                    ForEach(0..<placeholders, id: \.self) { _ in
+                        thumbFrame(isSelected: false) {
+                            ZStack {
+                                Theme.stone.opacity(0.6)
+                                ProgressView().controlSize(.mini).tint(Theme.muted)
+                            }
+                        }
                     }
                 }
                 .padding(.vertical, 2)
@@ -252,6 +299,12 @@ struct StorySheet: View {
             if let importedImage {
                 Image(uiImage: importedImage).resizable().scaledToFill()
             }
+        case .styled(let kind):
+            if let image = styledImages[kind] {
+                Image(uiImage: image).resizable().scaledToFill()
+            } else {
+                Theme.navy
+            }
         case .remote(let url):
             if let image = images[url] {
                 Image(uiImage: image).resizable().scaledToFill()
@@ -263,22 +316,22 @@ struct StorySheet: View {
 
     // MARK: Логика
 
+    /// Дизајнираните позадини веднаш, па проверените фотографии (по 4 паралелно, до 8, секогаш истите).
     @MainActor
-    /// Секоја фотографија прво се проверува (без луѓе) и дури потоа се појавува во лентата.
-    private func loadOptions() async {
+    private func load() async {
+        for kind in 0..<2 {
+            let renderer = ImageRenderer(content: StoryBackdrop(kind: kind, trip: trip))
+            renderer.scale = 2
+            styledImages[kind] = renderer.uiImage
+        }
         render()
-        let urls = await PhotoService.candidates(for: trip.destination)
-        for url in urls {
-            guard let image = await PhotoService.image(at: url) else { continue }
+
+        _ = await PhotoService.verifiedPhotos(for: trip.destination) { url, image in
+            guard !remotes.contains(url) else { return }
             images[url] = image
-            let option = Option.remote(url)
-            if let blankIndex = options.firstIndex(of: .blank) {
-                options.insert(option, at: blankIndex)
-            } else {
-                options.append(option)
-            }
-            if selected == .blank && importedImage == nil {
-                selected = option
+            remotes.append(url)
+            if !userChose && importedImage == nil && remotes.count == 1 {
+                selected = .remote(url)
                 render()
             }
         }
@@ -286,43 +339,17 @@ struct StorySheet: View {
     }
 
     @MainActor
-    private func select(_ option: Option) {
-        Task { await choose(option) }
-    }
-
-    @MainActor
-    private func choose(_ option: Option) async {
-        if case .remote(let url) = option, images[url] == nil {
-            loadingURL = url
-            let image = await PhotoService.image(at: url)
-            if loadingURL == url { loadingURL = nil }
-            guard let image else {
-                options.removeAll { $0 == option }
-                return
-            }
-            images[url] = image
-        }
+    private func choose(_ option: Option) {
+        userChose = true
         selected = option
         render()
-        prefetchNext()
     }
 
     @MainActor
     private func next() {
-        guard options.count > 1, let index = options.firstIndex(of: selected) else { return }
-        select(options[(index + 1) % options.count])
-    }
-
-    /// Ја вчитува следната слика однапред, за допирот да е моментален.
-    @MainActor
-    private func prefetchNext() {
-        guard let index = options.firstIndex(of: selected) else { return }
-        let nextOption = options[(index + 1) % options.count]
-        if case .remote(let url) = nextOption, images[url] == nil {
-            Task {
-                if let image = await PhotoService.image(at: url) { images[url] = image }
-            }
-        }
+        let list = options
+        guard list.count > 1, let index = list.firstIndex(of: selected) else { return }
+        choose(list[(index + 1) % list.count])
     }
 
     @MainActor
@@ -331,7 +358,7 @@ struct StorySheet: View {
               let data = try? await item.loadTransferable(type: Data.self),
               let original = UIImage(data: data) else { return }
         importedImage = original.downscaled(maxSide: 1800)
-        if !options.contains(.imported) { options.insert(.imported, at: 0) }
+        userChose = true
         selected = .imported
         render()
         pickerItem = nil
