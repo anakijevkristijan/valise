@@ -41,8 +41,8 @@ targets:
       base:
         PRODUCT_NAME: Valise
         PRODUCT_BUNDLE_IDENTIFIER: com.valise.packing
-        MARKETING_VERSION: "1.8"
-        CURRENT_PROJECT_VERSION: "9"
+        MARKETING_VERSION: "1.9"
+        CURRENT_PROJECT_VERSION: "10"
         TARGETED_DEVICE_FAMILY: "1,2"
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_FILE: Resources/Info.plist

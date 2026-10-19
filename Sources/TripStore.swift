@@ -1,0 +1,238 @@
+import Foundation
+import SwiftUI
+
+/// Локално, офлајн складирање на патувањата (JSON во Documents).
+final class TripStore: ObservableObject {
+    @Published private(set) var trips: [Trip] = []
+
+    private let fileURL: URL
+    private var refreshing: Set<UUID> = []
+
+    init() {
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        fileURL = docs.appendingPathComponent("valise-trips.json")
+        load()
+    }
+
+    // MARK: Читање
+
+    var upcoming: [Trip] {
+        trips.filter { !$0.isPast }.sorted { $0.startDate < $1.startDate }
+    }
+
+    var past: [Trip] {
+        trips.filter(\.isPast).sorted { $0.startDate > $1.startDate }
+    }
+
+    func trip(_ id: UUID) -> Trip? {
+        trips.first { $0.id == id }
+    }
+
+    // MARK: Облак
+
+    private(set) var cloud: CloudSync?
+
+    var isSignedIn: Bool { cloud != nil }
+
+    /// По најава: слушај ги заедничките патувања и качи ги локалните.
+    func startSync(uid: String) {
+        guard cloud?.uid != uid else { return }
+        cloud?.stop()
+        let sync = CloudSync(uid: uid, store: self)
+        cloud = sync
+        let name = UserDefaults.standard.string(forKey: "userName") ?? ""
+        for index in trips.indices where trips[index].ownerUID == nil {
+            sync.claim(&trips[index], myName: name)
+            let trip = trips[index]
+            Task { await sync.upload(trip) }
+        }
+        save()
+        sync.start()
+        objectWillChange.send()
+    }
+
+    /// По одјава: туѓите патувања се тргаат од телефонот, моите остануваат.
+    func stopSync(previousUID: String?) {
+        cloud?.stop()
+        cloud = nil
+        if let previousUID {
+            trips.removeAll { $0.ownerUID != nil && $0.ownerUID != previousUID }
+        }
+        save()
+        objectWillChange.send()
+    }
+
+    /// Промена што дошла од облакот (без повторно качување).
+    func applyRemote(_ trip: Trip) {
+        if let index = trips.firstIndex(where: { $0.id == trip.id }) {
+            if trips[index] != trip { trips[index] = trip }
+        } else {
+            trips.append(trip)
+        }
+        save()
+    }
+
+    func removeLocal(_ id: UUID) {
+        guard trips.contains(where: { $0.id == id }) else { return }
+        trips.removeAll { $0.id == id }
+        save()
+    }
+
+    // MARK: Промени
+
+    func add(_ trip: Trip) {
+        var newTrip = trip
+        if let cloud {
+            cloud.claim(&newTrip, myName: UserDefaults.standard.string(forKey: "userName") ?? "")
+        }
+        trips.append(newTrip)
+        save()
+        if let cloud {
+            let uploaded = newTrip
+            Task { await cloud.upload(uploaded) }
+        }
+    }
+
+    func mutate(_ id: UUID, _ change: (inout Trip) -> Void) {
+        guard let index = trips.firstIndex(where: { $0.id == id }) else { return }
+        let before = trips[index]
+        change(&trips[index])
+        save()
+        cloud?.push(old: before, new: trips[index])
+    }
+
+    func delete(_ id: UUID) {
+        guard let trip = self.trip(id) else { return }
+        trips.removeAll { $0.id == id }
+        save()
+        if let cloud {
+            Task { await cloud.removeOrLeave(trip) }
+        }
+    }
+
+    func deleteAll() {
+        let all = trips
+        trips.removeAll()
+        save()
+        if let cloud {
+            Task { for trip in all { await cloud.removeOrLeave(trip) } }
+        }
+    }
+
+    // MARK: Покана на сопатник
+
+    enum InviteOutcome {
+        case joined(String)
+        case alreadyIn(String)
+        case invited(String, String)
+        case isYou
+        case failed
+    }
+
+    /// Пријател од контакти: ако има акаунт — веднаш е во патувањето; ако нема — покана што го чека.
+    @MainActor
+    func invite(name: String, phones: [String], emails: [String], to tripID: UUID) async -> InviteOutcome {
+        guard let cloud, let current = trip(tripID) else { return .failed }
+
+        let phoneKeys = phones.compactMap { PhoneID.normalize($0) }.map { PhoneID.phoneKey($0) }
+        let emailKeys = emails.map { PhoneID.emailKey($0) }
+        let keys = Array(Set(phoneKeys)) + Array(Set(emailKeys))
+        guard !keys.isEmpty else { return .failed }
+
+        if !current.isCloud, let index = trips.firstIndex(where: { $0.id == tripID }) {
+            cloud.claim(&trips[index], myName: UserDefaults.standard.string(forKey: "userName") ?? "")
+            save()
+        }
+        if let latest = trip(tripID), latest.ownerUID == cloud.uid { await cloud.upload(latest) }
+
+        if let uid = await cloud.lookup(keys: keys) {
+            if uid == cloud.uid { return .isYou }
+            if trip(tripID)?.memberUIDs?.contains(uid) == true { return .alreadyIn(name) }
+            mutate(tripID) { t in
+                var list = t.companions ?? []
+                list.append(Companion(name: name, uid: uid))
+                t.companions = list
+                var members = t.memberUIDs ?? []
+                if !members.contains(uid) { members.append(uid) }
+                t.memberUIDs = members
+                PackingEngine.ensureTogether(&t)
+            }
+            return .joined(name)
+        }
+
+        mutate(tripID) { t in
+            var list = t.companions ?? []
+            list.append(Companion(name: name, inviteKey: keys.first))
+            t.companions = list
+            PackingEngine.ensureTogether(&t)
+        }
+        let me = UserDefaults.standard.string(forKey: "userName") ?? ""
+        if let latest = trip(tripID) {
+            await cloud.createInvites(trip: latest, keys: keys, fromName: me)
+        }
+        let message = L("Здраво \(name.split(separator: " ").first.map(String.init) ?? name)! ✈︎ Патувам за \(current.destination.name) (\(Fmt.range(current.startDate, current.endDate))) и те додадов во Valise. Симни ја апликацијата и регистрирај се со твојот број — патувањето и листата ќе те чекаат. — \(me)",
+                        "Hi \(name.split(separator: " ").first.map(String.init) ?? name)! ✈︎ I'm going to \(current.destination.name) (\(Fmt.range(current.startDate, current.endDate))) and added you on Valise. Get the app and sign up with your number — the trip and packing list will be waiting. — \(me)")
+        return .invited(name, message)
+    }
+
+    // MARK: Прогноза — се освежува при секое отворање
+
+    /// Освежи го времето за едно патување. Двојни повици во иста минута се прескокнуваат.
+    @MainActor
+    func refreshWeather(_ id: UUID, force: Bool = false) async {
+        guard let current = self.trip(id), !current.isPast else { return }
+        if !force, let updated = current.weatherUpdatedAt, Date().timeIntervalSince(updated) < 60 { return }
+        guard !refreshing.contains(id) else { return }
+        refreshing.insert(id)
+        defer { refreshing.remove(id) }
+
+        let result = await WeatherService.fetchWeather(for: current.destination, from: current.startDate, to: current.endDate)
+        guard !result.days.isEmpty else { return }
+        mutate(id) {
+            $0.weather = result.days
+            $0.weatherSource = result.source
+            $0.weatherUpdatedAt = Date()
+        }
+    }
+
+    /// При отворање на апликацијата и враќање во неа.
+    @MainActor
+    func refreshAllUpcoming() async {
+        for trip in upcoming {
+            await refreshWeather(trip.id)
+        }
+    }
+
+    // MARK: Диск
+
+    private func load() {
+        guard let data = try? Data(contentsOf: fileURL) else { return }
+        if let decoded = try? JSONDecoder().decode([Trip].self, from: data) {
+            trips = decoded
+        }
+    }
+
+    private func save() {
+        do {
+            let data = try JSONEncoder().encode(trips)
+            try data.write(to: fileURL, options: .atomic)
+        } catch {
+            print("Valise: save failed — \(error)")
+        }
+    }
+}
+
+/// Последниот град од кој тргна — за побрзо следно патување.
+enum LastOrigin {
+    private static let key = "lastOrigin"
+
+    static func load() -> Place? {
+        guard let data = UserDefaults.standard.data(forKey: key) else { return nil }
+        return try? JSONDecoder().decode(Place.self, from: data)
+    }
+
+    static func save(_ place: Place?) {
+        guard let place, let data = try? JSONEncoder().encode(place) else { return }
+        UserDefaults.standard.set(data, forKey: key)
+    }
+}
