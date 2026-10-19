@@ -44,6 +44,7 @@ struct TripDetailView: View {
             }
         }
         .toolbar(.hidden, for: .navigationBar)
+        .toolbar(.hidden, for: .tabBar)
         .task { await refreshWeather(force: false) }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
@@ -65,6 +66,7 @@ struct TripDetailView: View {
                     BoardingPassCard(trip: trip)
                     companionsSection(trip)
                     weatherSection(trip)
+                    TripOutfitsSection(trip: trip)
                     BagFitCard(trip: trip)
                     tabPicker(trip)
 
@@ -541,6 +543,8 @@ struct TripDetailView: View {
                     categoryBlock(category, items: group, trip: trip)
                 }
             }
+
+            OutfitPackingBlock(trip: trip)
 
             Button {
                 addTogether = false

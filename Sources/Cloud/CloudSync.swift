@@ -11,7 +11,8 @@ enum CloudCodec {
 
     /// Лични работи што воопшто не одат во облакот.
     static let personalKeys: Set<String> = [
-        "exitChecklist", "dismissedSuggestions", "weather", "weatherSource", "weatherUpdatedAt"
+        "exitChecklist", "dismissedSuggestions", "weather", "weatherSource", "weatherUpdatedAt",
+        "outfitPlan", "outfitPacked"
     ]
 
     static func encode(_ trip: Trip, myUID: String) -> [String: Any]? {
@@ -82,6 +83,8 @@ enum CloudCodec {
             trip.weather = local.weather
             trip.weatherSource = local.weatherSource
             trip.weatherUpdatedAt = local.weatherUpdatedAt
+            trip.outfitPlan = local.outfitPlan
+            trip.outfitPacked = local.outfitPacked
         } else {
             trip.exitChecklist = PackingEngine.defaultExitChecklist()
         }

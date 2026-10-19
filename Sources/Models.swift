@@ -400,6 +400,10 @@ struct Trip: Codable, Identifiable, Hashable {
     /// Заедничко патување (Firebase).
     var ownerUID: String?
     var memberUIDs: [String]?
+    /// Аутфит по ден ("yyyy-MM-dd" → id на аутфит). Лично, не се синхронизира.
+    var outfitPlan: [String: UUID]?
+    /// Парчиња од гардеробата што веќе се спакувани.
+    var outfitPacked: [UUID]?
 
     /// Синхронизирано со акаунт.
     var isCloud: Bool { ownerUID != nil }

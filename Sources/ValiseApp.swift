@@ -8,6 +8,7 @@ struct ValiseApp: App {
     @StateObject private var store = TripStore()
     @StateObject private var premium = PremiumStore()
     @StateObject private var account = AccountService()
+    @StateObject private var wardrobe = WardrobeStore()
 
     init() {
         FirebaseApp.configure()
@@ -19,6 +20,7 @@ struct ValiseApp: App {
                 .environmentObject(store)
                 .environmentObject(premium)
                 .environmentObject(account)
+                .environmentObject(wardrobe)
                 .onAppear { account.bind(store) }
                 .onOpenURL { url in
                     _ = GIDSignIn.sharedInstance.handle(url)
@@ -60,7 +62,7 @@ struct RootView: View {
                 AccountChoiceView()
                     .transition(.opacity)
             default:
-                HomeView()
+                MainTabView()
                     .transition(.opacity)
             }
         }
