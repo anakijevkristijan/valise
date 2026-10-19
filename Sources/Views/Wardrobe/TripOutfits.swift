@@ -602,34 +602,49 @@ struct DayOutfitsSheet: View {
     }
 }
 
-// MARK: - Во листата за пакување: облеката од аутфитите
+// MARK: - Во листата за пакување: облеката од аутфитите (веднаш под „Облека“)
 
 struct OutfitPackingBlock: View {
     let trip: Trip
 
     @EnvironmentObject private var store: TripStore
     @EnvironmentObject private var wardrobe: WardrobeStore
+    @State private var pickingDay: TripOutfitsSection.PickDay?
+
+    /// Општ предмет што може да се намали според аутфитите.
+    struct Trim: Identifiable {
+        let id: UUID
+        let name: String
+        let from: Int
+        let to: Int
+    }
 
     var body: some View {
         let planned = wardrobe.plannedItems(for: trip)
         let packed = Set(trip.outfitPacked ?? [])
 
-        if !planned.isEmpty {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 10) {
-                    Image(systemName: "hanger")
-                        .font(.system(size: 12, weight: .light))
-                        .foregroundStyle(Theme.gold)
-                    Text(L("ОД АУТФИТИТЕ", "FROM YOUR OUTFITS"))
-                        .font(.sans(11, .semibold))
-                        .tracking(2)
-                        .foregroundStyle(Theme.navy)
-                    Spacer()
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                Image(systemName: "hanger")
+                    .font(.system(size: 12, weight: .light))
+                    .foregroundStyle(Theme.gold)
+                Text(L("ОБЛЕКА ОД АУТФИТИТЕ", "CLOTHES FROM YOUR OUTFITS"))
+                    .font(.sans(11, .semibold))
+                    .tracking(2)
+                    .foregroundStyle(Theme.navy)
+                Spacer()
+                if !planned.isEmpty {
                     Text("\(planned.filter { packed.contains($0.item.id) }.count)/\(planned.count)")
                         .font(.codes(14))
                         .foregroundStyle(Theme.muted)
                 }
-                .padding(.horizontal, 2)
+            }
+            .padding(.horizontal, 2)
+
+            if planned.isEmpty {
+                emptyCard
+            } else {
+                summary(planned)
 
                 VStack(spacing: 0) {
                     ForEach(Array(planned.enumerated()), id: \.element.item.id) { index, entry in
@@ -640,9 +655,128 @@ struct OutfitPackingBlock: View {
                     }
                 }
                 .luxCard(padding: 0, fill: Theme.surface, radius: 16)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .strokeBorder(Theme.gold.opacity(0.35), lineWidth: 1)
+                )
+
+                let suggestions = trims(planned)
+                if !suggestions.isEmpty {
+                    trimCard(suggestions)
+                }
+            }
+        }
+        .sheet(item: $pickingDay) { day in
+            DayOutfitsSheet(tripID: trip.id, date: day.date)
+                .environmentObject(store)
+                .environmentObject(wardrobe)
+                .presentationCornerRadius(28)
+        }
+    }
+
+    // MARK: Празно
+
+    private var emptyCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(L("Тука автоматски се бројат парчињата од аутфитите што ќе ги испланираш по денови.",
+                   "Pieces from the outfits you plan for each day are counted here automatically."))
+                .font(.sans(13))
+                .foregroundStyle(Theme.inkSoft)
+                .fixedSize(horizontal: false, vertical: true)
+            Button {
+                if let first = trip.days.first { pickingDay = .init(date: first) }
+            } label: {
+                Label(L("Планирај аутфити", "Plan outfits"), systemImage: "calendar")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(SecondaryButtonStyle())
+        }
+        .luxCard(padding: 16)
+    }
+
+    // MARK: Колку од секоја категорија
+
+    private func summary(_ planned: [(item: WardrobeItem, times: Int)]) -> some View {
+        let counts = WardrobeCategory.allCases.compactMap { category -> String? in
+            let n = planned.filter { $0.item.category == category }.count
+            return n > 0 ? category.count(n) : nil
+        }
+        return VStack(alignment: .leading, spacing: 4) {
+            Text(L("Треба да спакуваш \(PieceText.pieces(planned.count)):", "You need to pack \(PieceText.pieces(planned.count)):"))
+                .font(.sans(13, .semibold))
+                .foregroundStyle(Theme.ink)
+            Text(counts.joined(separator: " · "))
+                .font(.sans(13))
+                .foregroundStyle(Theme.inkSoft)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 2)
+    }
+
+    // MARK: Усогласување со општата листа
+
+    private func trims(_ planned: [(item: WardrobeItem, times: Int)]) -> [Trim] {
+        var result: [Trim] = []
+        for category in WardrobeCategory.allCases where !category.packingKeys.isEmpty {
+            let need = planned.filter { $0.item.category == category }.count
+            guard need > 0,
+                  let generic = trip.items.first(where: { item in
+                      !item.isCustom && category.packingKeys.contains(item.key ?? "") && item.quantity > need
+                  }) else { continue }
+            result.append(Trim(id: generic.id, name: generic.displayName, from: generic.quantity, to: need))
+        }
+        return result
+    }
+
+    private func trimCard(_ trims: [Trim]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: "lightbulb")
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundStyle(Theme.gold)
+                    .padding(.top, 1)
+                Text(L("Според аутфитите ти треба помалку од општата листа:",
+                       "Your outfits need less than the general list:"))
+                    .font(.sans(12, .medium))
+                    .foregroundStyle(Theme.inkSoft)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            ForEach(trims) { trim in
+                HStack(spacing: 6) {
+                    Text(trim.name)
+                        .font(.sans(13, .medium))
+                        .foregroundStyle(Theme.ink)
+                    Spacer()
+                    Text("\(trim.from) → \(trim.to)")
+                        .font(.codes(15))
+                        .foregroundStyle(Theme.navy)
+                }
+            }
+            Button {
+                apply(trims)
+            } label: {
+                Text(L("Усогласи ја облеката", "Match my clothing"))
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(SecondaryButtonStyle())
+        }
+        .padding(14)
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Theme.goldPale.opacity(0.6)))
+    }
+
+    private func apply(_ trims: [Trim]) {
+        withAnimation(.easeInOut(duration: 0.25)) {
+            store.mutate(trip.id) { t in
+                for trim in trims {
+                    if let index = t.items.firstIndex(where: { $0.id == trim.id }) {
+                        t.items[index].quantity = trim.to
+                    }
+                }
             }
         }
     }
+
+    // MARK: Ред
 
     private func row(_ item: WardrobeItem, times: Int, isPacked: Bool) -> some View {
         Button {
@@ -687,6 +821,14 @@ struct OutfitPackingBlock: View {
                         .foregroundStyle(times > 1 ? Theme.gold : Theme.muted)
                 }
                 Spacer(minLength: 4)
+                if times > 1 {
+                    Text("\(times)×")
+                        .font(.sans(11, .bold))
+                        .foregroundStyle(Theme.ticketText)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(Theme.gold))
+                }
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 10)

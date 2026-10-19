@@ -542,9 +542,11 @@ struct TripDetailView: View {
                 if !group.isEmpty {
                     categoryBlock(category, items: group, trip: trip)
                 }
+                if category == .clothing {
+                    // Веднаш под „Облека“: што бројат аутфитите од горе
+                    OutfitPackingBlock(trip: trip)
+                }
             }
-
-            OutfitPackingBlock(trip: trip)
 
             Button {
                 addTogether = false

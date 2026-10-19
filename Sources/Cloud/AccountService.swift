@@ -20,6 +20,8 @@ final class AccountService: ObservableObject {
 
     private var handle: NSObjectProtocol?
     private weak var store: TripStore?
+    private weak var wardrobe: WardrobeStore?
+    private var personal: PersonalCloud?
     private var currentUID: String?
 
     var isSignedIn: Bool { profile != nil }
@@ -29,8 +31,9 @@ final class AccountService: ObservableObject {
     }
 
     /// Се повикува еднаш при старт.
-    func bind(_ store: TripStore) {
+    func bind(_ store: TripStore, wardrobe: WardrobeStore) {
         self.store = store
+        self.wardrobe = wardrobe
         guard handle == nil else { return }
         handle = Auth.auth().addStateDidChangeListener { [weak self] _, user in
             Task { @MainActor in self?.update(user) }
@@ -49,12 +52,21 @@ final class AccountService: ObservableObject {
                 UserDefaults.standard.set(name, forKey: "userName")
             }
             store?.startSync(uid: user.uid)
+            personal?.stop()
+            if let store, let wardrobe {
+                let cloud = PersonalCloud(uid: user.uid, wardrobe: wardrobe, trips: store)
+                personal = cloud
+                cloud.start()
+            }
             Task { await afterSignIn() }
         } else {
             let previous = currentUID
             currentUID = nil
             Session.uid = nil
             profile = nil
+            // Гардеробата и аутфитите остануваат на телефонот (и се чуваат на акаунтот).
+            personal?.stop()
+            personal = nil
             store?.stopSync(previousUID: previous)
         }
     }
@@ -146,6 +158,7 @@ final class AccountService: ObservableObject {
                 await store.cloud?.removeOrLeave(trip)
             }
         }
+        await personal?.deleteEverything()
         do {
             try await user.delete()
             UserDefaults.standard.removeObject(forKey: PhoneID.phoneStorageKey)

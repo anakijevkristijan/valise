@@ -3,6 +3,8 @@ import SwiftUI
 /// Таб „Гардероба“: парчиња и аутфити, по сезони.
 struct WardrobeView: View {
     @EnvironmentObject private var wardrobe: WardrobeStore
+    @EnvironmentObject private var account: AccountService
+    @State private var showAccount = false
 
     enum Pane: String { case pieces, outfits }
 
@@ -34,6 +36,10 @@ struct WardrobeView: View {
                 .scrollIndicators(.hidden)
             }
             .toolbar(.hidden, for: .navigationBar)
+        }
+        .sheet(isPresented: $showAccount) {
+            AccountView(startWith: .signIn)
+                .environmentObject(account)
         }
         .sheet(isPresented: $showAddItem) {
             AddWardrobeItemView()
@@ -86,7 +92,56 @@ struct WardrobeView: View {
                        "\(wardrobe.items.count) pieces · \(wardrobe.outfits.count) outfits"))
                     .font(.sans(14))
                     .foregroundStyle(Theme.inkSoft)
+                cloudStatus
+                    .padding(.top, 4)
             }
+        }
+    }
+
+    /// Каде се чува гардеробата.
+    @ViewBuilder
+    private var cloudStatus: some View {
+        switch wardrobe.cloudState {
+        case .off:
+            Button {
+                showAccount = true
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "iphone")
+                        .font(.system(size: 11))
+                    Text(L("Само на овој телефон · Најави се за да се чува на акаунтот",
+                           "Only on this phone · Sign in to keep it in your account"))
+                        .font(.sans(11, .medium))
+                        .multilineTextAlignment(.leading)
+                }
+                .foregroundStyle(Theme.terracotta)
+            }
+            .buttonStyle(.plain)
+        case .syncing:
+            HStack(spacing: 6) {
+                ProgressView().controlSize(.mini).tint(Theme.muted)
+                Text(L("Се зачувува на акаунтот…", "Saving to your account…"))
+                    .font(.sans(11, .medium))
+            }
+            .foregroundStyle(Theme.muted)
+        case .synced:
+            HStack(spacing: 6) {
+                Image(systemName: "checkmark.icloud")
+                    .font(.system(size: 11))
+                Text(L("Зачувано на твојот акаунт", "Saved to your account"))
+                    .font(.sans(11, .medium))
+            }
+            .foregroundStyle(Theme.sage)
+        case .failed:
+            HStack(alignment: .top, spacing: 6) {
+                Image(systemName: "exclamationmark.icloud")
+                    .font(.system(size: 11))
+                Text(L("Не се зачувува на акаунтот — објави ги новите правила во Firebase (firestore.rules).",
+                       "Not saving to your account — publish the new Firebase rules (firestore.rules)."))
+                    .font(.sans(11, .medium))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .foregroundStyle(Theme.terracotta)
         }
     }
 

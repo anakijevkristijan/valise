@@ -21,7 +21,7 @@ struct ValiseApp: App {
                 .environmentObject(premium)
                 .environmentObject(account)
                 .environmentObject(wardrobe)
-                .onAppear { account.bind(store) }
+                .onAppear { account.bind(store, wardrobe: wardrobe) }
                 .onOpenURL { url in
                     _ = GIDSignIn.sharedInstance.handle(url)
                 }

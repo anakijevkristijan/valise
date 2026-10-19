@@ -32,6 +32,11 @@ service cloud.firestore {
       allow write: if signedIn() && request.auth.uid == uid;
     }
 
+    // Лично: гардероба, аутфити, план по денови — само сопственикот
+    match /users/{uid}/{collection}/{docId} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
     // Пребарување пријател по шифриран број/е-пошта — само по точен клуч, без листање
     match /lookup/{key} {
       allow get: if signedIn();

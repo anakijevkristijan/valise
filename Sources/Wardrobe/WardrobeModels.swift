@@ -68,6 +68,31 @@ enum WardrobeCategory: String, Codable, CaseIterable, Identifiable {
         }
     }
 
+    /// „3 горни дела“, „1 фустан“, „2 пара обувки“…
+    func count(_ n: Int) -> String {
+        let one = n == 1
+        switch self {
+        case .outerwear: return one ? L("1 јакна", "1 jacket") : L("\(n) јакни", "\(n) jackets")
+        case .top: return one ? L("1 горен дел", "1 top") : L("\(n) горни дела", "\(n) tops")
+        case .dress: return one ? L("1 фустан", "1 dress") : L("\(n) фустани", "\(n) dresses")
+        case .bottom: return one ? L("1 долен дел", "1 bottom") : L("\(n) долни дела", "\(n) bottoms")
+        case .shoes: return one ? L("1 пар обувки", "1 pair of shoes") : L("\(n) пара обувки", "\(n) pairs of shoes")
+        case .bag: return one ? L("1 торба", "1 bag") : L("\(n) торби", "\(n) bags")
+        case .accessory: return one ? L("1 додаток", "1 accessory") : L("\(n) додатоци", "\(n) accessories")
+        }
+    }
+
+    /// Општите предмети од листата за пакување што ги покрива оваа категорија.
+    var packingKeys: [String] {
+        switch self {
+        case .top: return ["tshirts", "shirt"]
+        case .bottom: return ["trousers", "shorts", "longTrousers", "smartTrousers"]
+        case .dress: return ["dress", "eveningDress"]
+        case .outerwear: return ["lightJacket", "warmJacket"]
+        default: return []
+        }
+    }
+
     /// Приближен волумен во куфер (литри, свиткано).
     var volume: Double {
         switch self {

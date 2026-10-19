@@ -188,13 +188,13 @@ final class WardrobeStore: ObservableObject {
         if let shoes = pieces.first(where: { $0.category == .shoes }) { worn.append(shoes) }
         let packed = pieces.filter { piece in !worn.contains { $0.id == piece.id } }
 
-        let outfitCount = trip.outfitSlots.filter { $0.outfitID != excludingOutfit && outfit($0.outfitID) != nil }.count
+        let slotCount = trip.outfitSlots.filter { $0.outfitID != excludingOutfit && outfit($0.outfitID) != nil }.count
             + (extra.isEmpty ? 0 : 1)
         let days = trip.hasLaundry ? min(trip.dayCount, 7) : trip.dayCount
 
         return OutfitLoad(pieces: pieces.count,
                           repeated: counts.values.filter { $0 > 1 }.count,
-                          outfits: outfitCount,
+                          outfits: slotCount,
                           packedVolume: packed.reduce(0) { $0 + $1.category.volume },
                           packedWeight: packed.reduce(0) { $0 + $1.category.weight },
                           capacity: trip.bag.usableVolume * 0.6,
@@ -215,12 +215,14 @@ final class WardrobeStore: ObservableObject {
         }
         items.append(item)
         save()
+        cloud?.pushItem(item, withImage: true)
     }
 
     func update(_ item: WardrobeItem) {
         guard let index = items.firstIndex(where: { $0.id == item.id }) else { return }
         items[index] = item
         save()
+        cloud?.pushItem(item, withImage: false)
     }
 
     func delete(_ id: UUID) {
@@ -228,10 +230,14 @@ final class WardrobeStore: ObservableObject {
         try? FileManager.default.removeItem(at: folder.appendingPathComponent(item.imageName))
         cache.removeObject(forKey: item.imageName as NSString)
         items.removeAll { $0.id == id }
-        for index in outfits.indices {
+        var changed: [Outfit] = []
+        for index in outfits.indices where outfits[index].itemIDs.contains(id) {
             outfits[index].itemIDs.removeAll { $0 == id }
+            changed.append(outfits[index])
         }
         save()
+        cloud?.deleteItem(id)
+        changed.forEach { cloud?.pushOutfit($0) }
     }
 
     // MARK: Промени — аутфити
@@ -243,11 +249,79 @@ final class WardrobeStore: ObservableObject {
             outfits.append(outfit)
         }
         save()
+        cloud?.pushOutfit(outfit)
     }
 
     func deleteOutfit(_ id: UUID) {
         outfits.removeAll { $0.id == id }
         save()
+        cloud?.deleteOutfit(id)
+    }
+
+    // MARK: Облак (акаунт)
+
+    /// Поврзано кога си најавен — секоја промена се зачувува и на акаунтот.
+    weak var cloud: PersonalCloud?
+
+    enum CloudState: Equatable {
+        case off        // не си најавен — само на телефонот
+        case syncing
+        case synced
+        case failed     // пр. правилата во Firebase не се ажурирани
+    }
+
+    @Published var cloudState: CloudState = .off
+
+    /// Парче дојдено од облакот (друг телефон или после повторна најава).
+    func applyRemote(_ item: WardrobeItem, imageData: Data?) {
+        let url = folder.appendingPathComponent(item.imageName)
+        if let imageData, !FileManager.default.fileExists(atPath: url.path) {
+            try? imageData.write(to: url, options: .atomic)
+            cache.removeObject(forKey: item.imageName as NSString)
+        }
+        if let index = items.firstIndex(where: { $0.id == item.id }) {
+            guard items[index] != item else { return }
+            items[index] = item
+        } else {
+            items.append(item)
+        }
+        save()
+    }
+
+    func removeRemoteItem(_ id: UUID) {
+        guard let item = self.item(id) else { return }
+        try? FileManager.default.removeItem(at: folder.appendingPathComponent(item.imageName))
+        cache.removeObject(forKey: item.imageName as NSString)
+        items.removeAll { $0.id == id }
+        save()
+    }
+
+    func applyRemote(_ outfit: Outfit) {
+        if let index = outfits.firstIndex(where: { $0.id == outfit.id }) {
+            guard outfits[index] != outfit else { return }
+            outfits[index] = outfit
+        } else {
+            outfits.append(outfit)
+        }
+        save()
+    }
+
+    func removeRemoteOutfit(_ id: UUID) {
+        guard outfits.contains(where: { $0.id == id }) else { return }
+        outfits.removeAll { $0.id == id }
+        save()
+    }
+
+    /// Сликата смалена за облакот (документ во Firestore е најмногу 1 MB).
+    func cloudImageData(for item: WardrobeItem) -> Data? {
+        guard let image = self.image(for: item) else { return nil }
+        for side in [720, 600, 480, 380, 300] as [CGFloat] {
+            let scaled = max(image.size.width, image.size.height) > side ? image.normalized(maxSide: side) : image
+            if let data = scaled.pngData(), data.count < 700_000 {
+                return data
+            }
+        }
+        return nil
     }
 
     // MARK: Диск

@@ -32,6 +32,9 @@ final class TripStore: ObservableObject {
 
     private(set) var cloud: CloudSync?
 
+    /// Лични податоци на акаунтот (аутфити по денови) — поставено од PersonalCloud.
+    weak var personal: PersonalCloud?
+
     var isSignedIn: Bool { cloud != nil }
 
     /// По најава: слушај ги заедничките патувања и качи ги локалните.
@@ -64,11 +67,26 @@ final class TripStore: ObservableObject {
 
     /// Промена што дошла од облакот (без повторно качување).
     func applyRemote(_ trip: Trip) {
-        if let index = trips.firstIndex(where: { $0.id == trip.id }) {
-            if trips[index] != trip { trips[index] = trip }
-        } else {
-            trips.append(trip)
+        var incoming = trip
+        // Патување што штотуку стигнало (пр. по повторна најава) — врати го мојот план со аутфити
+        if incoming.outfitDays == nil, incoming.outfitPlan == nil, let plan = personal?.cachedPlan(trip.id) {
+            incoming.outfitDays = plan.days.isEmpty ? nil : plan.days
+            incoming.outfitPacked = plan.packed.isEmpty ? nil : plan.packed
         }
+        if let index = trips.firstIndex(where: { $0.id == incoming.id }) {
+            if trips[index] != incoming { trips[index] = incoming }
+        } else {
+            trips.append(incoming)
+        }
+        save()
+    }
+
+    /// План со аутфити дојден од акаунтот (без повторно качување).
+    func setPlanFromCloud(_ id: UUID, days: [String: [UUID]], packed: [UUID]) {
+        guard let index = trips.firstIndex(where: { $0.id == id }) else { return }
+        trips[index].outfitPlan = nil
+        trips[index].outfitDays = days.isEmpty ? nil : days
+        trips[index].outfitPacked = packed.isEmpty ? nil : packed
         save()
     }
 
@@ -99,6 +117,11 @@ final class TripStore: ObservableObject {
         change(&trips[index])
         save()
         cloud?.push(old: before, new: trips[index])
+        let after = trips[index]
+        if before.outfitDays != after.outfitDays || before.outfitPlan != after.outfitPlan
+            || before.outfitPacked != after.outfitPacked {
+            personal?.pushPlan(after)
+        }
     }
 
     func delete(_ id: UUID) {
@@ -108,6 +131,7 @@ final class TripStore: ObservableObject {
         if let cloud {
             Task { await cloud.removeOrLeave(trip) }
         }
+        personal?.deletePlan(id)
     }
 
     func deleteAll() {
