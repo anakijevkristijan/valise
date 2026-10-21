@@ -10,7 +10,19 @@ struct HomeView: View {
     @State private var showWizard = false
     @State private var showSettings = false
     @State private var pendingTripID: UUID?
-    @State private var showPast = false
+    @AppStorage("homeFilter") private var filter: PassFilter = .upcoming
+
+    enum PassFilter: String, CaseIterable {
+        case upcoming, past, all
+
+        var title: String {
+            switch self {
+            case .upcoming: return L("Претстојни", "Upcoming")
+            case .past: return L("Поминати", "Past")
+            case .all: return L("Сите", "All")
+            }
+        }
+    }
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -21,14 +33,10 @@ struct HomeView: View {
                     VStack(alignment: .leading, spacing: 32) {
                         header
 
-                        if store.upcoming.isEmpty {
+                        if store.trips.isEmpty {
                             emptyState
                         } else {
-                            upcomingSection
-                        }
-
-                        if !store.past.isEmpty {
-                            pastSection
+                            passesSection
                         }
                     }
                     .padding(.horizontal, 22)
@@ -140,54 +148,79 @@ struct HomeView: View {
 
     private let columns = [GridItem(.adaptive(minimum: 150, maximum: 230), spacing: 14)]
 
-    private var upcomingSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Eyebrow(L("Твоите пасови", "Your passes") + " · \(store.upcoming.count)")
+    /// Филтер горе (Претстојни · Поминати · Сите), а „Ново патување“ секогаш е првата картичка.
+    private var passesSection: some View {
+        let shown: [Trip] = {
+            switch filter {
+            case .upcoming: return store.upcoming
+            case .past: return store.past
+            case .all: return store.upcoming + store.past
+            }
+        }()
+
+        return VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 18) {
+                ForEach(PassFilter.allCases, id: \.self) { option in
+                    filterTab(option)
+                }
+                Spacer()
+            }
+            .overlay(alignment: .bottom) { Hairline() }
+
             LazyVGrid(columns: columns, spacing: 14) {
-                ForEach(store.upcoming) { trip in
+                if filter != .past {
+                    Button { showWizard = true } label: {
+                        NewPassTile()
+                    }
+                    .buttonStyle(PressableStyle())
+                    .accessibilityLabel(L("Ново патување", "New trip"))
+                }
+                ForEach(shown) { trip in
                     NavigationLink(value: trip.id) {
-                        PassTile(trip: trip)
+                        PassTile(trip: trip, dimmed: trip.isPast)
                     }
                     .buttonStyle(PressableStyle())
                     .contextMenu { deleteButton(trip) }
                 }
-                Button { showWizard = true } label: {
-                    NewPassTile()
-                }
-                .buttonStyle(PressableStyle())
+            }
+
+            if shown.isEmpty && filter == .past {
+                Text(L("Сè уште нема поминати патувања.", "No past trips yet."))
+                    .font(.sans(14))
+                    .foregroundStyle(Theme.muted)
             }
         }
     }
 
-    private var pastSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Button {
-                withAnimation(.easeInOut) { showPast.toggle() }
-            } label: {
-                HStack {
-                    Eyebrow(L("Минати патувања", "Past trips") + " · \(store.past.count)")
-                    Spacer()
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Theme.muted)
-                        .rotationEffect(.degrees(showPast ? 180 : 0))
-                }
-                .contentShape(Rectangle())
+    private func filterTab(_ option: PassFilter) -> some View {
+        let count: Int = {
+            switch option {
+            case .upcoming: return store.upcoming.count
+            case .past: return store.past.count
+            case .all: return store.trips.count
             }
-            .buttonStyle(.plain)
-
-            if showPast {
-                LazyVGrid(columns: columns, spacing: 14) {
-                    ForEach(store.past) { trip in
-                        NavigationLink(value: trip.id) {
-                            PassTile(trip: trip, dimmed: true)
-                        }
-                        .buttonStyle(PressableStyle())
-                        .contextMenu { deleteButton(trip) }
-                    }
-                }
+        }()
+        return Button {
+            withAnimation(.easeInOut(duration: 0.2)) { filter = option }
+        } label: {
+            HStack(spacing: 5) {
+                Text(option.title.uppercased())
+                    .font(.sans(12, .semibold))
+                    .tracking(1.4)
+                Text("\(count)")
+                    .font(.codes(14))
+                    .opacity(0.6)
             }
+            .foregroundStyle(filter == option ? Theme.navy : Theme.muted)
+            .padding(.bottom, 11)
+            .overlay(alignment: .bottom) {
+                Rectangle()
+                    .fill(filter == option ? Theme.navy : Color.clear)
+                    .frame(height: 1.5)
+            }
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
     }
 
     private func deleteButton(_ trip: Trip) -> some View {

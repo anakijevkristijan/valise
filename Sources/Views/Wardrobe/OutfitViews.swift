@@ -207,9 +207,10 @@ struct TargetChips: View {
         ScrollView(.horizontal) {
             HStack(spacing: 6) {
                 ForEach(targets) { target in
-                    let color = target.isMet ? Theme.sage : Theme.terracotta
+                    let color = target.status == .over ? Theme.terracotta : (target.status == .exact ? Theme.sage : Theme.gold)
                     HStack(spacing: 4) {
-                        Image(systemName: target.isMet ? "checkmark" : "exclamationmark")
+                        Image(systemName: target.status == .over ? "exclamationmark.triangle.fill"
+                              : (target.status == .exact ? "checkmark" : "hanger"))
                             .font(.system(size: 9, weight: .bold))
                         Text(target.label)
                             .font(.sans(11, .semibold))
@@ -230,6 +231,12 @@ enum TargetText {
     /// „2 горни дела, 1 пар обувки“ — или nil ако сè е покриено.
     static func missing(_ targets: [ClothingTarget]) -> String? {
         let parts = targets.filter { $0.missing > 0 }.map { $0.category.count($0.missing) }
+        return parts.isEmpty ? nil : parts.joined(separator: ", ")
+    }
+
+    /// „Горни дела 7/6“ — што е над планираното, или nil.
+    static func over(_ targets: [ClothingTarget]) -> String? {
+        let parts = targets.filter { $0.over > 0 }.map(\.label)
         return parts.isEmpty ? nil : parts.joined(separator: ", ")
     }
 }
@@ -414,10 +421,15 @@ struct OutfitBuilderView: View {
                 let targets = wardrobe.targets(for: trip, extra: selected, excludingOutfit: existing?.id)
                 if !targets.isEmpty {
                     TargetChips(targets: targets)
+                    if let over = TargetText.over(targets) {
+                        warningLine(L("Го надминуваш планираното во листата: \(over).",
+                                      "You're over what the list planned: \(over)."),
+                                    color: Theme.terracotta)
+                    }
                     if let missing = TargetText.missing(targets) {
                         warningLine(L("Според листата уште ти требаат: \(missing).",
                                       "The list still needs: \(missing)."),
-                                    color: Theme.terracotta)
+                                    color: Theme.gold)
                     }
                 }
                 let load = wardrobe.load(for: trip, extra: selected, excludingOutfit: existing?.id)
@@ -497,6 +509,16 @@ struct OutfitBuilderView: View {
             }
         }
         guard adding else { return }
+
+        // Предупредување: аутфитите го надминуваат планираното во листата (пр. 7 маици, а планирани 6)
+        if let trip,
+           let target = wardrobe.targets(for: trip, extra: selected, excludingOutfit: existing?.id)
+               .first(where: { $0.category == item.category }),
+           target.over > 0 {
+            show(L("Го надминуваш планираното: \(target.label). Листата предвидува \(target.need).",
+                   "Over the plan: \(target.label). The list planned \(target.need)."))
+            return
+        }
 
         let info = reuse(item)
         guard info.count > 0 else { return }

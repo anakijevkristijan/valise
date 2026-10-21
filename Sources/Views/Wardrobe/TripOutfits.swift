@@ -215,6 +215,11 @@ struct TripClosetSummary: View {
             let targets = wardrobe.targets(for: trip)
             if !targets.isEmpty {
                 TargetChips(targets: targets)
+                if let over = TargetText.over(targets) {
+                    Label(L("Над планираното: \(over)", "Over the plan: \(over)"), systemImage: "exclamationmark.triangle.fill")
+                        .font(.sans(12, .semibold))
+                        .foregroundStyle(Theme.terracotta)
+                }
             }
 
             if load.capacity > 0 {
@@ -311,6 +316,7 @@ struct DayOutfitsSheet: View {
     @State private var editing: Outfit?
     @State private var pending: Outfit?
     @State private var toast: String?
+    @State private var toastIsWarning = false
     @State private var toastToken = 0
 
     private var dayKey: String { Trip.dayKey(date) }
@@ -322,7 +328,7 @@ struct DayOutfitsSheet: View {
                 content(trip)
             }
             if let toast {
-                ToastBanner(text: toast, isWarning: false)
+                ToastBanner(text: toast, isWarning: toastIsWarning)
                     .padding(.top, 12)
                     .zIndex(2)
             }
@@ -584,7 +590,12 @@ struct DayOutfitsSheet: View {
         withAnimation(.easeInOut(duration: 0.25)) {
             store.mutate(tripID) { $0.addOutfit(outfit.id, forKey: key) }
         }
-        show(L("Додадено: \(outfit.name)", "Added: \(outfit.name)"))
+        // Дали сега аутфитите го надминуваат планираното во листата?
+        if let trip = store.trip(tripID), let over = TargetText.over(wardrobe.targets(for: trip)) {
+            show(L("Додадено, но го надминуваш планираното: \(over).", "Added, but over the plan: \(over)."), warning: true)
+        } else {
+            show(L("Додадено: \(outfit.name)", "Added: \(outfit.name)"), warning: false)
+        }
     }
 
     private func remove(_ outfit: Outfit) {
@@ -594,12 +605,13 @@ struct DayOutfitsSheet: View {
         }
     }
 
-    private func show(_ text: String) {
+    private func show(_ text: String, warning: Bool) {
         toastToken += 1
         let token = toastToken
+        toastIsWarning = warning
         withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { toast = text }
         Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            try? await Task.sleep(nanoseconds: warning ? 3_200_000_000 : 2_000_000_000)
             if token == toastToken {
                 withAnimation(.easeOut(duration: 0.3)) { toast = nil }
             }

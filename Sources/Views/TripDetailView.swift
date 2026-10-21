@@ -544,10 +544,6 @@ struct TripDetailView: View {
                 if !group.isEmpty {
                     categoryBlock(category, items: group, trip: trip)
                 }
-                if category == .clothing {
-                    // Веднаш под „Облека“: што бројат аутфитите од горе
-                    OutfitPackingBlock(trip: trip)
-                }
             }
 
             Button {
@@ -906,19 +902,15 @@ struct PackingRow: View {
                                 .foregroundStyle(Theme.muted)
                         }
 
-                        if let share = outfitShare {
-                            HStack(spacing: 5) {
-                                Image(systemName: share.have >= share.need ? "checkmark.circle.fill" : "hanger")
-                                    .font(.system(size: 10, weight: .semibold))
-                                Text(L("Од аутфитите: \(share.have)/\(share.need)", "From outfits: \(share.have)/\(share.need)"))
+                        // Само кога аутфитите го надминуваат планираното
+                        if let share = outfitShare, share.have > share.need {
+                            HStack(spacing: 4) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.system(size: 9, weight: .semibold))
+                                Text(L("\(share.have - share.need) повеќе од планираното", "\(share.have - share.need) more than planned"))
                                     .font(.sans(11, .semibold))
-                                if share.have < share.need {
-                                    Text(L("· фалат \(share.need - share.have)", "· \(share.need - share.have) missing"))
-                                        .font(.sans(11, .medium))
-                                }
                             }
-                            .foregroundStyle(share.have == share.need ? Theme.sage
-                                             : (share.have < share.need ? Theme.terracotta : Theme.gold))
+                            .foregroundStyle(Theme.terracotta)
                         }
                     }
 
@@ -951,7 +943,29 @@ struct PackingRow: View {
                 }
             }
 
-            if item.quantity > 1 {
+            if let share = outfitShare {
+                // До планираното (×6): колку има во аутфитите
+                HStack(spacing: 8) {
+                    HStack(spacing: 3) {
+                        Image(systemName: "hanger")
+                            .font(.system(size: 9, weight: .semibold))
+                        Text("\(share.have)")
+                            .font(.sans(12, .bold))
+                    }
+                    .foregroundStyle(share.have > share.need ? Theme.ticketText
+                                     : (share.have == share.need ? Theme.sage : Theme.gold))
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(share.have > share.need ? Theme.terracotta
+                                               : (share.have == share.need ? Theme.sage : Theme.gold).opacity(0.14)))
+                    Text("×\(item.quantity)")
+                        .font(.codes(17))
+                        .foregroundStyle(item.isPacked ? Theme.muted : Theme.navy)
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(L("Во аутфитите \(share.have) од планирани \(item.quantity)",
+                                      "\(share.have) in outfits of \(item.quantity) planned"))
+            } else if item.quantity > 1 {
                 Text("×\(item.quantity)")
                     .font(.codes(17))
                     .foregroundStyle(item.isPacked ? Theme.muted : Theme.navy)
@@ -1030,28 +1044,33 @@ struct BagFitCard: View {
         let color: Color = level == .over ? Theme.terracotta : (level == .snug ? Theme.gold : Theme.navy)
 
         VStack(alignment: .leading, spacing: 18) {
-            HStack(spacing: 14) {
-                Image(systemName: trip.bag.kind.icon)
-                    .font(.system(size: 18, weight: .light))
-                    .foregroundStyle(Theme.navy)
-                    .frame(width: 30)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(trip.bag.displayTitle)
-                        .font(.serif(20))
-                        .foregroundStyle(Theme.ink)
-                    Text(trip.bag.limitText)
-                        .font(.sans(13))
-                        .foregroundStyle(Theme.inkSoft)
+            // Сите багажи (пр. мала торба + кабински + чекиран)
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(Array(trip.allBags.enumerated()), id: \.offset) { _, spec in
+                    HStack(spacing: 14) {
+                        Image(systemName: spec.kind.icon)
+                            .font(.system(size: 18, weight: .light))
+                            .foregroundStyle(Theme.navy)
+                            .frame(width: 30)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(spec.displayTitle)
+                                .font(.serif(trip.allBags.count > 1 ? 17 : 20))
+                                .foregroundStyle(Theme.ink)
+                            Text(spec.limitText)
+                                .font(.sans(13))
+                                .foregroundStyle(Theme.inkSoft)
+                        }
+                        Spacer()
+                    }
                 }
-                Spacer()
             }
 
-            meter(label: L("Волумен", "Volume"),
-                  value: "\(Int(trip.packedVolume.rounded())) / \(Int(trip.bag.usableVolume.rounded())) L",
+            meter(label: trip.allBags.count > 1 ? L("Волумен (вкупно)", "Volume (total)") : L("Волумен", "Volume"),
+                  value: "\(Int(trip.packedVolume.rounded())) / \(Int(trip.totalUsableVolume.rounded())) L",
                   ratio: trip.fillRatio,
                   color: color)
 
-            if let weightRatio = trip.weightRatio, let limit = trip.bag.weightLimit {
+            if let weightRatio = trip.weightRatio, let limit = trip.totalWeightLimit {
                 meter(label: L("Тежина (проценка)", "Weight (estimate)"),
                       value: "\(Fmt.number((trip.packedWeight * 10).rounded() / 10)) / \(Fmt.number(limit)) kg",
                       ratio: weightRatio,

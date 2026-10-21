@@ -10,15 +10,18 @@ struct TripDraft {
     var endDate: Date = Date().adding(days: 18).startOfDay
     var transport: Transport = .plane
     var airlineID: String = "wizz"
-    var bagIndex: Int = 0
-    var useCustomBag = false
+    /// Колку од секој багаж (клуч → број). Може повеќе багажи.
+    var bagCounts: [String: Int] = [:]
+    var customCount = 0
     var customBag: BagSpec = Airlines.customBag()
     var activities: Set<Activity> = [.walking]
     var style: TravelerStyle = .neutral
     var hasLaundry = false
     var companions: [Companion] = []
 
-    init() {}
+    init() {
+        resetBags()
+    }
 
     /// Нацрт од постоечко патување (за уредување).
     init(trip: Trip) {
@@ -33,30 +36,88 @@ struct TripDraft {
         hasLaundry = trip.hasLaundry
         companions = trip.travelers
 
-        let bag = trip.bag
-        if bag.kind == .custom || bag.key == "custom" {
-            useCustomBag = true
-            customBag = bag
-        } else if let index = bagOptions.firstIndex(where: { $0.key != nil && $0.key == bag.key })
-                    ?? bagOptions.firstIndex(where: { $0.kind == bag.kind && $0.height == bag.height && $0.width == bag.width && $0.depth == bag.depth }) {
-            bagIndex = index
-        } else {
-            useCustomBag = true
-            customBag = bag
+        let options = bagOptions
+        for spec in trip.allBags {
+            if spec.kind == .custom || spec.key == "custom" {
+                customCount += 1
+                customBag = spec
+            } else if let key = spec.key, options.contains(where: { $0.key == key }) {
+                bagCounts[key, default: 0] += 1
+            } else if let match = options.first(where: { $0.kind == spec.kind && $0.height == spec.height
+                                                          && $0.width == spec.width && $0.depth == spec.depth }),
+                      let key = match.key {
+                bagCounts[key, default: 0] += 1
+            } else {
+                customCount += 1
+                customBag = spec
+            }
         }
+        if bagCounts.isEmpty && customCount == 0 { resetBags() }
     }
 
     var bagOptions: [BagSpec] {
         if transport == .plane {
-            return Airlines.find(airlineID)?.bags ?? Airlines.all[0].bags
+            return (Airlines.find(airlineID) ?? Airlines.find("other"))?.bags ?? []
         }
         return Airlines.groundBags
     }
 
-    var resolvedBag: BagSpec {
-        if useCustomBag { return customBag }
+    func count(of spec: BagSpec) -> Int {
+        spec.key.flatMap { bagCounts[$0] } ?? 0
+    }
+
+    mutating func setCount(_ value: Int, for spec: BagSpec) {
+        guard let key = spec.key else { return }
+        bagCounts[key] = max(0, value)
+    }
+
+    /// По избор на превоз/авиокомпанија: вклучените багажи се избрани однапред.
+    mutating func resetBags() {
+        bagCounts = [:]
+        customCount = 0
         let options = bagOptions
-        return options[min(max(bagIndex, 0), options.count - 1)]
+        if transport == .plane {
+            let included = options.filter(\.isFree)
+            for spec in included.isEmpty ? Array(options.prefix(1)) : included {
+                if let key = spec.key { bagCounts[key] = 1 }
+            }
+        } else if let cabin = options.first(where: { $0.kind == .cabin }), let key = cabin.key {
+            bagCounts[key] = 1
+        }
+    }
+
+    /// Сите избрани багажи (со повторување за бројот).
+    var resolvedBags: [BagSpec] {
+        var list: [BagSpec] = []
+        for spec in bagOptions {
+            list += Array(repeating: spec, count: count(of: spec))
+        }
+        list += Array(repeating: customBag, count: customCount)
+        return list
+    }
+
+    /// Најголемиот — „главниот“ багаж.
+    var primaryBag: BagSpec {
+        resolvedBags.max { $0.volume < $1.volume } ?? bagOptions.first ?? customBag
+    }
+
+    var totalVolume: Double {
+        resolvedBags.reduce(0) { $0 + $1.volume }
+    }
+
+    /// „Мала торба + Чекиран куфер ×2 · 96 L“
+    var bagsSummary: String {
+        var groups: [(title: String, count: Int)] = []
+        for spec in resolvedBags {
+            let title = spec.displayTitle
+            if let index = groups.firstIndex(where: { $0.title == title }) {
+                groups[index].count += 1
+            } else {
+                groups.append((title: title, count: 1))
+            }
+        }
+        let names = groups.map { $0.count > 1 ? "\($0.title) ×\($0.count)" : $0.title }.joined(separator: " + ")
+        return "\(names) · \(Int(totalVolume.rounded())) L"
     }
 
     var dayCount: Int {
@@ -82,6 +143,7 @@ struct TripWizardView: View {
     @State private var weatherKey: String
     @State private var companionName = ""
     @FocusState private var companionFocused: Bool
+    @State private var showAirlinePicker = false
 
     private let stepCount = 5
 
@@ -324,8 +386,7 @@ struct TripWizardView: View {
                     SelectTile(icon: t.icon, title: t.title, subtitle: nil, isSelected: draft.transport == t) {
                         withAnimation(.easeInOut(duration: 0.25)) {
                             draft.transport = t
-                            draft.bagIndex = t == .plane ? 0 : 1
-                            draft.useCustomBag = false
+                            draft.resetBags()
                         }
                     }
                 }
@@ -334,46 +395,62 @@ struct TripWizardView: View {
             if draft.transport == .plane {
                 VStack(alignment: .leading, spacing: 12) {
                     Eyebrow(L("Авиокомпанија", "Airline"))
-                    ScrollView(.horizontal) {
-                        HStack(spacing: 8) {
-                            ForEach(Airlines.all) { airline in
-                                ChipButton(title: airline.name, isSelected: draft.airlineID == airline.id) {
-                                    withAnimation(.easeInOut(duration: 0.2)) {
-                                        draft.airlineID = airline.id
-                                        draft.bagIndex = 0
-                                        draft.useCustomBag = false
-                                    }
-                                }
+                    Button {
+                        showAirlinePicker = true
+                    } label: {
+                        let airline = Airlines.find(draft.airlineID)
+                        HStack(spacing: 14) {
+                            Text(airline?.code ?? "—")
+                                .font(.codes(16))
+                                .foregroundStyle(Theme.goldLight)
+                                .frame(width: 44, height: 44)
+                                .background(Circle().fill(Theme.navy))
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(airline?.name ?? L("Избери авиокомпанија", "Choose an airline"))
+                                    .font(.sans(16, .semibold))
+                                    .foregroundStyle(Theme.ink)
+                                Text(L("Пребарај меѓу \(Airlines.all.count - 1) авиокомпании", "Search \(Airlines.all.count - 1) airlines"))
+                                    .font(.sans(12))
+                                    .foregroundStyle(Theme.muted)
                             }
+                            Spacer()
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(Theme.navy)
                         }
-                        .padding(.vertical, 2)
+                        .padding(14)
+                        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Theme.surface))
+                        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 0.75))
                     }
-                    .scrollIndicators(.hidden)
+                    .buttonStyle(PressableStyle())
                 }
             }
 
             VStack(alignment: .leading, spacing: 12) {
-                Eyebrow(L("Со што пакуваш", "What you're packing in"))
+                Eyebrow(L("Со што пакуваш — може повеќе", "What you're packing in — pick several"))
                 VStack(spacing: 0) {
                     let options = draft.bagOptions
-                    ForEach(Array(options.enumerated()), id: \.offset) { index, bag in
-                        BagOptionRow(bag: bag, isSelected: !draft.useCustomBag && draft.bagIndex == index) {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                draft.bagIndex = index
-                                draft.useCustomBag = false
-                            }
+                    ForEach(Array(options.enumerated()), id: \.offset) { _, bag in
+                        BagCountRow(bag: bag, count: draft.count(of: bag)) { value in
+                            withAnimation(.easeInOut(duration: 0.2)) { draft.setCount(value, for: bag) }
                         }
                         Hairline().padding(.leading, 64)
                     }
-                    BagOptionRow(bag: draft.customBag, isSelected: draft.useCustomBag) {
-                        withAnimation(.easeInOut(duration: 0.2)) { draft.useCustomBag = true }
+                    BagCountRow(bag: draft.customBag, count: draft.customCount) { value in
+                        withAnimation(.easeInOut(duration: 0.2)) { draft.customCount = max(0, value) }
                     }
                 }
                 .luxCard(padding: 0)
 
-                if draft.useCustomBag {
+                if draft.customCount > 0 {
                     customBagEditor
                         .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+
+                if draft.resolvedBags.isEmpty {
+                    noteRow(icon: "exclamationmark.circle", text: L("Избери барем еден багаж.", "Choose at least one bag."))
+                } else {
+                    noteRow(icon: "suitcase", text: L("Вкупно: \(draft.bagsSummary)", "Total: \(draft.bagsSummary)"))
                 }
 
                 if draft.transport == .plane {
@@ -382,8 +459,29 @@ struct TripWizardView: View {
                     }
                     noteRow(icon: "info.circle", text: L("Мерките се информативни (\(Airlines.dataUpdated)). Провери ги на сајтот на авиокомпанијата пред лет.",
                                                          "Sizes are a guide (\(Airlines.dataUpdated)). Check the airline's website before you fly."))
+                    if let site = Airlines.find(draft.airlineID)?.website, let url = URL(string: "https://\(site)") {
+                        Link(destination: url) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "arrow.up.right.square")
+                                    .font(.system(size: 12))
+                                Text(site)
+                                    .font(.sans(13, .medium))
+                            }
+                            .foregroundStyle(Theme.navy)
+                        }
+                        .padding(.horizontal, 4)
+                    }
                 }
             }
+        }
+        .sheet(isPresented: $showAirlinePicker) {
+            AirlinePickerSheet(selectedID: draft.airlineID) { airline in
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    draft.airlineID = airline.id
+                    draft.resetBags()
+                }
+            }
+            .presentationCornerRadius(28)
         }
     }
 
@@ -561,10 +659,11 @@ struct TripWizardView: View {
                         endDate: max(draft.endDate, draft.startDate).startOfDay,
                         transport: draft.transport,
                         airlineID: draft.transport == .plane ? draft.airlineID : nil,
-                        bag: draft.resolvedBag,
+                        bag: draft.primaryBag,
                         activities: Activity.allCases.filter { draft.activities.contains($0) },
                         style: draft.style,
                         hasLaundry: draft.hasLaundry)
+        trip.bags = draft.resolvedBags
         trip.weather = weather
         trip.weatherSource = weatherSource
         trip.tint = editing?.tint ?? (store.trips.count % Theme.ticketColors.count)
@@ -584,7 +683,7 @@ struct TripWizardView: View {
 
             VStack(alignment: .leading, spacing: 14) {
                 summaryRow(icon: draft.transport.icon, text: transportText)
-                summaryRow(icon: draft.resolvedBag.kind.icon, text: "\(draft.resolvedBag.displayTitle) · \(draft.resolvedBag.limitText)")
+                summaryRow(icon: draft.primaryBag.kind.icon, text: draft.bagsSummary)
                 if !draft.companions.isEmpty {
                     summaryRow(icon: "person.2", text: draft.companions.map(\.name).joined(separator: ", "))
                 }
@@ -693,7 +792,7 @@ struct TripWizardView: View {
         switch step {
         case 0: return draft.destination != nil
         case 1: return draft.endDate >= draft.startDate
-        case 2: return draft.resolvedBag.volume > 0
+        case 2: return !draft.resolvedBags.isEmpty && draft.totalVolume > 0
         default: return true
         }
     }
@@ -716,7 +815,7 @@ struct TripWizardView: View {
     }
 
     private var canSave: Bool {
-        draft.destination != nil && draft.endDate >= draft.startDate && draft.resolvedBag.volume > 0
+        draft.destination != nil && draft.endDate >= draft.startDate && !draft.resolvedBags.isEmpty && draft.totalVolume > 0
     }
 
     /// Ги зачувува промените, без да се губи спакуваното, сопатниците и рачно додаденото.
@@ -727,6 +826,9 @@ struct TripWizardView: View {
         updated.createdAt = original.createdAt
         updated.exitChecklist = original.exitChecklist
         updated.dismissedSuggestions = original.dismissedSuggestions
+        updated.outfitPlan = original.outfitPlan
+        updated.outfitDays = original.outfitDays
+        updated.outfitPacked = original.outfitPacked
 
         // Заедничко патување: мојот запис, сопственикот и членовите остануваат
         updated.ownerUID = original.ownerUID
@@ -1075,6 +1177,190 @@ struct BagOptionRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+}
+
+/// Багаж со бројач: 0 = не е избран; 1–3 = колку парчиња.
+struct BagCountRow: View {
+    let bag: BagSpec
+    let count: Int
+    var maxCount: Int = 3
+    let onChange: (Int) -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Button {
+                if count == 0 { onChange(1) }
+            } label: {
+                HStack(spacing: 14) {
+                    Image(systemName: bag.kind.icon)
+                        .font(.system(size: 16, weight: .light))
+                        .foregroundStyle(Theme.navy)
+                        .frame(width: 34)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 8) {
+                            Text(bag.displayTitle)
+                                .font(.sans(15, .medium))
+                                .foregroundStyle(Theme.ink)
+                            if bag.isFree {
+                                Text(L("ВКЛУЧЕНО", "INCLUDED"))
+                                    .font(.sans(9, .bold))
+                                    .tracking(1.2)
+                                    .foregroundStyle(Theme.sage)
+                            }
+                        }
+                        Text(bag.kind == .custom ? (bag.displayDetail ?? "") : bag.limitText)
+                            .font(.sans(13))
+                            .foregroundStyle(Theme.inkSoft)
+                        if bag.kind != .custom, let detail = bag.displayDetail {
+                            Text(detail)
+                                .font(.sans(12))
+                                .foregroundStyle(Theme.muted)
+                        }
+                    }
+                    Spacer(minLength: 4)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if count == 0 {
+                Button { onChange(1) } label: {
+                    Circle()
+                        .strokeBorder(Theme.hairline, lineWidth: 1.2)
+                        .frame(width: 26, height: 26)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(L("Додај \(bag.displayTitle)", "Add \(bag.displayTitle)"))
+            } else {
+                HStack(spacing: 0) {
+                    Button { onChange(count - 1) } label: {
+                        Image(systemName: count == 1 ? "xmark" : "minus")
+                            .font(.system(size: 11, weight: .bold))
+                            .frame(width: 30, height: 30)
+                    }
+                    .accessibilityLabel(L("Помалку", "Fewer"))
+                    Text("\(count)")
+                        .font(.codes(17))
+                        .frame(minWidth: 16)
+                    Button { onChange(min(maxCount, count + 1)) } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 11, weight: .bold))
+                            .frame(width: 30, height: 30)
+                    }
+                    .disabled(count >= maxCount)
+                    .opacity(count >= maxCount ? 0.4 : 1)
+                    .accessibilityLabel(L("Повеќе", "More"))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(Theme.goldLight)
+                .padding(.horizontal, 2)
+                .background(Capsule().fill(Theme.navy))
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+    }
+}
+
+/// Пребарување авиокомпанија: популарни горе, па по региони; име, IATA код или земја.
+struct AirlinePickerSheet: View {
+    let selectedID: String
+    let onSelect: (Airline) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var query = ""
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if query.trimmingCharacters(in: .whitespaces).isEmpty {
+                    Section(L("Популарни", "Popular")) {
+                        ForEach(Airlines.popular) { row($0) }
+                    }
+                    ForEach(AirlineRegion.allCases) { region in
+                        let list = Airlines.all.filter { $0.region == region && $0.id != "other" }
+                        if !list.isEmpty {
+                            Section(region.title) {
+                                ForEach(list) { row($0) }
+                            }
+                        }
+                    }
+                    if let other = Airlines.find("other") {
+                        Section { row(other) }
+                    }
+                } else {
+                    let results = Airlines.search(query)
+                    if results.isEmpty {
+                        Text(L("Нема таква авиокомпанија. Избери „Друга“ и внеси мерки.",
+                               "No such airline. Choose “Other” and enter the sizes."))
+                            .font(.sans(14))
+                            .foregroundStyle(Theme.muted)
+                            .listRowBackground(Theme.surface)
+                        if let other = Airlines.find("other") { row(other) }
+                    } else {
+                        ForEach(results) { row($0) }
+                    }
+                }
+            }
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(Theme.paper)
+            .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always),
+                        prompt: L("Име, код (W6) или земја", "Name, code (W6) or country"))
+            .autocorrectionDisabled()
+            .navigationTitle(L("Авиокомпанија", "Airline"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(L("Затвори", "Close")) { dismiss() }
+                }
+            }
+        }
+    }
+
+    private func row(_ airline: Airline) -> some View {
+        Button {
+            onSelect(airline)
+            dismiss()
+        } label: {
+            HStack(spacing: 12) {
+                Text(airline.code)
+                    .font(.codes(14))
+                    .foregroundStyle(Theme.goldLight)
+                    .frame(width: 38, height: 38)
+                    .background(Circle().fill(Theme.navy))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(airline.name)
+                        .font(.sans(15, .medium))
+                        .foregroundStyle(Theme.ink)
+                    Text(subtitle(airline))
+                        .font(.sans(12))
+                        .foregroundStyle(Theme.muted)
+                        .lineLimit(1)
+                }
+                Spacer()
+                if airline.id == selectedID {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.navy)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .listRowBackground(Theme.surface)
+    }
+
+    private func subtitle(_ airline: Airline) -> String {
+        var parts: [String] = []
+        if !airline.country.isEmpty { parts.append(airline.countryName) }
+        if airline.isLowCost { parts.append(L("нискобуџетна", "low-cost")) }
+        if let cabin = airline.bags.first(where: { $0.kind == .cabin }) {
+            parts.append(L("кабински \(cabin.dimensionText)", "cabin \(cabin.dimensionText)"))
+        }
+        return parts.joined(separator: " · ")
     }
 }
 

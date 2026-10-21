@@ -381,7 +381,10 @@ struct Trip: Codable, Identifiable, Hashable {
     var endDate: Date
     var transport: Transport
     var airlineID: String?
+    /// Главниот (најголемиот) багаж — за компатибилност со постарите верзии.
     var bag: BagSpec
+    /// Сите багажи на патувањето (пр. мала торба + кабински + 2 чекирани).
+    var bags: [BagSpec]?
     var activities: [Activity]
     var style: TravelerStyle
     var hasLaundry: Bool
@@ -491,16 +494,52 @@ struct Trip: Codable, Identifiable, Hashable {
         myItems.reduce(0) { $0 + Double($1.bagUnits) * $1.unitVolume }
     }
 
+    // MARK: Багажи (може повеќе)
+
+    var allBags: [BagSpec] {
+        if let bags, !bags.isEmpty { return bags }
+        return [bag]
+    }
+
+    var totalUsableVolume: Double {
+        allBags.reduce(0) { $0 + $1.usableVolume }
+    }
+
+    /// Збир на дозволените тежини — само ако секој багаж има ограничување.
+    var totalWeightLimit: Double? {
+        let limits = allBags.compactMap(\.weightLimit)
+        guard limits.count == allBags.count, !limits.isEmpty else { return nil }
+        return limits.reduce(0, +)
+    }
+
+    var hasCheckedBag: Bool { allBags.contains { $0.kind == .checked } }
+
+    /// „Мала торба + Кабински куфер ×2“
+    var bagsTitle: String {
+        var groups: [(title: String, count: Int)] = []
+        for spec in allBags {
+            let title = spec.displayTitle
+            if let index = groups.firstIndex(where: { $0.title == title }) {
+                groups[index].count += 1
+            } else {
+                groups.append((title: title, count: 1))
+            }
+        }
+        return groups.map { $0.count > 1 ? "\($0.title) ×\($0.count)" : $0.title }.joined(separator: " + ")
+    }
+
     var packedWeight: Double {
-        myItems.reduce(bag.kind.tare) { $0 + Double($1.bagUnits) * $1.unitWeight }
+        let tare = allBags.reduce(0) { $0 + $1.kind.tare }
+        return myItems.reduce(tare) { $0 + Double($1.bagUnits) * $1.unitWeight }
     }
 
     var fillRatio: Double {
-        bag.usableVolume > 0 ? packedVolume / bag.usableVolume : 0
+        let capacity = totalUsableVolume
+        return capacity > 0 ? packedVolume / capacity : 0
     }
 
     var weightRatio: Double? {
-        guard let limit = bag.weightLimit, limit > 0 else { return nil }
+        guard let limit = totalWeightLimit, limit > 0 else { return nil }
         return packedWeight / limit
     }
 

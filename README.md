@@ -24,6 +24,8 @@
 
 Верзија 2.2: подготовка за App Store — Најава со Apple (се вклучува со платена сметка), PrivacyInfo.xcprivacy, ITSAppUsesNonExemptEncryption, тест-отклучување само надвор од App Store, целосно бришење на профилот, автор и лиценца на фотографиите од Wikimedia, iPhone Duo/iPad (сите насоки на голем екран), Liquid Glass таб-лента на iOS 26+, VoiceOver ознаки, градење со најнов Xcode (27.x) на macOS 26.
 
+Верзија 2.3: 140+ авиокомпании од целиот свет со пребарување (име, IATA код, земја), повеќе багажи по патување (со бројач), бројка од аутфитите до планираното во листата (×6) и предупредување кога се надминува, почетна со „Ново патување“ прва и филтер Претстојни / Поминати / Сите.
+
 ## Пред App Store (кога ќе имаш платена Apple Developer сметка)
 1. `Resources/Info.plist` → `ValiseSignInWithApple` = YES.
 2. `project.yml` → отстрани го `#` пред `CODE_SIGN_ENTITLEMENTS: Resources/Valise.entitlements`.

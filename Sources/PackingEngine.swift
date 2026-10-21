@@ -202,7 +202,7 @@ enum PackingEngine {
         let w = trip.weatherSummary
         let acts = Set(trip.activities)
         let isPlane = trip.transport == .plane
-        let carryOnOnly = isPlane && trip.bag.kind != .checked
+        let carryOnOnly = isPlane && !trip.hasCheckedBag
         let woman = trip.style == .woman
         let man = trip.style == .man
         let international = trip.isInternational
@@ -511,11 +511,11 @@ enum PackingEngine {
             return L("Тесно, но собира. Свиткај ја облеката во ролни и облечи го најобемното на пат.",
                      "Snug, but it fits. Roll your clothes and wear the bulkiest pieces on the way.")
         case .over:
-            if heavy && !over, let limit = trip.bag.weightLimit {
+            if heavy && !over, let limit = trip.totalWeightLimit {
                 return L("Над дозволените \(Fmt.number(limit)) kg. Облечи ги најтешките работи на пат или намали ги количините.",
                          "Over the \(Fmt.number(limit)) kg limit. Wear the heaviest pieces or pack fewer.")
             }
-            if trip.bag.kind == .personal {
+            if trip.allBags.allSatisfy({ $0.kind == .personal }) {
                 return L("Премногу за малата торба. Намали количини, облечи го обемното на пат или земи кабински куфер — однапред е многу поевтино отколку на излезот.",
                          "Too much for the small bag. Pack fewer, wear the bulky pieces, or add a cabin bag — it's far cheaper online than at the gate.")
             }

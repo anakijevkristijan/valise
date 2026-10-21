@@ -263,11 +263,11 @@ final class WardrobeStore: ObservableObject {
                           outfits: slotCount,
                           packedVolume: packed.reduce(0) { $0 + $1.category.volume },
                           packedWeight: packed.reduce(0) { $0 + $1.category.weight },
-                          capacity: trip.bag.usableVolume * 0.6,
+                          capacity: trip.totalUsableVolume * 0.6,
                           recommended: days + max(3, days / 2 + 2),
                           wornOnTravel: worn,
                           days: trip.dayCount,
-                          bagName: trip.bag.displayTitle)
+                          bagName: trip.bagsTitle)
     }
 
     // MARK: Промени — парчиња

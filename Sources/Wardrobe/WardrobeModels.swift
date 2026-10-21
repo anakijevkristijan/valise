@@ -134,6 +134,9 @@ struct ClothingTarget: Identifiable {
     var over: Int { max(0, have - need) }
     var isMet: Bool { have >= need }
 
+    enum Status { case under, exact, over }
+    var status: Status { have < need ? .under : (have == need ? .exact : .over) }
+
     /// „Горни дела 3/5“
     var label: String { "\(category.shortPlural) \(have)/\(need)" }
 
