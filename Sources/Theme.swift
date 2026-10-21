@@ -450,11 +450,24 @@ struct CircleIconButton: View {
             CircleIcon(systemName: systemName)
         }
         .buttonStyle(PressableStyle())
+        .accessibilityLabel(CircleIcon.label(for: systemName))
     }
 }
 
 struct CircleIcon: View {
     let systemName: String
+
+    /// Што изговара VoiceOver за копчињата само со икона.
+    static func label(for systemName: String) -> String {
+        switch systemName {
+        case "xmark": return L("Затвори", "Close")
+        case "chevron.left": return L("Назад", "Back")
+        case "ellipsis": return L("Повеќе", "More")
+        case "plus": return L("Додај", "Add")
+        case "square.and.arrow.up": return L("Сподели", "Share")
+        default: return systemName
+        }
+    }
 
     var body: some View {
         Image(systemName: systemName)

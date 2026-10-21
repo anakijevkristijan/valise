@@ -28,6 +28,8 @@ targets:
       - path: Assets.xcassets
       - path: Resources/GoogleService-Info.plist
         buildPhase: resources
+      - path: Resources/PrivacyInfo.xcprivacy
+        buildPhase: resources
     dependencies:
       - package: Firebase
         product: FirebaseCore
@@ -41,8 +43,8 @@ targets:
       base:
         PRODUCT_NAME: Valise
         PRODUCT_BUNDLE_IDENTIFIER: com.valise.packing
-        MARKETING_VERSION: "2.1"
-        CURRENT_PROJECT_VERSION: "12"
+        MARKETING_VERSION: "2.2"
+        CURRENT_PROJECT_VERSION: "13"
         TARGETED_DEVICE_FAMILY: "1,2"
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_FILE: Resources/Info.plist
@@ -51,7 +53,8 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
-        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait
+        # Сите насоки се дозволени, а AppDelegate ги ограничува на исправено кај обичните iPhone (на отворен iPhone Duo — сите)
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         INFOPLIST_KEY_NSContactsUsageDescription: "Valise uses the contact you pick to invite a travel companion."
         INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription: "Valise saves your travel story image to Photos."
@@ -59,4 +62,6 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         CODE_SIGN_STYLE: Automatic
+        # За App Store (платена сметка): отстрани го # од следниот ред и стави ValiseSignInWithApple = YES во Resources/Info.plist
+        # CODE_SIGN_ENTITLEMENTS: Resources/Valise.entitlements
     scheme: {}

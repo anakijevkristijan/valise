@@ -2,8 +2,8 @@ import Foundation
 import StoreKit
 
 /// Valise Premium — еднократно отклучување (StoreKit 2).
-/// Без платена Apple Developer сметка производот не постои, па за тестирање
-/// има „отклучи за тест“. ⚠️ Отстрани го `unlockForTesting` пред App Store.
+/// „Отклучи за тест“ постои само кога апликацијата НЕ е од App Store / TestFlight (пр. Sideloadly).
+/// Во App Store верзијата Premium се добива само со вистинско купување.
 @MainActor
 final class PremiumStore: ObservableObject {
     static let productID = "com.valise.premium.lifetime"
@@ -13,6 +13,11 @@ final class PremiumStore: ObservableObject {
     @Published private(set) var product: Product?
     @Published private(set) var isWorking = false
     @Published private(set) var didLoad = false
+    /// Инсталирано од App Store или TestFlight (потпишано од Apple).
+    @Published private(set) var isStoreInstall = false
+
+    /// Тест-отклучување е дозволено само надвор од App Store.
+    var allowsTestUnlock: Bool { didLoad && !isStoreInstall }
 
     private var updatesTask: Task<Void, Never>?
 
@@ -36,6 +41,9 @@ final class PremiumStore: ObservableObject {
 
     func load() async {
         product = try? await Product.products(for: [Self.productID]).first
+        // App Store и TestFlight имаат потврда (receipt) од Apple; Sideloadly нема.
+        let hasReceipt = Bundle.main.appStoreReceiptURL.map { FileManager.default.fileExists(atPath: $0.path) } ?? false
+        isStoreInstall = hasReceipt || product != nil
         await refreshEntitlements()
         didLoad = true
     }
@@ -70,18 +78,28 @@ final class PremiumStore: ObservableObject {
     }
 
     func unlockForTesting() {
+        guard allowsTestUnlock else { return }
         setPremium(true)
     }
 
     func lockForTesting() {
+        guard allowsTestUnlock else { return }
         setPremium(false)
     }
 
     private func refreshEntitlements() async {
+        var owned = false
         for await result in Transaction.currentEntitlements {
-            if case .verified(let transaction) = result {
-                apply(transaction)
+            if case .verified(let transaction) = result,
+               transaction.productID == Self.productID, transaction.revocationDate == nil {
+                owned = true
             }
+        }
+        if owned {
+            setPremium(true)
+        } else if isStoreInstall {
+            // Во App Store верзијата важи само вистинското купување
+            setPremium(false)
         }
     }
 

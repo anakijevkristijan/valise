@@ -1,6 +1,16 @@
 import UIKit
 import Vision
 
+/// Автор и лиценца на фотографија од Wikimedia Commons (мора да се наведат).
+struct PhotoCredit: Codable, Hashable {
+    let author: String
+    let license: String
+
+    var text: String {
+        L("Фото: \(author) · \(license) · Wikimedia Commons", "Photo: \(author) · \(license) · Wikimedia Commons")
+    }
+}
+
 /// Фотографии од дестинацијата, бесплатно и без клуч:
 /// Wikidata (според GeoNames ID) → главна слика (P18) + категорија на Wikimedia Commons (P373).
 /// Сè се чува во меморија и на диск.
@@ -20,6 +30,30 @@ enum PhotoService {
     }()
     @MainActor private static var rejected: Set<String> = PhotoService.loadRejected()
     @MainActor private static var candidateMemory: [Int: [URL]] = [:]
+    @MainActor private static var credits: [String: PhotoCredit] = PhotoService.loadCredits()
+
+    /// Автор и лиценца (за потпис на сликата).
+    @MainActor static func credit(for url: URL) -> PhotoCredit? {
+        credits[url.absoluteString]
+    }
+
+    @MainActor private static func remember(credits new: [String: PhotoCredit]) {
+        guard !new.isEmpty else { return }
+        credits.merge(new) { _, latest in latest }
+        if let data = try? JSONEncoder().encode(credits) {
+            try? data.write(to: creditsFile, options: .atomic)
+        }
+    }
+
+    private static var creditsFile: URL {
+        cacheFolder.appendingPathComponent("credits.json")
+    }
+
+    private static func loadCredits() -> [String: PhotoCredit] {
+        guard let data = try? Data(contentsOf: creditsFile),
+              let saved = try? JSONDecoder().decode([String: PhotoCredit].self, from: data) else { return [:] }
+        return saved
+    }
 
     // MARK: Јавно
 
@@ -68,7 +102,7 @@ enum PhotoService {
             async let category = claimString(entity: entity, property: "P373")
             async let label = englishLabel(entity: entity)
             let (file, cat, name) = await (mainFile, category, label)
-            if let file { main = filePathURL(file) }
+            if let file { main = await fileImage(file) }
             async let catImages = categoryImages(cat)
             async let searched = searchImages(name ?? place.name)
             fromCategory = await catImages
@@ -281,6 +315,16 @@ enum PhotoService {
                     let width: Int?
                     let height: Int?
                     let mime: String?
+                    let extmetadata: [String: Meta]?
+                }
+                /// Вредност од extmetadata (само текст; друго се игнорира).
+                struct Meta: Decodable {
+                    let value: String?
+                    private enum CodingKeys: String, CodingKey { case value }
+                    init(from decoder: Decoder) throws {
+                        let container = try decoder.container(keyedBy: CodingKeys.self)
+                        value = try? container.decode(String.self, forKey: .value)
+                    }
                 }
                 let title: String?
                 let imageinfo: [Info]?
@@ -295,7 +339,7 @@ enum PhotoService {
         let url = api("https://commons.wikimedia.org/w/api.php", [
             "action": "query", "generator": "categorymembers",
             "gcmtitle": "Category:\(category)", "gcmtype": "file", "gcmlimit": "40",
-            "prop": "imageinfo", "iiprop": "url|size|mime", "iiurlwidth": "1280",
+            "prop": "imageinfo", "iiprop": "url|size|mime|extmetadata", "iiextmetadatafilter": "Artist|LicenseShortName", "iiurlwidth": "1280",
             "format": "json", "formatversion": "2"
         ])
         return await commonsImages(url)
@@ -305,7 +349,7 @@ enum PhotoService {
         let url = api("https://commons.wikimedia.org/w/api.php", [
             "action": "query", "generator": "search", "gsrnamespace": "6",
             "gsrsearch": "\"\(term)\" filetype:bitmap", "gsrlimit": "30",
-            "prop": "imageinfo", "iiprop": "url|size|mime", "iiurlwidth": "1280",
+            "prop": "imageinfo", "iiprop": "url|size|mime|extmetadata", "iiextmetadatafilter": "Artist|LicenseShortName", "iiurlwidth": "1280",
             "format": "json", "formatversion": "2"
         ])
         return await commonsImages(url)
@@ -317,7 +361,7 @@ enum PhotoService {
             "action": "query", "generator": "geosearch",
             "ggscoord": "\(latitude)|\(longitude)", "ggsradius": "10000",
             "ggsnamespace": "6", "ggslimit": "50",
-            "prop": "imageinfo", "iiprop": "url|size|mime", "iiurlwidth": "1280",
+            "prop": "imageinfo", "iiprop": "url|size|mime|extmetadata", "iiextmetadatafilter": "Artist|LicenseShortName", "iiurlwidth": "1280",
             "format": "json", "formatversion": "2"
         ])
         return await commonsImages(url)
@@ -333,23 +377,51 @@ enum PhotoService {
     private static func commonsImages(_ url: URL?) async -> [URL] {
         guard let url, let data = await get(url, timeout: 8),
               let decoded = try? JSONDecoder().decode(CommonsResponse.self, from: data) else { return [] }
-        return (decoded.query?.pages ?? []).compactMap { page in
+        var found: [URL] = []
+        var newCredits: [String: PhotoCredit] = [:]
+        for page in decoded.query?.pages ?? [] {
             guard let info = page.imageinfo?.first,
                   info.mime == "image/jpeg",
                   (info.width ?? 0) >= 900,
                   (info.height ?? 0) >= 600,
-                  let thumb = info.thumburl else { return nil }
+                  let thumb = info.thumburl,
+                  let imageURL = URL(string: thumb) else { continue }
             let title = (page.title ?? "").lowercased()
-            if excluded.contains(where: { title.contains($0) }) { return nil }
-            return URL(string: thumb)
+            if excluded.contains(where: { title.contains($0) }) { continue }
+            found.append(imageURL)
+            newCredits[imageURL.absoluteString] = credit(from: info)
         }
+        await remember(credits: newCredits)
+        return found
     }
 
-    private static func filePathURL(_ fileName: String) -> URL? {
-        let underscored = fileName.replacingOccurrences(of: " ", with: "_")
-        guard let encoded = underscored.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else { return nil }
-        return URL(string: "https://commons.wikimedia.org/wiki/Special:FilePath/\(encoded)?width=1280")
+    /// Една датотека по име (главната слика од Wikidata) — со автор и лиценца.
+    private static func fileImage(_ fileName: String) async -> URL? {
+        let url = api("https://commons.wikimedia.org/w/api.php", [
+            "action": "query", "titles": "File:\(fileName)",
+            "prop": "imageinfo", "iiprop": "url|size|mime|extmetadata",
+            "iiextmetadatafilter": "Artist|LicenseShortName", "iiurlwidth": "1280",
+            "format": "json", "formatversion": "2"
+        ])
+        return await commonsImages(url).first
     }
+
+    private static func credit(from info: CommonsResponse.Query.Page.Info) -> PhotoCredit {
+        let rawAuthor = info.extmetadata?["Artist"]?.value ?? ""
+        var author = rawAuthor
+            .replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+            .replacingOccurrences(of: "&amp;", with: "&")
+            .replacingOccurrences(of: "&quot;", with: "\"")
+            .replacingOccurrences(of: "&#39;", with: "'")
+            .replacingOccurrences(of: "\n", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if author.isEmpty { author = L("непознат автор", "unknown author") }
+        if author.count > 42 { author = String(author.prefix(40)) + "…" }
+        let license = info.extmetadata?["LicenseShortName"]?.value?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? "CC"
+        return PhotoCredit(author: author, license: license.isEmpty ? "CC" : license)
+    }
+
 
     // MARK: Помошни
 
@@ -388,11 +460,11 @@ enum PhotoService {
     }
 
     private static func listFile(_ id: Int) -> URL {
-        cacheFolder.appendingPathComponent("list-v3-\(id).json")
+        cacheFolder.appendingPathComponent("list-v4-\(id).json")
     }
 
     private static func verifiedFile(_ id: Int) -> URL {
-        cacheFolder.appendingPathComponent("verified-\(id).json")
+        cacheFolder.appendingPathComponent("verified-v2-\(id).json")
     }
 
     private static func saveVerified(_ urls: [URL], for id: Int) {

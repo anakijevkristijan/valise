@@ -225,6 +225,7 @@ struct TripDetailView: View {
             } label: {
                 CircleIcon(systemName: "ellipsis")
             }
+            .accessibilityLabel(CircleIcon.label(for: "ellipsis"))
         }
         .padding(.top, 8)
     }
@@ -926,6 +927,9 @@ struct PackingRow: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(item.isPacked ? [.isSelected] : [])
+            .accessibilityHint(L("Допри за спакувано", "Double-tap to mark as packed"))
 
             if showsWhoPicker {
                 Menu {

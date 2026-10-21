@@ -274,16 +274,27 @@ struct MainTabView: View {
     var body: some View {
         TabView(selection: $tab) {
             HomeView()
-                .toolbarBackground(Theme.paper, for: .tabBar)
-                .toolbarBackground(.visible, for: .tabBar)
+                .modifier(TabBarLook())
                 .tabItem { Label(L("Патувања", "Trips"), systemImage: "airplane") }
                 .tag(0)
             WardrobeView()
-                .toolbarBackground(Theme.paper, for: .tabBar)
-                .toolbarBackground(.visible, for: .tabBar)
+                .modifier(TabBarLook())
                 .tabItem { Label(L("Гардероба", "Wardrobe"), systemImage: "hanger") }
                 .tag(1)
         }
         .tint(Theme.navy)
+    }
+}
+
+/// На iOS 26+ таб-лентата е Liquid Glass (системска); на постарите — во бојата на хартијата.
+struct TabBarLook: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26, *) {
+            content
+        } else {
+            content
+                .toolbarBackground(Theme.paper, for: .tabBar)
+                .toolbarBackground(.visible, for: .tabBar)
+        }
     }
 }

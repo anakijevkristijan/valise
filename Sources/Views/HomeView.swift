@@ -80,6 +80,7 @@ struct HomeView: View {
                             .background(Circle().fill(Theme.navy))
                     }
                     .buttonStyle(PressableStyle())
+                    .accessibilityLabel(L("Ново патување", "New trip"))
                 }
                 Button { showSettings = true } label: {
                     Text(initial)
@@ -88,6 +89,7 @@ struct HomeView: View {
                         .frame(width: 40, height: 40)
                         .overlay(Circle().strokeBorder(Theme.navy.opacity(0.35), lineWidth: 0.75))
                 }
+                .accessibilityLabel(L("Профил и поставки", "Profile and settings"))
                 .buttonStyle(PressableStyle())
             }
 

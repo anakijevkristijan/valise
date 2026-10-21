@@ -24,6 +24,7 @@ final class AccountService: ObservableObject {
     private weak var wardrobe: WardrobeStore?
     private var personal: PersonalCloud?
     private var currentUID: String?
+    private let apple = AppleSignIn()
 
     var isSignedIn: Bool { profile != nil }
 
@@ -147,6 +148,37 @@ final class AccountService: ObservableObject {
         }
     }
 
+    /// Најава со Apple (кога е вклучена во AppConfig). nil = успешно или откажано.
+    func signInWithApple() async -> String? {
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            guard let result = try await apple.request() else { return nil }
+            let credential = OAuthProvider.appleCredential(withIDToken: result.idToken,
+                                                           rawNonce: result.nonce,
+                                                           fullName: result.fullName)
+            let auth = try await Auth.auth().signIn(with: credential)
+            // Apple го дава името само при првата најава
+            if let components = result.fullName {
+                let name = PersonNameComponentsFormatter().string(from: components)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                if !name.isEmpty {
+                    if (auth.user.displayName ?? "").isEmpty {
+                        let change = auth.user.createProfileChangeRequest()
+                        change.displayName = name
+                        try? await change.commitChanges()
+                    }
+                    if (UserDefaults.standard.string(forKey: "userName") ?? "").isEmpty {
+                        UserDefaults.standard.set(name, forKey: "userName")
+                    }
+                }
+            }
+            return nil
+        } catch {
+            return Self.message(for: error)
+        }
+    }
+
     func resetPassword(email: String) async -> String? {
         do {
             try await Auth.auth().sendPasswordReset(withEmail: email.trimmingCharacters(in: .whitespaces))
@@ -184,12 +216,35 @@ final class AccountService: ObservableObject {
         guard let user = Auth.auth().currentUser else { return nil }
         isWorking = true
         defer { isWorking = false }
+
+        // Apple бара: при бришење на акаунт, пристапот од „Најава со Apple“ се повлекува.
+        if AppConfig.appleSignInEnabled, user.providerData.contains(where: { $0.providerID == "apple.com" }) {
+            do {
+                guard let result = try await apple.request() else { return nil } // откажано
+                let credential = OAuthProvider.appleCredential(withIDToken: result.idToken,
+                                                               rawNonce: result.nonce,
+                                                               fullName: nil)
+                _ = try await user.reauthenticate(with: credential)
+                if let code = result.authorizationCode {
+                    try? await Auth.auth().revokeToken(withAuthorizationCode: code)
+                }
+            } catch {
+                return Self.message(for: error)
+            }
+        }
+
         if let store {
             for trip in store.trips where trip.isCloud {
                 await store.cloud?.removeOrLeave(trip)
             }
         }
         await personal?.deleteEverything()
+        // Профилот и клучевите за пребарување (шифриран број/е-пошта)
+        if let cloud = store?.cloud {
+            let phoneKey = PhoneID.normalize(phone).map { PhoneID.phoneKey($0) }
+            let emailKey = (user.email ?? "").isEmpty ? nil : PhoneID.emailKey(user.email ?? "")
+            await cloud.deleteProfile(keys: [phoneKey, emailKey].compactMap { $0 })
+        }
         do {
             try await user.delete()
             UserDefaults.standard.removeObject(forKey: PhoneID.phoneStorageKey)

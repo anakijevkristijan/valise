@@ -3,8 +3,22 @@ import UIKit
 import FirebaseCore
 import GoogleSignIn
 
+/// Ориентација според големината на прозорецот:
+/// мал екран (обичен iPhone, затворен iPhone Duo) → само исправено;
+/// голем (отворен iPhone Duo, iPad) → сите насоки, како iPad.
+final class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication,
+                     supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
+        if UIDevice.current.userInterfaceIdiom == .pad { return .all }
+        guard let window else { return .portrait }
+        let size = window.bounds.size
+        return min(size.width, size.height) >= 600 ? .allButUpsideDown : .portrait
+    }
+}
+
 @main
 struct ValiseApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var store = TripStore()
     @StateObject private var premium = PremiumStore()
     @StateObject private var account = AccountService()

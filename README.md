@@ -22,6 +22,14 @@
 
 Верзија 2.1: акаунтот е задолжителен; при одјава сè се брише од телефонот (останува на акаунтот и се враќа при најава); бројките за облека во листата (маици 5, панталони 2, обувки…) се споредуваат постојано со аутфитите — „Од аутфитите 3/5“ и предупредувања кога фали; сигурни слики за Story (до 8, секогаш истите, повеќе извори, дизајнирани позадини); побрза гардероба (мали сликички, брзо пребарување).
 
+Верзија 2.2: подготовка за App Store — Најава со Apple (се вклучува со платена сметка), PrivacyInfo.xcprivacy, ITSAppUsesNonExemptEncryption, тест-отклучување само надвор од App Store, целосно бришење на профилот, автор и лиценца на фотографиите од Wikimedia, iPhone Duo/iPad (сите насоки на голем екран), Liquid Glass таб-лента на iOS 26+, VoiceOver ознаки, градење со најнов Xcode (27.x) на macOS 26.
+
+## Пред App Store (кога ќе имаш платена Apple Developer сметка)
+1. `Resources/Info.plist` → `ValiseSignInWithApple` = YES.
+2. `project.yml` → отстрани го `#` пред `CODE_SIGN_ENTITLEMENTS: Resources/Valise.entitlements`.
+3. Firebase → Authentication → Sign-in method → **Apple** → Enable.
+4. App Store Connect → In-App Purchase `com.valise.premium.lifetime` (Non-Consumable).
+
 **Важно за 2.0:** во Firebase → Firestore → Rules залепи го новиот `firestore.rules` и притисни Publish.
 
 ## Firebase (еднаш)

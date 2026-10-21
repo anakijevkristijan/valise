@@ -83,6 +83,19 @@ struct AccountView: View {
                     .lineSpacing(3)
             }
 
+            if AppConfig.appleSignInEnabled {
+                ContinueWithAppleButton(isWorking: account.isWorking) {
+                    Task {
+                        error = nil
+                        if let failure = await account.signInWithApple() {
+                            error = failure
+                        } else if account.isSignedIn {
+                            dismiss()
+                        }
+                    }
+                }
+            }
+
             Button {
                 Task {
                     error = nil
@@ -320,5 +333,30 @@ struct AccountView: View {
             .font(.sans(13, .medium))
             .foregroundStyle(color)
             .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// „Продолжи со Apple“ — црно копче со логото, според упатствата на Apple.
+struct ContinueWithAppleButton: View {
+    var isWorking: Bool = false
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: "apple.logo")
+                    .font(.system(size: 17, weight: .medium))
+                Text(L("Продолжи со Apple", "Continue with Apple"))
+                    .font(.system(size: 16, weight: .semibold))
+                if isWorking { ProgressView().tint(.white) }
+            }
+            .foregroundStyle(Color.white)
+            .frame(maxWidth: .infinity)
+            .frame(height: 52)
+            .background(Capsule().fill(Color.black))
+        }
+        .buttonStyle(PressableStyle())
+        .disabled(isWorking)
+        .accessibilityLabel(L("Продолжи со Apple", "Continue with Apple"))
     }
 }

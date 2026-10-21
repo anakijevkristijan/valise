@@ -308,6 +308,12 @@ struct AccountChoiceView: View {
                     .padding(.bottom, 36)
 
                     VStack(spacing: 12) {
+                        if AppConfig.appleSignInEnabled {
+                            ContinueWithAppleButton(isWorking: account.isWorking) {
+                                Task { error = await account.signInWithApple() }
+                            }
+                        }
+
                         Button {
                             Task {
                                 error = await account.signInWithGoogle()

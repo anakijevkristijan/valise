@@ -6,6 +6,8 @@ import PhotosUI
 struct StoryCardView: View {
     let trip: Trip
     let photo: UIImage?
+    /// Автор и лиценца на фотографијата (Wikimedia бара потпис).
+    var credit: String? = nil
 
     private var foreground: Color { photo == nil ? Theme.navy : .white }
 
@@ -73,7 +75,17 @@ struct StoryCardView: View {
 
                 BoardingPassCard(trip: trip, style: .story)
                     .padding(.horizontal, 22)
-                    .padding(.bottom, 40)
+                    .padding(.bottom, credit == nil ? 40 : 24)
+
+                if let credit {
+                    Text(credit)
+                        .font(.sans(6.5, .medium))
+                        .foregroundStyle(foreground.opacity(0.75))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .padding(.horizontal, 22)
+                        .padding(.bottom, 12)
+                }
             }
         }
         .frame(width: 360, height: 640)
@@ -123,6 +135,7 @@ struct StorySheet: View {
     @State private var selected: Option = .styled(0)
     @State private var userChose = false
     @State private var images: [URL: UIImage] = [:]
+    @State private var credits: [URL: String] = [:]
     @State private var styledImages: [Int: UIImage] = [:]
     @State private var importedImage: UIImage?
     @State private var pickerItem: PhotosPickerItem?
@@ -146,6 +159,13 @@ struct StorySheet: View {
         }
     }
 
+    private var currentCredit: String? {
+        if case .remote(let url) = selected {
+            return credits[url] ?? L("Фото: Wikimedia Commons", "Photo: Wikimedia Commons")
+        }
+        return nil
+    }
+
     private var placeholders: Int {
         isLoadingList ? max(0, PhotoService.storyTarget - remotes.count) : 0
     }
@@ -163,7 +183,7 @@ struct StorySheet: View {
 
                 GeometryReader { geo in
                     let scale = min(geo.size.width / 360, geo.size.height / 640)
-                    StoryCardView(trip: trip, photo: currentPhoto)
+                    StoryCardView(trip: trip, photo: currentPhoto, credit: currentCredit)
                         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
                         .shadow(color: Theme.navy.opacity(0.16), radius: 24, x: 0, y: 12)
                         .scaleEffect(scale)
@@ -329,6 +349,7 @@ struct StorySheet: View {
         _ = await PhotoService.verifiedPhotos(for: trip.destination) { url, image in
             guard !remotes.contains(url) else { return }
             images[url] = image
+            credits[url] = PhotoService.credit(for: url)?.text
             remotes.append(url)
             if !userChose && importedImage == nil && remotes.count == 1 {
                 selected = .remote(url)
@@ -366,7 +387,7 @@ struct StorySheet: View {
 
     @MainActor
     private func render() {
-        let renderer = ImageRenderer(content: StoryCardView(trip: trip, photo: currentPhoto))
+        let renderer = ImageRenderer(content: StoryCardView(trip: trip, photo: currentPhoto, credit: currentCredit))
         renderer.scale = 3
         rendered = renderer.uiImage
     }

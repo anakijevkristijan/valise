@@ -324,6 +324,17 @@ final class CloudSync {
         return nil
     }
 
+    /// При бришење на акаунтот: профилот и клучевите за пребарување.
+    func deleteProfile(keys: [String]) async {
+        for key in keys {
+            let doc = db.collection("lookup").document(key)
+            if let existing = try? await doc.getDocument(), (existing.data()?["uid"] as? String) == uid {
+                try? await doc.delete()
+            }
+        }
+        try? await db.collection("users").document(uid).delete()
+    }
+
     /// Ги регистрира моите клучеви за пријателите да можат да ме најдат.
     func registerProfile(name: String, phoneKey: String?, emailKey: String?) async {
         var user: [String: Any] = ["name": name]

@@ -82,7 +82,7 @@ struct SettingsView: View {
                     }
                     .buttonStyle(SecondaryButtonStyle())
 
-                    Text("VALISE 2.1")
+                    Text("VALISE 2.2")
                         .font(.sans(10, .semibold))
                         .tracking(3)
                         .foregroundStyle(Theme.muted)
@@ -358,7 +358,8 @@ struct PremiumSheet: View {
                     }
 
                     VStack(alignment: .leading, spacing: 14) {
-                        benefit("paintpalette", L("7 премиум теми, вклучително Машнички и Цветна", "7 premium themes, including Coquette and Blossom"))
+                        benefit("paintpalette", L("\(Palette.all.filter { $0.isPremium }.count) премиум теми — Машнички, Балерина, Цреши, Ѕвездена ноќ…",
+                                                  "\(Palette.all.filter { $0.isPremium }.count) premium themes — Coquette, Balletcore, Cherry, Celestial…"))
                         benefit("camera.aperture", L("Story во боите на темата", "Stories in your theme's colours"))
                         benefit("sparkles", L("Сите идни теми, без доплата", "All future themes included"))
                     }
@@ -375,12 +376,14 @@ struct PremiumSheet: View {
                         .padding(.vertical, 16)
                         .overlay(Capsule().strokeBorder(Theme.navy.opacity(0.25), lineWidth: 0.75))
 
-                        Button(L("Заклучи повторно (тест)", "Lock again (test)")) {
-                            premium.lockForTesting()
+                        if premium.allowsTestUnlock {
+                            Button(L("Заклучи повторно (тест)", "Lock again (test)")) {
+                                premium.lockForTesting()
+                            }
+                            .font(.sans(12))
+                            .foregroundStyle(Theme.muted)
+                            .frame(maxWidth: .infinity)
                         }
-                        .font(.sans(12))
-                        .foregroundStyle(Theme.muted)
-                        .frame(maxWidth: .infinity)
                     } else if premium.storeAvailable {
                         Button {
                             Task { await premium.purchase() }
@@ -404,6 +407,22 @@ struct PremiumSheet: View {
                             .font(.sans(12))
                             .foregroundStyle(Theme.muted)
                             .frame(maxWidth: .infinity)
+                    } else if !premium.allowsTestUnlock {
+                        // App Store, но производот уште не се вчитал
+                        VStack(spacing: 12) {
+                            ProgressView().tint(Theme.navy)
+                            Button(L("Обиди се повторно", "Try again")) {
+                                Task { await premium.load() }
+                            }
+                            .font(.sans(13, .medium))
+                            .foregroundStyle(Theme.navy)
+                            Button(L("Врати купување", "Restore purchase")) {
+                                Task { await premium.restore() }
+                            }
+                            .font(.sans(13, .medium))
+                            .foregroundStyle(Theme.navy)
+                        }
+                        .frame(maxWidth: .infinity)
                     } else {
                         Button {
                             premium.unlockForTesting()
