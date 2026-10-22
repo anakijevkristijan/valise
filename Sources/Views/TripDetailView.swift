@@ -587,8 +587,8 @@ struct TripDetailView: View {
                         .foregroundStyle(Theme.terracotta)
                 }
             }
-            Text(L("Работи што ги делите — изберете кој што носи. Се гледа и штиклира кај сите.",
-                   "Things you share — choose who brings what. Everyone sees and ticks the same list."))
+            Text(L("Работи што ги делите — изберете кој што носи. Се гледа и штиклира кај сите. Кој ќе штиклира дека зел нешто, тоа станува негово.",
+                   "Things you share — choose who brings what. Everyone sees and ticks the same list. Whoever ticks an item takes it over."))
                 .font(.sans(12))
                 .foregroundStyle(Theme.muted)
                 .fixedSize(horizontal: false, vertical: true)
@@ -710,7 +710,22 @@ struct TripDetailView: View {
 
     private func toggle(_ item: PackingItem) {
         withAnimation(.easeInOut(duration: 0.2)) {
-            updateItem(item.id) { $0.isPacked.toggle() }
+            store.mutate(tripID) { trip in
+                if let i = trip.items.firstIndex(where: { $0.id == item.id }) {
+                    trip.items[i].isPacked.toggle()
+                } else if var together = trip.together, let i = together.firstIndex(where: { $0.id == item.id }) {
+                    together[i].isPacked.toggle()
+                    // Заедничко: кој штиклира дека го зел — тој го носи (пр. било за Виктор, го зедов јас)
+                    if together[i].isPacked, !trip.isMine(together[i]) {
+                        if trip.isCloud {
+                            if let me = trip.myCompanionID { together[i].assignee = me }
+                        } else {
+                            together[i].assignee = nil   // локално nil = јас
+                        }
+                    }
+                    trip.together = together
+                }
+            }
         }
     }
 
