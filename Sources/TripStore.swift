@@ -218,11 +218,14 @@ final class TripStore: ObservableObject {
 
     // MARK: Прогноза — се освежува при секое отворање
 
-    /// Освежи го времето за едно патување. Двојни повици во иста минута се прескокнуваат.
+    /// Освежи го времето за едно патување.
+    /// Автоматски најмногу на секои 2 часа (патување подалеку од прогнозата — еднаш дневно),
+    /// за да остане во бесплатните 500.000 барања месечно на Apple Weather. „Повлечи надолу“ секогаш освежува.
     @MainActor
     func refreshWeather(_ id: UUID, force: Bool = false) async {
         guard let current = self.trip(id), !current.isPast else { return }
-        if !force, let updated = current.weatherUpdatedAt, Date().timeIntervalSince(updated) < 60 { return }
+        if !force, let updated = current.weatherUpdatedAt,
+           Date().timeIntervalSince(updated) < Self.autoRefreshInterval(for: current) { return }
         guard !refreshing.contains(id) else { return }
         refreshing.insert(id)
         defer { refreshing.remove(id) }
@@ -234,6 +237,10 @@ final class TripStore: ObservableObject {
             $0.weatherSource = result.source
             $0.weatherUpdatedAt = Date()
         }
+    }
+
+    private static func autoRefreshInterval(for trip: Trip) -> TimeInterval {
+        trip.daysUntil > WeatherService.forecastHorizonDays ? 24 * 3600 : 2 * 3600
     }
 
     /// При отворање на апликацијата и враќање во неа.

@@ -362,6 +362,9 @@ struct AccountChoiceView: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 24)
 
+                    LegalConsentNote()
+                        .padding(.top, 14)
+
                     Spacer(minLength: 40)
                 }
                 .padding(.horizontal, 26)

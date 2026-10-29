@@ -13,6 +13,7 @@ struct SettingsView: View {
 
     @State private var draftName = ""
     @State private var confirmReset = false
+    @State private var legalDoc: LegalDoc?
 
     var body: some View {
         ZStack {
@@ -61,11 +62,16 @@ struct SettingsView: View {
                         Hairline()
                         infoRow("clock", L("Мерки за багаж", "Baggage sizes"), Airlines.dataUpdated)
                         Hairline()
-                        infoRow("cloud.sun", L("Прогноза", "Forecast"), "Open-Meteo")
+                        infoRow("cloud.sun", L("Прогноза", "Forecast"), AppConfig.weatherKitEnabled ? "Apple Weather" : "Open-Meteo")
                         Hairline()
-                        infoRow("photo", L("Фотографии", "Photos"), "Wikimedia")
+                        infoRow("map", L("Пребарување места", "Place search"), "Apple Maps")
+                        Hairline()
+                        infoRow("photo", L("Фотографии", "Photos"), "Wikimedia Commons")
+                        WeatherCreditView()
                     }
                     .luxCard(padding: 20)
+
+                    legalSection
 
                     Text(L("Мерките за багаж се информативни. Авиокомпаниите ги менуваат често — пред лет секогаш провери на нивниот сајт.",
                            "Baggage sizes are a guide. Airlines change them often — always check their website before you fly."))
@@ -82,7 +88,7 @@ struct SettingsView: View {
                     }
                     .buttonStyle(SecondaryButtonStyle())
 
-                    Text("VALISE 2.4")
+                    Text("VALISE 2.5")
                         .font(.sans(10, .semibold))
                         .tracking(3)
                         .foregroundStyle(Theme.muted)
@@ -102,10 +108,60 @@ struct SettingsView: View {
             PremiumSheet()
                 .environmentObject(premium)
         }
+        .sheet(item: $legalDoc) { doc in
+            LegalView(doc: doc)
+        }
         .confirmationDialog(L("Да се избришат сите патувања?", "Delete all trips?"), isPresented: $confirmReset, titleVisibility: .visible) {
             Button(L("Избриши сè", "Delete everything"), role: .destructive) { store.deleteAll() }
         }
         .presentationCornerRadius(28)
+    }
+
+    // MARK: Правно
+
+    private var legalSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Eyebrow(L("Приватност и услови", "Privacy & terms"))
+            VStack(spacing: 0) {
+                legalRow("hand.raised", L("Политика за приватност", "Privacy Policy")) { legalDoc = .privacy }
+                Hairline().padding(.leading, 48)
+                legalRow("doc.text", L("Услови за користење", "Terms of Use")) { legalDoc = .terms }
+                if !LegalTexts.supportEmail.isEmpty, let url = URL(string: "mailto:\(LegalTexts.supportEmail)") {
+                    Hairline().padding(.leading, 48)
+                    Link(destination: url) {
+                        legalLabel("envelope", L("Пиши ни", "Contact us"))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .luxCard(padding: 0, radius: 16)
+        }
+    }
+
+    private func legalRow(_ icon: String, _ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            legalLabel(icon, title)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func legalLabel(_ icon: String, _ title: String) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .light))
+                .foregroundStyle(Theme.gold)
+                .frame(width: 20)
+            Text(title)
+                .font(.sans(15))
+                .foregroundStyle(Theme.ink)
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Theme.muted)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .contentShape(Rectangle())
     }
 
     // MARK: Акаунт

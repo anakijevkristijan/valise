@@ -92,7 +92,9 @@ enum PhotoService {
         }
 
         async let geo = geoImages(latitude: place.latitude, longitude: place.longitude)
-        let entity = await entityID(geonamesID: place.id)
+        // GeoNames бројка постои само за места од Open-Meteo (позитивен id); кај Apple Maps — пребарување по име
+        var entity: String? = nil
+        if place.id > 0 { entity = await entityID(geonamesID: place.id) }
 
         var main: URL?
         var fromCategory: [URL] = []

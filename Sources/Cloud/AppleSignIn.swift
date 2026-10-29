@@ -6,10 +6,21 @@ import CryptoKit
 /// Поставки што се менуваат при објавување на App Store.
 enum AppConfig {
     /// „Најава со Apple“ бара платена Apple Developer сметка и капацитет „Sign in with Apple“.
-    /// Се вклучува во Resources/Info.plist: ValiseSignInWithApple = YES.
-    static var appleSignInEnabled: Bool {
-        Bundle.main.object(forInfoDictionaryKey: "ValiseSignInWithApple") as? Bool ?? false
+    /// Вклучено во TestFlight/App Store изградбата (VALISE_STORE_BUILD = YES).
+    static var appleSignInEnabled: Bool { flag("ValiseSignInWithApple") }
+
+    /// Вредностите доаѓаат од поставката VALISE_STORE_BUILD (YES/NO) при изградба.
+    private static func flag(_ key: String) -> Bool {
+        let value = Bundle.main.object(forInfoDictionaryKey: key)
+        if let bool = value as? Bool { return bool }
+        if let text = value as? String { return ["yes", "true", "1"].contains(text.lowercased()) }
+        return false
     }
+
+    /// Прогноза од Apple Weather (WeatherKit) — бесплатно до 500.000 барања месечно со платената сметка.
+    /// Бара капацитет „WeatherKit“ на App ID. Вклучено во TestFlight/App Store изградбата (VALISE_STORE_BUILD = YES).
+    /// Исклучено (тест-верзии со Sideloadly) = Open-Meteo, кое е бесплатно само за некомерцијална употреба.
+    static var weatherKitEnabled: Bool { flag("ValiseWeatherKit") }
 }
 
 /// Резултат од Apple — само она што ни треба за Firebase.

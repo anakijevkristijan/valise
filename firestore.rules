@@ -26,10 +26,11 @@ service cloud.firestore {
       return request.auth.uid in get(/databases/$(database)/documents/trips/$(tripId)).data.memberUIDs;
     }
 
-    // Профил: име и шифрирани клучеви (без вистински број/е-пошта)
+    // Профил: име и шифрирани клучеви (без вистински број/е-пошта).
+    // Го чита само сопственикот — апликацијата никогаш не чита туѓи профили,
+    // а правилата погоре (me()) го читаат преку get(), што не зависи од ова правило.
     match /users/{uid} {
-      allow read: if signedIn();
-      allow write: if signedIn() && request.auth.uid == uid;
+      allow read, write: if signedIn() && request.auth.uid == uid;
     }
 
     // Лично: гардероба, аутфити, план по денови — само сопственикот

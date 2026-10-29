@@ -175,6 +175,10 @@ struct AccountView: View {
             .buttonStyle(PrimaryButtonStyle())
             .disabled(!canSubmit || account.isWorking)
 
+            if mode == .signUp {
+                LegalConsentNote()
+            }
+
             if mode == .signIn {
                 Button(L("Заборавена лозинка?", "Forgot password?")) {
                     Task {
@@ -192,8 +196,10 @@ struct AccountView: View {
                 .disabled(email.isEmpty)
             }
 
-            note(L("Најава со Apple ќе се појави кога апликацијата ќе оди на App Store.",
-                   "Sign in with Apple will appear once the app is on the App Store."))
+            if !AppConfig.appleSignInEnabled {
+                note(L("Најава со Apple ќе се појави кога апликацијата ќе оди на App Store.",
+                       "Sign in with Apple will appear once the app is on the App Store."))
+            }
         }
     }
 

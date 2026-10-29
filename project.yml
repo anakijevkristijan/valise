@@ -43,8 +43,8 @@ targets:
       base:
         PRODUCT_NAME: Valise
         PRODUCT_BUNDLE_IDENTIFIER: com.valise.packing
-        MARKETING_VERSION: "2.4"
-        CURRENT_PROJECT_VERSION: "15"
+        MARKETING_VERSION: "2.5"
+        CURRENT_PROJECT_VERSION: "17"
         TARGETED_DEVICE_FAMILY: "1,2"
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_FILE: Resources/Info.plist
@@ -62,6 +62,7 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         CODE_SIGN_STYLE: Automatic
-        # За App Store (платена сметка): отстрани го # од следниот ред и стави ValiseSignInWithApple = YES во Resources/Info.plist
-        # CODE_SIGN_ENTITLEMENTS: Resources/Valise.entitlements
+        # NO = тест-верзија за Sideloadly (Open-Meteo, без Најава со Apple); TestFlight/App Store изградбата праќа YES
+        VALISE_STORE_BUILD: "NO"
+        # Entitlements (Најава со Apple, WeatherKit) ги потпишува .github/workflows/testflight.yml од Resources/Valise.entitlements
     scheme: {}

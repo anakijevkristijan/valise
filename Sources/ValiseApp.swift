@@ -53,13 +53,15 @@ struct RootView: View {
     @AppStorage("languageChosen") private var languageChosen: Bool = false
     @AppStorage(AppLanguage.storageKey) private var language: String = AppLanguage.mk.rawValue
     @AppStorage(Theme.storageKey) private var themeID: String = Palette.classic.id
+    @AppStorage(AgeGateView.verifiedKey) private var ageVerified: Bool = false
 
-    /// 0 = јазик, 1 = име, 2 = акаунт (задолжителен), 3 = почетна
+    /// 0 = јазик, 4 = возраст (пред да се внесе било што), 1 = име, 2 = акаунт (задолжителен), 3 = почетна
     private var stage: Int {
         if !languageChosen { return 0 }
         if account.hasSession {
             return userName.isEmpty ? 1 : 3
         }
+        if !ageVerified { return 4 }
         if userName.isEmpty { return 1 }
         return 2
     }
@@ -76,6 +78,9 @@ struct RootView: View {
                     .transition(.opacity)
             case 2:
                 AccountChoiceView()
+                    .transition(.opacity)
+            case 4:
+                AgeGateView()
                     .transition(.opacity)
             default:
                 MainTabView()

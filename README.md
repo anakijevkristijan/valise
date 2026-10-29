@@ -27,12 +27,28 @@
 Верзија 2.3: 140+ авиокомпании од целиот свет со пребарување (име, IATA код, земја), повеќе багажи по патување (со бројач), бројка од аутфитите до планираното во листата (×6) и предупредување кога се надминува, почетна со „Ново патување“ прва и филтер Претстојни / Поминати / Сите.
 
 Верзија 2.4: нова икона — куфер нацртан со тенкопишувач и маркер, со црвена етикета „V“; посебни верзии за темен и обоен (tinted) изглед на почетниот екран (iOS 18+).
+Заедно: кога ќе штиклираш заедничка работа што била за некој друг (пр. Виктор), таа станува твоја — кај сите пишува дека ја носиш ти.
 
-## Пред App Store (кога ќе имаш платена Apple Developer сметка)
-1. `Resources/Info.plist` → `ValiseSignInWithApple` = YES.
-2. `project.yml` → отстрани го `#` пред `CODE_SIGN_ENTITLEMENTS: Resources/Valise.entitlements`.
-3. Firebase → Authentication → Sign-in method → **Apple** → Enable.
-4. App Store Connect → In-App Purchase `com.valise.premium.lifetime` (Non-Consumable).
+Верзија 2.5 (закони и правила): Политика за приватност и Услови за користење во апликацијата (Поставки → Приватност и услови, и при регистрација); неутрално прашање за датум на раѓање пред регистрација (под 13 години — нема акаунт, ништо не се чува); профилите во Firestore ги чита само сопственикот; прогноза од Apple Weather (WeatherKit) и пребарување места со Apple Maps во App Store верзијата, со задолжителниот потпис на изворот.
+
+## TestFlight (официјално тестирање) — без Mac
+Workflow-от `.github/workflows/testflight.yml` прави архива, ја потпишува преку App Store Connect API клучот и ја качува на TestFlight. Тест-верзијата за Sideloadly (`build-ipa.yml`) останува иста.
+
+**Еднаш:**
+1. developer.apple.com → **Certificates, IDs & Profiles → Identifiers → +** → App IDs → App → Bundle ID `com.valise.packing` (Explicit). Вклучи **Sign in with Apple**, а во *App Services* — **WeatherKit**.
+2. appstoreconnect.apple.com → **Apps → + → New App**: iOS, име (привремено), Primary Language, Bundle ID `com.valise.packing`, SKU `valise001`.
+3. App Store Connect → **Users and Access → Integrations → App Store Connect API → Team Keys → +** → име `GitHub`, улога **Admin** → Generate. Симни го `.p8` (може само еднаш), запиши **Key ID** и **Issuer ID**.
+4. developer.apple.com → **Account → Membership details** → **Team ID**.
+5. GitHub репото → **Settings → Secrets and variables → Actions → New repository secret**: `APPLE_TEAM_ID`, `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8` (целата содржина на .p8, отворен со Notepad).
+6. Firebase → Authentication → Sign-in method → **Apple** → Enable.
+
+**Секое качување:** GitHub → **Actions → „Качи на TestFlight“ → Run workflow**. За 10–30 минути изградбата е во App Store Connect → TestFlight. Бројот на изградбата се зголемува сам.
+
+Во TestFlight изградбата се вклучени Најава со Apple и Apple Weather (`VALISE_STORE_BUILD = YES`). Во Sideloadly изградбата — исклучени (Open-Meteo).
+
+## Пред App Store
+1. App Store Connect → In-App Purchase `com.valise.premium.lifetime` (Non-Consumable) и **Agreements, Tax, and Banking → Paid Apps**.
+2. Види `LEGAL-CHECKLIST.md` — линкови, приватност, возраст, статус на трговец.
 
 **Важно за 2.0:** во Firebase → Firestore → Rules залепи го новиот `firestore.rules` и притисни Publish.
 

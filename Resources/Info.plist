@@ -5,7 +5,9 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>ValiseSignInWithApple</key>
-	<false/>
+	<string>$(VALISE_STORE_BUILD)</string>
+	<key>ValiseWeatherKit</key>
+	<string>$(VALISE_STORE_BUILD)</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

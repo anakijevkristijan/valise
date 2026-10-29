@@ -719,6 +719,7 @@ struct TripWizardView: View {
                         .luxCard(padding: 18)
                 } else {
                     WeatherStrip(days: weather)
+                    WeatherCreditView()
                 }
             }
         }
