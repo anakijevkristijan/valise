@@ -211,9 +211,15 @@ final class TripStore: ObservableObject {
         if let latest = trip(tripID) {
             await cloud.createInvites(trip: latest, keys: keys, fromName: me)
         }
-        let message = L("Здраво \(name.split(separator: " ").first.map(String.init) ?? name)! ✈︎ Патувам за \(current.destination.name) (\(Fmt.range(current.startDate, current.endDate))) и те додадов во Valise. Симни ја апликацијата и регистрирај се со твојот број — патувањето и листата ќе те чекаат. — \(me)",
-                        "Hi \(name.split(separator: " ").first.map(String.init) ?? name)! ✈︎ I'm going to \(current.destination.name) (\(Fmt.range(current.startDate, current.endDate))) and added you on Valise. Get the app and sign up with your number — the trip and packing list will be waiting. — \(me)")
-        return .invited(name, message)
+        return .invited(name, Self.inviteMessage(friend: name, trip: current, me: me))
+    }
+
+    /// Порака за пријател што уште нема Valise.
+    static func inviteMessage(friend name: String, trip: Trip, me: String) -> String {
+        let first = name.split(separator: " ").first.map(String.init) ?? name
+        let range = Fmt.range(trip.startDate, trip.endDate)
+        return L("Здраво \(first)! ✈︎ Патувам за \(trip.destination.name) (\(range)) и те додадов во Tripdrobe. Симни ја апликацијата и регистрирај се со твојот број — патувањето и листата ќе те чекаат. — \(me)",
+                 "Hi \(first)! ✈︎ I'm going to \(trip.destination.name) (\(range)) and added you on Tripdrobe. Get the app and sign up with your number — the trip and packing list will be waiting. — \(me)")
     }
 
     // MARK: Прогноза — се освежува при секое отворање
@@ -223,6 +229,7 @@ final class TripStore: ObservableObject {
     /// за да остане во бесплатните 500.000 барања месечно на Apple Weather. „Повлечи надолу“ секогаш освежува.
     @MainActor
     func refreshWeather(_ id: UUID, force: Bool = false) async {
+        guard PremiumStore.cachedIsPremium else { return }   // прогнозата е Premium
         guard let current = self.trip(id), !current.isPast else { return }
         if !force, let updated = current.weatherUpdatedAt,
            Date().timeIntervalSince(updated) < Self.autoRefreshInterval(for: current) { return }

@@ -131,7 +131,7 @@ struct BoardingPassCard: View {
     private var topHalf: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text("VALISE")
+                Text("TRIPDROBE")
                     .font(.sans(10, .semibold))
                     .tracking(3.2)
                 Spacer()
@@ -332,7 +332,7 @@ struct PassTile: View {
     private var top: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text("VALISE")
+                Text("TRIPDROBE")
                     .font(.sans(8, .semibold))
                     .tracking(2.4)
                 Spacer()

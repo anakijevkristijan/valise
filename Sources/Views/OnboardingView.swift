@@ -14,7 +14,7 @@ struct OnboardingView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     HStack {
-                        Text("VALISE")
+                        Text("TRIPDROBE")
                             .font(.sans(12, .semibold))
                             .tracking(4)
                             .foregroundStyle(Theme.navy)
@@ -119,7 +119,7 @@ struct OnboardingView: View {
             }
 
             HStack {
-                Text("VALISE")
+                Text("TRIPDROBE")
                     .font(.sans(10, .semibold))
                     .tracking(3.2)
                     .foregroundStyle(Theme.goldLight)
@@ -194,7 +194,7 @@ struct LanguagePickerView: View {
             PaperBackground()
 
             VStack(alignment: .leading, spacing: 0) {
-                Text("VALISE")
+                Text("TRIPDROBE")
                     .font(.sans(12, .semibold))
                     .tracking(4)
                     .foregroundStyle(Theme.navy)
@@ -283,7 +283,7 @@ struct AccountChoiceView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    Text("VALISE")
+                    Text("TRIPDROBE")
                         .font(.sans(12, .semibold))
                         .tracking(4)
                         .foregroundStyle(Theme.navy)

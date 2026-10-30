@@ -567,6 +567,7 @@ enum Fmt {
 
     static func day(_ d: Date) -> String { formatter("d").string(from: d) }
     static func dayMonth(_ d: Date) -> String { formatter("d MMMM").string(from: d) }
+    static func longDate(_ d: Date) -> String { formatter("d MMMM yyyy").string(from: d) }
     static func weekdayShort(_ d: Date) -> String {
         formatter("EEE").string(from: d).replacingOccurrences(of: ".", with: "")
     }

@@ -60,6 +60,7 @@ struct HomeView: View {
                 pendingTripID = newID
             }
             .environmentObject(store)
+            .environmentObject(premium)
         }
         .sheet(isPresented: $showSettings) {
             SettingsView()
@@ -74,7 +75,7 @@ struct HomeView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(alignment: .center) {
-                Text("VALISE")
+                Text("TRIPDROBE")
                     .font(.sans(12, .semibold))
                     .tracking(4)
                     .foregroundStyle(Theme.navy)

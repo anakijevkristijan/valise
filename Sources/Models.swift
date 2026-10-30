@@ -584,7 +584,7 @@ struct Trip: Codable, Identifiable, Hashable {
             }
         }
         lines.append("")
-        lines.append(L("Спакувано со Valise", "Packed with Valise"))
+        lines.append(L("Спакувано со Tripdrobe", "Packed with Tripdrobe"))
         return lines.joined(separator: "\n")
     }
 
@@ -610,7 +610,7 @@ struct Trip: Codable, Identifiable, Hashable {
         }
         lines.append("")
         let sender = me.split(separator: " ").first.map(String.init) ?? me
-        lines.append(L("— \(sender), преку Valise", "— \(sender), via Valise"))
+        lines.append(L("— \(sender), преку Tripdrobe", "— \(sender), via Tripdrobe"))
         return lines.joined(separator: "\n")
     }
 }

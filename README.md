@@ -1,4 +1,4 @@
-# Valise — iOS апликација за паметно пакување
+# Tripdrobe (поранешно Valise) — iOS апликација за паметно пакување
 
 Верзија 1.1: изглед „карта за прва класа“, македонски / English, прогноза за сите денови (лани = *), освежување при секое отворање, споделување на Instagram Story.
 
@@ -31,6 +31,23 @@
 
 Верзија 2.5 (закони и правила): Политика за приватност и Услови за користење во апликацијата (Поставки → Приватност и услови, и при регистрација); неутрално прашање за датум на раѓање пред регистрација (под 13 години — нема акаунт, ништо не се чува); профилите во Firestore ги чита само сопственикот; прогноза од Apple Weather (WeatherKit) и пребарување места со Apple Maps во App Store верзијата, со задолжителниот потпис на изворот.
 
+Верзија 2.6: пребарување градови додека пишуваш (Apple Maps); календарот се собира по изборот на датумите; секој чекор почнува од врвот; облеката според температурата (на студено помалку маици, повеќе долги ракави и џемпери); поголеми полиња за датум на раѓање; телефонски број по најавата (може да се прескокне); пријатели од контакти уште при правење патување — веднаш се гледа кој има Valise; Premium како годишна ($19.99, 7 дена бесплатно) или месечна ($3.99) претплата, со сите задолжителни услови до копчето; бесплатно — само листата за пакување.
+
+Име: **Tripdrobe** — во App Store Connect → App Information → Name: `Tripdrobe: Trip Outfit Planner`. Внатрешните имиња (проект, Bundle ID `com.valise.packing`, ID на производите) остануваат исти — корисниците не ги гледаат.
+
+## Претплата во App Store Connect (еднаш)
+Бесплатно: неограничени патувања само со листа за пакување. Premium: прогноза, авиокомпании и багаж, гардероба и аутфити, пријатели, Story, „Пред излез“, теми.
+
+1. **Agreements, Tax, and Banking → Paid Apps** — активен (банка + даночен формулар). Без ова производите не се вчитуваат ни во TestFlight.
+2. Апликацијата → **Monetization → Subscriptions** → **+ Subscription Group**: `Tripdrobe Premium`.
+3. Во групата **+** два пати:
+   - `com.valise.premium.yearly` — Duration **1 Year**, цена **$19.99**, **Introductory Offer → Free Trial → 1 Week**.
+   - `com.valise.premium.monthly` — Duration **1 Month**, цена **$3.99**.
+   - За секоја: Localization (англиски, по желба и македонски): Display Name и Description; **Review Screenshot** (слика од екранот Premium).
+4. Во описот на апликацијата (App Store) додај линкови до Условите за користење и Политиката за приватност — Apple го бара тоа за претплати.
+
+Во TestFlight купувањата се бесплатни, а претплатите се обновуваат забрзано (секој ден), за да може да се проба обновувањето.
+
 ## TestFlight (официјално тестирање) — без Mac
 Workflow-от `.github/workflows/testflight.yml` прави архива, ја потпишува преку App Store Connect API клучот и ја качува на TestFlight. Тест-верзијата за Sideloadly (`build-ipa.yml`) останува иста.
 
@@ -47,7 +64,7 @@ Workflow-от `.github/workflows/testflight.yml` прави архива, ја �
 Во TestFlight изградбата се вклучени Најава со Apple и Apple Weather (`VALISE_STORE_BUILD = YES`). Во Sideloadly изградбата — исклучени (Open-Meteo).
 
 ## Пред App Store
-1. App Store Connect → In-App Purchase `com.valise.premium.lifetime` (Non-Consumable) и **Agreements, Tax, and Banking → Paid Apps**.
+1. Претплатите (види „Претплата во App Store Connect“) и **Agreements, Tax, and Banking → Paid Apps**.
 2. Види `LEGAL-CHECKLIST.md` — линкови, приватност, возраст, статус на трговец.
 
 **Важно за 2.0:** во Firebase → Firestore → Rules залепи го новиот `firestore.rules` и притисни Publish.

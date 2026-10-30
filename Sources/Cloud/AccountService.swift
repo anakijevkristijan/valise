@@ -78,7 +78,7 @@ final class AccountService: ObservableObject {
             if previous != nil {
                 store?.wipeLocal()
                 wardrobe?.wipeLocal()
-                for key in ["userName", PhoneID.phoneStorageKey, "lastOrigin"] {
+                for key in ["userName", PhoneID.phoneStorageKey, "lastOrigin", "phoneAsked"] {
                     UserDefaults.standard.removeObject(forKey: key)
                 }
             }

@@ -37,7 +37,7 @@ struct AgeGateView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    Text("VALISE")
+                    Text("TRIPDROBE")
                         .font(.sans(12, .semibold))
                         .tracking(4)
                         .foregroundStyle(Theme.navy)
@@ -87,7 +87,7 @@ struct AgeGateView: View {
                         Button("\(value)") { day = value; invalid = false }
                     }
                 } label: {
-                    field(day.map { "\($0)" } ?? L("Ден", "Day"), filled: day != nil)
+                    field(day.map { "\($0)" } ?? L("Ден", "Day"), filled: day != nil, width: 84)
                 }
 
                 Menu {
@@ -95,16 +95,15 @@ struct AgeGateView: View {
                         Button(monthName(value)) { month = value; invalid = false }
                     }
                 } label: {
-                    field(month.map { monthName($0) } ?? L("Месец", "Month"), filled: month != nil)
+                    field(month.map { monthName($0) } ?? L("Месец", "Month"), filled: month != nil, width: nil)
                 }
-                .layoutPriority(1)
 
                 Menu {
                     ForEach(Array(stride(from: currentYear, through: currentYear - 110, by: -1)), id: \.self) { value in
                         Button(String(value)) { year = value; invalid = false }
                     }
                 } label: {
-                    field(year.map { String($0) } ?? L("Година", "Year"), filled: year != nil)
+                    field(year.map { String($0) } ?? L("Година", "Year"), filled: year != nil, width: 104)
                 }
             }
             .padding(.bottom, 14)
@@ -129,21 +128,23 @@ struct AgeGateView: View {
         }
     }
 
-    private func field(_ text: String, filled: Bool) -> some View {
+    /// Ден и година имаат фиксна ширина (секогаш читливи), месецот го зема останатото.
+    private func field(_ text: String, filled: Bool, width: CGFloat?) -> some View {
         HStack(spacing: 6) {
             Text(text)
-                .font(.sans(15, filled ? .semibold : .regular))
+                .font(.sans(17, filled ? .semibold : .regular))
                 .foregroundStyle(filled ? Theme.ink : Theme.muted)
                 .lineLimit(1)
-                .minimumScaleFactor(0.8)
+                .minimumScaleFactor(width == nil ? 0.75 : 1)
             Spacer(minLength: 0)
             Image(systemName: "chevron.down")
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(Theme.muted)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 14)
-        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 16)
+        .frame(width: width)
+        .frame(maxWidth: width == nil ? .infinity : nil)
         .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.surface))
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
     }
@@ -187,7 +188,7 @@ struct AgeGateView: View {
             Image(systemName: "suitcase")
                 .font(.system(size: 30, weight: .ultraLight))
                 .foregroundStyle(Theme.gold)
-            Text(L("Valise засега не е достапна за тебе.", "Valise isn't available for you yet."))
+            Text(L("Tripdrobe засега не е достапна за тебе.", "Tripdrobe isn't available for you yet."))
                 .font(.serif(30))
                 .foregroundStyle(Theme.ink)
                 .fixedSize(horizontal: false, vertical: true)

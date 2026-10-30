@@ -1,4 +1,5 @@
 import SwiftUI
+import MapKit
 import UIKit
 
 // MARK: - Нацрт на патувањето
@@ -133,6 +134,7 @@ struct TripWizardView: View {
     let onCreate: (UUID) -> Void
 
     @EnvironmentObject private var store: TripStore
+    @EnvironmentObject private var premium: PremiumStore
     @Environment(\.dismiss) private var dismiss
 
     @State private var draft: TripDraft
@@ -143,6 +145,9 @@ struct TripWizardView: View {
     @State private var weatherKey: String
     @State private var companionName = ""
     @FocusState private var companionFocused: Bool
+    /// Пријатели од контакти: по креирањето — ако имаат Valise, влегуваат во патувањето; ако немаат — покана.
+    @State private var pendingInvites: [PendingInvite] = []
+    @State private var contactNote: String?
     @State private var showAirlinePicker = false
 
     private let stepCount = 5
@@ -190,16 +195,24 @@ struct TripWizardView: View {
                     .frame(maxWidth: 620)
                     .frame(maxWidth: .infinity)
                     .containerRelativeFrame(.horizontal)
-                    .id(step)
-                    .transition(.opacity)
                 }
                 .scrollDismissesKeyboard(.interactively)
                 .scrollIndicators(.hidden)
+                // Нов чекор = нов ScrollView, секогаш од врвот
+                .id(step)
+                .transition(.opacity)
 
                 bottomBar
             }
         }
         .sensoryFeedback(.selection, trigger: step)
+        .onAppear {
+            // Без Premium нема правила на авиокомпании — општи багажи
+            if !premium.isPremium && draft.airlineID != "other" && !isEditing {
+                draft.airlineID = "other"
+                draft.resetBags()
+            }
+        }
     }
 
     // MARK: Лента горе
@@ -392,7 +405,14 @@ struct TripWizardView: View {
                 }
             }
 
-            if draft.transport == .plane {
+            if draft.transport == .plane && !premium.isPremium {
+                PremiumLockRow(icon: "airplane",
+                               title: L("Авиокомпанија и правила за багаж", "Airline and baggage rules"),
+                               detail: L("Мерки и килограми за 140+ авиокомпании — без казни на аеродром.",
+                                         "Sizes and weights for 140+ airlines — no fees at the gate."))
+            }
+
+            if draft.transport == .plane && premium.isPremium {
                 VStack(alignment: .leading, spacing: 12) {
                     Eyebrow(L("Авиокомпанија", "Airline"))
                     Button {
@@ -453,7 +473,7 @@ struct TripWizardView: View {
                     noteRow(icon: "suitcase", text: L("Вкупно: \(draft.bagsSummary)", "Total: \(draft.bagsSummary)"))
                 }
 
-                if draft.transport == .plane {
+                if draft.transport == .plane && premium.isPremium {
                     if let tip = Airlines.find(draft.airlineID)?.tip {
                         noteRow(icon: "exclamationmark.circle", text: tip)
                     }
@@ -568,7 +588,14 @@ struct TripWizardView: View {
                 }
             }
 
-            companionsEditor
+            if premium.isPremium {
+                companionsEditor
+            } else {
+                PremiumLockRow(icon: "person.2",
+                               title: L("Патувај со пријатели", "Travel with friends"),
+                               detail: L("Заедничка листа и кој што носи — синхронизирано кај сите.",
+                                         "A shared list and who brings what — synced for everyone."))
+            }
 
             VStack(alignment: .leading, spacing: 12) {
                 Eyebrow(L("За кого пакуваме", "Who are we packing for"))
@@ -610,14 +637,58 @@ struct TripWizardView: View {
             .padding(.vertical, 8)
             .luxCard(padding: 0, radius: 14)
 
+            Button(action: pickContact) {
+                HStack(spacing: 10) {
+                    Image(systemName: "person.crop.circle.badge.plus")
+                        .font(.system(size: 16, weight: .light))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L("Додај од контакти", "Add from contacts"))
+                            .font(.sans(14, .semibold))
+                        Text(L("Ќе видиш дали веќе има Tripdrobe", "See right away if they're on Tripdrobe"))
+                            .font(.sans(12))
+                            .foregroundStyle(Theme.muted)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Theme.muted)
+                }
+                .foregroundStyle(Theme.navy)
+                .padding(14)
+                .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Theme.surface))
+                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 0.75))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(PressableStyle())
+
+            if let contactNote {
+                Text(contactNote)
+                    .font(.sans(12, .medium))
+                    .foregroundStyle(Theme.terracotta)
+            }
+
             if !draft.companions.isEmpty {
                 ScrollView(.horizontal) {
                     HStack(spacing: 8) {
                         ForEach(draft.companions) { companion in
                             Button {
-                                withAnimation { draft.companions.removeAll { $0.id == companion.id } }
+                                withAnimation {
+                                    draft.companions.removeAll { $0.id == companion.id }
+                                    pendingInvites.removeAll { $0.id == companion.id }
+                                }
                             } label: {
                                 HStack(spacing: 6) {
+                                    if let invite = pendingInvites.first(where: { $0.id == companion.id }) {
+                                        if let hasApp = invite.hasApp {
+                                            Image(systemName: hasApp ? "checkmark.icloud" : "envelope")
+                                                .font(.system(size: 11, weight: .semibold))
+                                        } else {
+                                            ProgressView().controlSize(.mini).tint(Theme.goldLight)
+                                        }
+                                    } else if companion.hasAccount {
+                                        Image(systemName: "checkmark.icloud")
+                                            .font(.system(size: 11, weight: .semibold))
+                                    }
                                     Text(companion.name)
                                         .font(.sans(13, .medium))
                                     Image(systemName: "xmark")
@@ -635,11 +706,75 @@ struct TripWizardView: View {
                 .scrollIndicators(.hidden)
             }
 
+            if !pendingInvites.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Label(L("има Tripdrobe — ќе ја гледа истата листа", "on Tripdrobe — will see the same list"),
+                          systemImage: "checkmark.icloud")
+                    Label(L("уште нема — по креирањето допри го името во патувањето и испрати покана",
+                            "not yet — after creating, tap their name in the trip to send an invite"),
+                          systemImage: "envelope")
+                }
+                .font(.sans(12))
+                .foregroundStyle(Theme.inkSoft)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+
             Text(L("Заедничките работи (шампон, крема за сонце, адаптер…) можете да ги поделите — тоа што го носи пријател не зафаќа место во твојот багаж.",
                    "Share common items (shampoo, sunscreen, adapter…) — whatever a friend carries doesn't take space in your bag."))
                 .font(.sans(12))
                 .foregroundStyle(Theme.muted)
                 .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func pickContact() {
+        contactNote = nil
+        ContactPickerPresenter.shared.present { contact in
+            guard let contact else { return }
+            Task { @MainActor in await addContact(contact) }
+        }
+    }
+
+    @MainActor
+    private func addContact(_ contact: PickedContact) async {
+        let phoneKeys = contact.phones.compactMap { PhoneID.normalize($0) }.map { PhoneID.phoneKey($0) }
+        let emailKeys = contact.emails.map { PhoneID.emailKey($0) }
+        let keys = Array(Set(phoneKeys)) + Array(Set(emailKeys))
+        guard !keys.isEmpty else {
+            contactNote = L("Контактот нема број или е-пошта.", "This contact has no number or email.")
+            return
+        }
+        let companion = Companion(name: contact.name)
+        withAnimation {
+            draft.companions.append(companion)
+            pendingInvites.append(PendingInvite(id: companion.id, contact: contact, hasApp: nil))
+        }
+        let uid = await store.cloud?.lookup(keys: keys)
+        if let uid, uid == Session.uid {
+            withAnimation {
+                draft.companions.removeAll { $0.id == companion.id }
+                pendingInvites.removeAll { $0.id == companion.id }
+            }
+            contactNote = L("Тоа си ти 🙂", "That's you 🙂")
+            return
+        }
+        if let index = pendingInvites.firstIndex(where: { $0.id == companion.id }) {
+            withAnimation { pendingInvites[index].hasApp = uid != nil }
+        }
+    }
+
+    /// По зачувувањето: пријателите од контакти се додаваат во патувањето (или добиваат покана).
+    private func sendInvites(to tripID: UUID) {
+        let invites = pendingInvites
+        guard !invites.isEmpty else { return }
+        let store = self.store
+        Task { @MainActor in
+            for invite in invites {
+                _ = await store.invite(name: invite.contact.name,
+                                       phones: invite.contact.phones,
+                                       emails: invite.contact.emails,
+                                       to: tripID)
+            }
         }
     }
 
@@ -658,7 +793,7 @@ struct TripWizardView: View {
                         startDate: draft.startDate.startOfDay,
                         endDate: max(draft.endDate, draft.startDate).startOfDay,
                         transport: draft.transport,
-                        airlineID: draft.transport == .plane ? draft.airlineID : nil,
+                        airlineID: draft.transport == .plane && premium.isPremium ? draft.airlineID : nil,
                         bag: draft.primaryBag,
                         activities: Activity.allCases.filter { draft.activities.contains($0) },
                         style: draft.style,
@@ -667,7 +802,8 @@ struct TripWizardView: View {
         trip.weather = weather
         trip.weatherSource = weatherSource
         trip.tint = editing?.tint ?? (store.trips.count % Theme.ticketColors.count)
-        trip.companions = draft.companions.isEmpty ? nil : draft.companions
+        let plain = draft.companions.filter { companion in !pendingInvites.contains { $0.id == companion.id } }
+        trip.companions = plain.isEmpty ? nil : plain
         if let editing {
             trip.items = editing.items
             trip.together = editing.together
@@ -693,6 +829,12 @@ struct TripWizardView: View {
             }
             .luxCard(padding: 20)
 
+            if !premium.isPremium {
+                PremiumLockRow(icon: "cloud.sun",
+                               title: L("Прогноза за секој ден", "Forecast for every day"),
+                               detail: L("Со Premium листата се прилагодува на времето на дестинацијата.",
+                                         "With Premium the list adapts to the weather at your destination."))
+            } else {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Eyebrow(L("Време на дестинацијата", "Weather at your destination"))
@@ -722,6 +864,7 @@ struct TripWizardView: View {
                     WeatherCreditView()
                 }
             }
+            }
         }
         .task(id: reviewWeatherKey) { await loadWeather() }
     }
@@ -740,7 +883,7 @@ struct TripWizardView: View {
     }
 
     private var transportText: String {
-        if draft.transport == .plane, let airline = Airlines.find(draft.airlineID), airline.id != "other" {
+        if draft.transport == .plane, premium.isPremium, let airline = Airlines.find(draft.airlineID), airline.id != "other" {
             return "\(draft.transport.title) · \(airline.name)"
         }
         return draft.transport.title
@@ -753,7 +896,7 @@ struct TripWizardView: View {
 
     @MainActor
     private func loadWeather() async {
-        guard let destination = draft.destination else { return }
+        guard premium.isPremium, let destination = draft.destination else { return }
         let key = reviewWeatherKey
         if key == weatherKey && !weather.isEmpty { return }
         isLoadingWeather = true
@@ -880,6 +1023,7 @@ struct TripWizardView: View {
         if updated.weather.isEmpty {
             Task { await store.refreshWeather(original.id, force: true) }
         }
+        sendInvites(to: original.id)
         dismiss()
     }
 
@@ -892,6 +1036,7 @@ struct TripWizardView: View {
 
         LastOrigin.save(draft.origin)
         store.add(trip)
+        sendInvites(to: trip.id)
         onCreate(trip.id)
         dismiss()
     }
@@ -899,6 +1044,14 @@ struct TripWizardView: View {
     private func hideKeyboard() {
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
+}
+
+/// Пријател избран од контакти, додека се прави патувањето.
+struct PendingInvite: Identifiable {
+    let id: UUID
+    let contact: PickedContact
+    /// nil = се проверува; true = има Valise; false = ќе добие покана
+    var hasApp: Bool?
 }
 
 // MARK: - Пребарување место
@@ -909,13 +1062,17 @@ struct PlaceSearchField: View {
     @Binding var selection: Place?
     var suggestions: [String] = []
 
+    @StateObject private var completer = PlaceCompleter()
     @State private var query = ""
-    @State private var results: [Place] = []
-    @State private var isSearching = false
+    /// Open-Meteo резерва (само тест-верзии) кога Apple нема предлог.
+    @State private var fallback: [Place] = []
+    @State private var resolving: MKLocalSearchCompletion?
+    @State private var failed = false
     @State private var isEditing = false
     @FocusState private var focused: Bool
 
     private var showsField: Bool { selection == nil || isEditing }
+    private var hasResults: Bool { !completer.results.isEmpty || !fallback.isEmpty }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -925,7 +1082,9 @@ struct PlaceSearchField: View {
                         .font(.sans(10, .semibold))
                         .tracking(1.8)
                         .foregroundStyle(Theme.gold)
-                        .frame(width: 30, alignment: .leading)
+                        .lineLimit(1)
+                        .fixedSize()
+                        .frame(minWidth: 40, alignment: .leading)
 
                     if showsField {
                         TextField("", text: $query, prompt: Text(placeholder).foregroundColor(Theme.muted.opacity(0.75)))
@@ -935,7 +1094,11 @@ struct PlaceSearchField: View {
                             .autocorrectionDisabled()
                             .textInputAutocapitalization(.words)
                             .submitLabel(.search)
-                        if isSearching {
+                            .onSubmit {
+                                if let first = completer.results.first { pick(first) }
+                                else if let first = fallback.first { choose(first) }
+                            }
+                        if resolving != nil {
                             ProgressView().tint(Theme.navy)
                         } else if !query.isEmpty {
                             Button { query = "" } label: {
@@ -975,33 +1138,39 @@ struct PlaceSearchField: View {
                 .padding(.horizontal, 18)
                 .padding(.vertical, 18)
 
-                if showsField && !results.isEmpty {
+                if showsField && hasResults {
                     Hairline()
-                    ForEach(results) { place in
-                        Button { choose(place) } label: {
-                            HStack(spacing: 12) {
-                                Text(place.flag).font(.system(size: 18))
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(place.name)
-                                        .font(.sans(16, .medium))
-                                        .foregroundStyle(Theme.ink)
-                                    Text(place.subtitle)
-                                        .font(.sans(13))
-                                        .foregroundStyle(Theme.inkSoft)
-                                        .lineLimit(1)
-                                }
-                                Spacer()
-                                Text(place.code)
-                                    .font(.codes(16))
-                                    .foregroundStyle(Theme.muted)
+                    VStack(spacing: 0) {
+                        ForEach(completer.results, id: \.self) { item in
+                            Button { pick(item) } label: {
+                                resultRow(icon: Text(Image(systemName: "mappin.circle")),
+                                          title: item.title,
+                                          subtitle: item.subtitle,
+                                          code: CityCode.code(for: item.title),
+                                          busy: resolving == item)
                             }
-                            .padding(.horizontal, 18)
-                            .padding(.vertical, 12)
-                            .contentShape(Rectangle())
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
+                        ForEach(fallback) { place in
+                            Button { choose(place) } label: {
+                                resultRow(icon: Text(place.flag),
+                                          title: place.name,
+                                          subtitle: place.subtitle,
+                                          code: place.code,
+                                          busy: false)
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
                     .padding(.vertical, 4)
+                }
+
+                if showsField && failed {
+                    Text(L("Не можам да го најдам ова место. Пробај повторно.", "Couldn't load this place. Please try again."))
+                        .font(.sans(12, .medium))
+                        .foregroundStyle(Theme.terracotta)
+                        .padding(.horizontal, 18)
+                        .padding(.bottom, 12)
                 }
             }
             .luxCard(padding: 0)
@@ -1020,34 +1189,88 @@ struct PlaceSearchField: View {
                 .scrollIndicators(.hidden)
             }
         }
-        .task(id: query) { await search() }
+        .onChange(of: query) { _, newValue in
+            failed = false
+            completer.update(newValue)
+        }
+        .task(id: query) { await loadFallback() }
+    }
+
+    private func resultRow(icon: Text, title: String, subtitle: String, code: String, busy: Bool) -> some View {
+        HStack(spacing: 12) {
+            icon
+                .font(.system(size: 18, weight: .light))
+                .foregroundStyle(Theme.gold)
+                .frame(width: 24)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.sans(16, .medium))
+                    .foregroundStyle(Theme.ink)
+                if !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.sans(13))
+                        .foregroundStyle(Theme.inkSoft)
+                        .lineLimit(1)
+                }
+            }
+            Spacer()
+            if busy {
+                ProgressView().controlSize(.small).tint(Theme.navy)
+            } else {
+                Text(code)
+                    .font(.codes(16))
+                    .foregroundStyle(Theme.muted)
+            }
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 12)
+        .contentShape(Rectangle())
+    }
+
+    /// Предлогот од Apple Maps добива координати дури при избор.
+    private func pick(_ item: MKLocalSearchCompletion) {
+        guard resolving == nil else { return }
+        resolving = item
+        Task { @MainActor in
+            let place = await WeatherService.resolve(item)
+            resolving = nil
+            if let place {
+                choose(place)
+            } else {
+                failed = true
+            }
+        }
     }
 
     private func choose(_ place: Place) {
         withAnimation(.easeInOut(duration: 0.25)) {
             selection = place
             isEditing = false
-            results = []
+            fallback = []
             query = ""
         }
+        completer.update("")
         focused = false
     }
 
+    /// Ако Apple нема предлог, во тест-верзиите пробува и со Open-Meteo.
     @MainActor
-    private func search() async {
+    private func loadFallback() async {
         let q = query.trimmingCharacters(in: .whitespaces)
-        guard q.count >= 2 else {
-            results = []
-            isSearching = false
+        guard q.count >= 3 else {
+            fallback = []
             return
         }
-        try? await Task.sleep(nanoseconds: 350_000_000)
+        try? await Task.sleep(nanoseconds: 600_000_000)
+        if Task.isCancelled || !completer.results.isEmpty {
+            fallback = []
+            return
+        }
+        let found = await WeatherService.searchOpenMeteoIfAllowed(q)
         if Task.isCancelled { return }
-        isSearching = true
-        let found = (try? await WeatherService.searchPlaces(q)) ?? []
-        if Task.isCancelled { return }
-        withAnimation(.easeInOut(duration: 0.2)) { results = found }
-        isSearching = false
+        withAnimation(.easeInOut(duration: 0.2)) {
+            fallback = completer.results.isEmpty ? found : []
+        }
     }
 }
 

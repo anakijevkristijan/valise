@@ -60,6 +60,7 @@ enum Catalog {
         "photoOutfits": ("Комбинации за слики", "Outfits for photos"),
         "eveningDress": ("Фустан за вечер", "Evening dress"),
         "shirt": ("Кошула", "Shirt"),
+        "longSleeves": ("Блузи со долги ракави", "Long-sleeve tops"),
         "smartTrousers": ("Елегантни панталони", "Smart trousers"),
         "smartOutfit": ("Елегантен комплет", "Smart outfit"),
         "nightOutfit": ("Облека за излегување", "Going-out outfit"),
@@ -236,8 +237,20 @@ enum PackingEngine {
         b.add("booking", .documents, vol: 0.01, kg: 0.01)
         b.add("cards", .documents, vol: 0.05, kg: 0.05, note: international ? "localCash" : nil)
 
-        // Облека
-        b.add("tshirts", .clothing, qty: min(clothDays + 1 + (hot ? 1 : 0), 12), vol: 0.6, kg: 0.18, worn: 1)
+        // Облека — горните делови според температурата преку ден:
+        // топло → маици; свежо → дел маици, дел долги ракави; студено → малку маици (под џемпер) и повеќе џемпери.
+        let tops = min(clothDays + 1 + (hot ? 1 : 0), 12)
+        if maxT >= 20 {
+            b.add("tshirts", .clothing, qty: tops, vol: 0.6, kg: 0.18, worn: 1)
+        } else if maxT >= 13 {
+            let tees = max(2, Int((Double(tops) * 0.55).rounded()))
+            b.add("tshirts", .clothing, qty: tees, vol: 0.6, kg: 0.18, worn: 1)
+            b.add("longSleeves", .clothing, qty: max(1, tops - tees), vol: 0.8, kg: 0.22)
+        } else {
+            let tees = min(max(2, Int((Double(clothDays) / 2).rounded(.up))), 5)
+            b.add("tshirts", .clothing, qty: tees, vol: 0.6, kg: 0.18, worn: 1)
+            b.add("longSleeves", .clothing, qty: max(1, Int((Double(clothDays) / 3).rounded(.up))), vol: 0.8, kg: 0.22)
+        }
         b.add("underwear", .clothing, qty: min(clothDays + 1, 12), vol: 0.1, kg: 0.05, worn: 1)
         b.add("socks", .clothing, qty: min(clothDays + 1, 12), vol: 0.12, kg: 0.05, worn: 1)
 
@@ -252,7 +265,11 @@ enum PackingEngine {
             b.add("dress", .clothing, qty: max(1, days / 3), vol: 0.8, kg: 0.25)
         }
         b.add("pyjamas", .clothing, vol: 0.8, kg: 0.25)
-        if chilly { b.add("sweater", .clothing, qty: days > 5 ? 2 : 1, vol: 1.6, kg: 0.45) }
+        if maxT < 13 || cold {
+            b.add("sweater", .clothing, qty: min(max(2, Int((Double(clothDays) / 2.5).rounded(.up))), 4), vol: 1.6, kg: 0.45, worn: 1)
+        } else if chilly {
+            b.add("sweater", .clothing, qty: days > 5 ? 2 : 1, vol: 1.6, kg: 0.45)
+        }
         if cold {
             b.add("warmJacket", .clothing, vol: 5, kg: 1.2, worn: 1)
         } else if minT < 17 {

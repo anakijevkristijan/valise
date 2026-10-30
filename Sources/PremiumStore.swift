@@ -1,20 +1,36 @@
 import Foundation
 import StoreKit
 
-/// Valise Premium — еднократно отклучување (StoreKit 2).
+/// Tripdrobe Premium (StoreKit 2): годишна претплата (со бесплатна проба) и месечна претплата,
+/// во групата „Tripdrobe Premium“ во App Store Connect.
+/// Бесплатно: неограничени патувања со листа за пакување. Premium: прогноза, авиокомпании и багаж,
+/// гардероба и аутфити, пријатели, Story, „Пред излез“ и теми.
 /// „Отклучи за тест“ постои само кога апликацијата НЕ е од App Store / TestFlight (пр. Sideloadly).
-/// Во App Store верзијата Premium се добива само со вистинско купување.
 @MainActor
 final class PremiumStore: ObservableObject {
-    static let productID = "com.valise.premium.lifetime"
+    static let yearlyID = "com.valise.premium.yearly"
+    static let monthlyID = "com.valise.premium.monthly"
+    static let allIDs = [yearlyID, monthlyID]
     private static let storageKey = "premiumUnlocked"
 
+    /// Последната позната состојба — за код надвор од екраните (пр. освежување на прогнозата).
+    nonisolated static var cachedIsPremium: Bool {
+        UserDefaults.standard.bool(forKey: "premiumUnlocked")
+    }
+
     @Published private(set) var isPremium: Bool
-    @Published private(set) var product: Product?
+    /// Производите по редослед: годишна, месечна, засекогаш (само тие што постојат во App Store Connect).
+    @Published private(set) var products: [Product] = []
     @Published private(set) var isWorking = false
     @Published private(set) var didLoad = false
     /// Инсталирано од App Store или TestFlight (потпишано од Apple).
     @Published private(set) var isStoreInstall = false
+    /// Активниот план (ID на производот) и кога истекува претплатата.
+    @Published private(set) var activeProductID: String?
+    @Published private(set) var expirationDate: Date?
+    /// Дали корисникот може да ја добие бесплатната проба (само еднаш по Apple ID).
+    @Published private(set) var trialEligible = false
+    @Published var errorMessage: String?
 
     /// Тест-отклучување е дозволено само надвор од App Store.
     var allowsTestUnlock: Bool { didLoad && !isStoreInstall }
@@ -27,30 +43,36 @@ final class PremiumStore: ObservableObject {
             for await update in Transaction.updates {
                 if case .verified(let transaction) = update {
                     await transaction.finish()
-                    await self?.apply(transaction)
                 }
+                await self?.refreshEntitlements()
             }
         }
         Task { await load() }
     }
 
-    /// Дали производот е достапен во App Store (не е при Sideloadly).
-    var storeAvailable: Bool { product != nil }
+    /// Дали производите се достапни (не се при Sideloadly).
+    var storeAvailable: Bool { !products.isEmpty }
 
-    var priceText: String? { product?.displayPrice }
+    var hasSubscription: Bool { activeProductID != nil }
+
+    func product(_ id: String) -> Product? { products.first { $0.id == id } }
 
     func load() async {
-        product = try? await Product.products(for: [Self.productID]).first
+        let loaded = (try? await Product.products(for: Self.allIDs)) ?? []
+        products = Self.allIDs.compactMap { id in loaded.first { $0.id == id } }
         // App Store и TestFlight имаат потврда (receipt) од Apple; Sideloadly нема.
         let hasReceipt = Bundle.main.appStoreReceiptURL.map { FileManager.default.fileExists(atPath: $0.path) } ?? false
-        isStoreInstall = hasReceipt || product != nil
+        isStoreInstall = hasReceipt || !products.isEmpty
+        if let subscription = product(Self.yearlyID)?.subscription {
+            trialEligible = await subscription.isEligibleForIntroOffer
+        }
         await refreshEntitlements()
         didLoad = true
     }
 
-    func purchase() async {
-        guard let product else { return }
+    func purchase(_ product: Product) async {
         isWorking = true
+        errorMessage = nil
         defer { isWorking = false }
         do {
             let result = try await product.purchase()
@@ -58,15 +80,15 @@ final class PremiumStore: ObservableObject {
             case .success(let verification):
                 if case .verified(let transaction) = verification {
                     await transaction.finish()
-                    apply(transaction)
                 }
+                await refreshEntitlements()
             case .userCancelled, .pending:
                 break
             @unknown default:
                 break
             }
         } catch {
-            print("Valise: purchase failed — \(error)")
+            errorMessage = L("Купувањето не успеа. Обиди се повторно.", "The purchase didn't go through. Please try again.")
         }
     }
 
@@ -87,30 +109,65 @@ final class PremiumStore: ObservableObject {
         setPremium(false)
     }
 
-    private func refreshEntitlements() async {
-        var owned = false
+    /// Активно право: претплата што не е истечена или откажана со враќање пари.
+    func refreshEntitlements() async {
+        var best: Transaction?
         for await result in Transaction.currentEntitlements {
-            if case .verified(let transaction) = result,
-               transaction.productID == Self.productID, transaction.revocationDate == nil {
-                owned = true
+            guard case .verified(let transaction) = result,
+                  Self.allIDs.contains(transaction.productID),
+                  transaction.revocationDate == nil else { continue }
+            if let expiry = transaction.expirationDate, expiry < Date() { continue }
+            if best == nil || (transaction.expirationDate ?? .distantPast) > (best?.expirationDate ?? .distantPast) {
+                best = transaction
             }
         }
-        if owned {
+        activeProductID = best?.productID
+        expirationDate = best?.expirationDate
+        if best != nil {
             setPremium(true)
         } else if isStoreInstall {
-            // Во App Store верзијата важи само вистинското купување
+            // Во App Store верзијата важи само вистинско купување
             setPremium(false)
-        }
-    }
-
-    private func apply(_ transaction: Transaction) {
-        if transaction.productID == Self.productID && transaction.revocationDate == nil {
-            setPremium(true)
         }
     }
 
     private func setPremium(_ value: Bool) {
         isPremium = value
         UserDefaults.standard.set(value, forKey: Self.storageKey)
+    }
+}
+
+// MARK: - Текстови за плановите
+
+extension Product {
+    /// „година“ / „месец“ за претплатите.
+    var periodWord: String? {
+        guard let period = subscription?.subscriptionPeriod else { return nil }
+        switch period.unit {
+        case .year: return period.value == 1 ? L("година", "year") : L("\(period.value) години", "\(period.value) years")
+        case .month: return period.value == 1 ? L("месец", "month") : L("\(period.value) месеци", "\(period.value) months")
+        case .week: return period.value == 1 ? L("недела", "week") : L("\(period.value) недели", "\(period.value) weeks")
+        case .day: return period.value == 1 ? L("ден", "day") : L("\(period.value) дена", "\(period.value) days")
+        default: return nil
+        }
+    }
+
+    /// Бесплатната проба, ако постои: „7 дена“.
+    var freeTrialText: String? {
+        guard let offer = subscription?.introductoryOffer, offer.paymentMode == .freeTrial else { return nil }
+        let value = offer.period.value
+        switch offer.period.unit {
+        case .day: return value == 7 ? L("7 дена", "7 days") : L("\(value) дена", "\(value) days")
+        case .week: return value == 1 ? L("7 дена", "7 days") : L("\(value * 7) дена", "\(value * 7) days")
+        case .month: return value == 1 ? L("1 месец", "1 month") : L("\(value) месеци", "\(value) months")
+        case .year: return L("\(value) година", "\(value) year")
+        default: return nil
+        }
+    }
+
+    /// Месечна цена за годишниот план: „$1.67 месечно“.
+    var monthlyEquivalent: String? {
+        guard let period = subscription?.subscriptionPeriod, period.unit == .year, period.value == 1 else { return nil }
+        return (price / 12).formatted(priceFormatStyle)
     }
 }

@@ -30,7 +30,7 @@ struct AccountView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     HStack {
-                        Eyebrow(account.isSignedIn ? L("Акаунт", "Account") : "VALISE", color: Theme.gold)
+                        Eyebrow(account.isSignedIn ? L("Акаунт", "Account") : "TRIPDROBE", color: Theme.gold)
                         Spacer()
                         CircleIconButton(systemName: "xmark") { dismiss() }
                     }

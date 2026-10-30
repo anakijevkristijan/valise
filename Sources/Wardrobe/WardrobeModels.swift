@@ -85,7 +85,7 @@ enum WardrobeCategory: String, Codable, CaseIterable, Identifiable {
     /// Општите предмети од листата за пакување што ги покрива оваа категорија.
     var packingKeys: [String] {
         switch self {
-        case .top: return ["tshirts", "shirt", "sweater"]
+        case .top: return ["tshirts", "longSleeves", "shirt", "sweater"]
         case .bottom: return ["trousers", "shorts", "longTrousers", "smartTrousers"]
         case .dress: return ["dress", "eveningDress"]
         case .outerwear: return ["lightJacket", "warmJacket"]

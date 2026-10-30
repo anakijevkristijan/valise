@@ -11,6 +11,8 @@ struct DateRangeCalendar: View {
     @State private var month: Date
     @State private var editing: Endpoint = .start
     @State private var monthDirection: Int = 1
+    /// По изборот на враќањето календарот се собира; „Промени датуми“ го отвора повторно.
+    @State private var collapsed = false
 
     private let minimum = Date().startOfDay
 
@@ -37,19 +39,39 @@ struct DateRangeCalendar: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             selectionHeader
-            Hairline()
-            monthHeader
-            VStack(spacing: 6) {
-                weekdayRow
-                daysGrid
-                    .id(month)
-                    .transition(.asymmetric(
-                        insertion: .move(edge: monthDirection > 0 ? .trailing : .leading).combined(with: .opacity),
-                        removal: .opacity
-                    ))
+            if collapsed {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.25)) { collapsed = false }
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "calendar")
+                            .font(.system(size: 13, weight: .light))
+                        Text(L("Промени датуми", "Change dates"))
+                            .font(.sans(13, .semibold))
+                        Spacer()
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 10, weight: .semibold))
+                    }
+                    .foregroundStyle(Theme.navy)
+                    .padding(.horizontal, 4)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            } else {
+                Hairline()
+                monthHeader
+                VStack(spacing: 6) {
+                    weekdayRow
+                    daysGrid
+                        .id(month)
+                        .transition(.asymmetric(
+                            insertion: .move(edge: monthDirection > 0 ? .trailing : .leading).combined(with: .opacity),
+                            removal: .opacity
+                        ))
+                }
+                .clipped()
+                quickLengths
             }
-            .clipped()
-            quickLengths
         }
         .padding(18)
         .luxCard(padding: 0)
@@ -89,6 +111,7 @@ struct DateRangeCalendar: View {
         let active = editing == point
         return Button {
             withAnimation(.easeInOut(duration: 0.2)) {
+                collapsed = false
                 editing = point
                 let target = point == .start ? start : end
                 monthDirection = target >= month ? 1 : -1
@@ -275,7 +298,17 @@ struct DateRangeCalendar: View {
                 } else {
                     end = day
                     editing = .start
+                    collapseSoon()
                 }
+            }
+        }
+    }
+
+    /// Кратка пауза за да се види изборот, па календарот се собира.
+    private func collapseSoon() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            if editing == .start && end.startOfDay >= start.startOfDay {
+                withAnimation(.easeInOut(duration: 0.3)) { collapsed = true }
             }
         }
     }
@@ -318,6 +351,7 @@ struct DateRangeCalendar: View {
                     end = start.startOfDay.adding(days: days - 1)
                     editing = .start
                 }
+                collapseSoon()
             }
     }
 }

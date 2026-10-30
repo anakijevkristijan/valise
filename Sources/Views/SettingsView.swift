@@ -1,4 +1,5 @@
 import SwiftUI
+import StoreKit
 
 struct SettingsView: View {
     @EnvironmentObject private var store: TripStore
@@ -88,7 +89,7 @@ struct SettingsView: View {
                     }
                     .buttonStyle(SecondaryButtonStyle())
 
-                    Text("VALISE 2.5")
+                    Text("TRIPDROBE 2.6")
                         .font(.sans(10, .semibold))
                         .tracking(3)
                         .foregroundStyle(Theme.muted)
@@ -375,6 +376,11 @@ struct ThemeSwatch: View {
 struct PremiumSheet: View {
     @EnvironmentObject private var premium: PremiumStore
     @Environment(\.dismiss) private var dismiss
+    @State private var selectedID = PremiumStore.yearlyID
+    @State private var legalDoc: LegalDoc?
+    @State private var manageSubscriptions = false
+
+    private var selected: Product? { premium.product(selectedID) ?? premium.products.first }
 
     var body: some View {
         ZStack {
@@ -383,7 +389,7 @@ struct PremiumSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 26) {
                     HStack {
-                        Text("VALISE PREMIUM")
+                        Text("TRIPDROBE PREMIUM")
                             .font(.sans(11, .semibold))
                             .tracking(3)
                             .foregroundStyle(Theme.gold)
@@ -403,68 +409,32 @@ struct PremiumSheet: View {
                     .scrollIndicators(.hidden)
 
                     VStack(alignment: .leading, spacing: 10) {
-                        Text(L("Направи го свое.", "Make it yours."))
+                        Text(L("Целото патување,\nспакувано.", "Your whole trip,\nsorted."))
                             .font(.serif(34))
                             .foregroundStyle(Theme.ink)
-                        Text(L("Ексклузивни теми — од машнички и цвеќиња до Ноар. Секоја ги менува пасовите, целата апликација и Story сликите.",
-                               "Exclusive themes — from bows and blossoms to Noir. Each one restyles your passes, the whole app and your Story images."))
+                        Text(L("Бесплатно имаш листа за пакување за колку сакаш патувања. Premium го додава сè останато.",
+                               "Free gives you a packing list for as many trips as you like. Premium adds everything else."))
                             .font(.sans(15))
                             .foregroundStyle(Theme.inkSoft)
                             .lineSpacing(3)
                     }
 
                     VStack(alignment: .leading, spacing: 14) {
-                        benefit("paintpalette", L("\(Palette.all.filter { $0.isPremium }.count) премиум теми — Машнички, Балерина, Цреши, Ѕвездена ноќ…",
-                                                  "\(Palette.all.filter { $0.isPremium }.count) premium themes — Coquette, Balletcore, Cherry, Celestial…"))
-                        benefit("camera.aperture", L("Story во боите на темата", "Stories in your theme's colours"))
-                        benefit("sparkles", L("Сите идни теми, без доплата", "All future themes included"))
+                        benefit("cloud.sun", L("Прогноза за секој ден и листа според времето", "Day-by-day forecast and a list that fits the weather"))
+                        benefit("airplane", L("Багаж за 140+ авиокомпании и дали сè ќе собере", "Baggage rules for 140+ airlines and whether it all fits"))
+                        benefit("hanger", L("Гардероба и аутфити по денови", "Your wardrobe and outfits for every day"))
+                        benefit("person.2", L("Патувања со пријатели — кој што носи", "Trips with friends — who brings what"))
+                        benefit("camera.aperture", L("Story за Instagram", "Stories for Instagram"))
+                        benefit("house", L("„Пред излез“ — мирен излез од дома", "“Before you leave” checklist"))
+                        benefit("paintpalette", L("\(Palette.all.filter { $0.isPremium }.count) премиум теми", "\(Palette.all.filter { $0.isPremium }.count) premium themes"))
                     }
 
                     if premium.isPremium {
-                        HStack(spacing: 10) {
-                            Image(systemName: "checkmark.seal")
-                                .font(.system(size: 18, weight: .light))
-                            Text(L("Premium е отклучен", "Premium is unlocked"))
-                                .font(.sans(15, .semibold))
-                        }
-                        .foregroundStyle(Theme.navy)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .overlay(Capsule().strokeBorder(Theme.navy.opacity(0.25), lineWidth: 0.75))
-
-                        if premium.allowsTestUnlock {
-                            Button(L("Заклучи повторно (тест)", "Lock again (test)")) {
-                                premium.lockForTesting()
-                            }
-                            .font(.sans(12))
-                            .foregroundStyle(Theme.muted)
-                            .frame(maxWidth: .infinity)
-                        }
+                        activeSection
                     } else if premium.storeAvailable {
-                        Button {
-                            Task { await premium.purchase() }
-                        } label: {
-                            HStack(spacing: 10) {
-                                if premium.isWorking { ProgressView().tint(Theme.goldLight) }
-                                Text(L("Отклучи", "Unlock") + (premium.priceText.map { " · \($0)" } ?? ""))
-                            }
-                        }
-                        .buttonStyle(PrimaryButtonStyle())
-                        .disabled(premium.isWorking)
-
-                        Button(L("Врати купување", "Restore purchase")) {
-                            Task { await premium.restore() }
-                        }
-                        .font(.sans(13, .medium))
-                        .foregroundStyle(Theme.navy)
-                        .frame(maxWidth: .infinity)
-
-                        Text(L("Еднократно плаќање. Без претплата.", "One-time purchase. No subscription."))
-                            .font(.sans(12))
-                            .foregroundStyle(Theme.muted)
-                            .frame(maxWidth: .infinity)
+                        plansSection
                     } else if !premium.allowsTestUnlock {
-                        // App Store, но производот уште не се вчитал
+                        // App Store / TestFlight, но производите уште не се вчитале
                         VStack(spacing: 12) {
                             ProgressView().tint(Theme.navy)
                             Button(L("Обиди се повторно", "Try again")) {
@@ -487,8 +457,8 @@ struct PremiumSheet: View {
                         }
                         .buttonStyle(PrimaryButtonStyle())
 
-                        Text(L("Плаќањето ќе работи кога апликацијата ќе биде на App Store. Додека тестираш, Premium е бесплатен.",
-                               "Payments will work once the app is on the App Store. While testing, Premium is free."))
+                        Text(L("Плаќањето работи во TestFlight и App Store. Додека тестираш со Sideloadly, Premium е бесплатен.",
+                               "Payments work in TestFlight and the App Store. While testing with Sideloadly, Premium is free."))
                             .font(.sans(12))
                             .foregroundStyle(Theme.muted)
                             .multilineTextAlignment(.center)
@@ -499,7 +469,191 @@ struct PremiumSheet: View {
                 .containerRelativeFrame(.horizontal)
             }
         }
+        .sheet(item: $legalDoc) { doc in
+            LegalView(doc: doc)
+        }
+        .manageSubscriptionsSheet(isPresented: $manageSubscriptions)
         .presentationCornerRadius(28)
+    }
+
+    // MARK: Активно
+
+    private var activeSection: some View {
+        VStack(spacing: 14) {
+            HStack(spacing: 10) {
+                Image(systemName: "checkmark.seal")
+                    .font(.system(size: 18, weight: .light))
+                Text(activeTitle)
+                    .font(.sans(15, .semibold))
+            }
+            .foregroundStyle(Theme.navy)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .overlay(Capsule().strokeBorder(Theme.navy.opacity(0.25), lineWidth: 0.75))
+
+            if premium.hasSubscription {
+                if let date = premium.expirationDate {
+                    Text(L("Следно обновување: \(Fmt.longDate(date))", "Renews on \(Fmt.longDate(date))"))
+                        .font(.sans(13))
+                        .foregroundStyle(Theme.inkSoft)
+                }
+                Button(L("Управувај со претплатата", "Manage subscription")) {
+                    manageSubscriptions = true
+                }
+                .font(.sans(14, .semibold))
+                .foregroundStyle(Theme.navy)
+            }
+
+            if premium.allowsTestUnlock {
+                Button(L("Заклучи повторно (тест)", "Lock again (test)")) {
+                    premium.lockForTesting()
+                }
+                .font(.sans(12))
+                .foregroundStyle(Theme.muted)
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var activeTitle: String {
+        switch premium.activeProductID {
+        case PremiumStore.yearlyID: return L("Premium · годишна претплата", "Premium · yearly")
+        case PremiumStore.monthlyID: return L("Premium · месечна претплата", "Premium · monthly")
+        default: return L("Premium е отклучен", "Premium is unlocked")
+        }
+    }
+
+    // MARK: Планови
+
+    private var plansSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(premium.products, id: \.id) { product in
+                planCard(product)
+            }
+
+            if let product = selected {
+                Button {
+                    Task { await premium.purchase(product) }
+                } label: {
+                    HStack(spacing: 10) {
+                        if premium.isWorking { ProgressView().tint(Theme.goldLight) }
+                        Text(ctaTitle(product))
+                    }
+                }
+                .buttonStyle(PrimaryButtonStyle())
+                .disabled(premium.isWorking)
+                .padding(.top, 6)
+
+                // Задолжително (Apple 3.1.2 и закони за автоматско обновување): јасно до копчето
+                Text(disclosure(product))
+                    .font(.sans(12))
+                    .foregroundStyle(Theme.inkSoft)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if let error = premium.errorMessage {
+                Text(error)
+                    .font(.sans(12, .medium))
+                    .foregroundStyle(Theme.terracotta)
+            }
+
+            HStack(spacing: 16) {
+                Button(L("Услови", "Terms")) { legalDoc = .terms }
+                Button(L("Приватност", "Privacy")) { legalDoc = .privacy }
+                Button(L("Врати купување", "Restore")) {
+                    Task { await premium.restore() }
+                }
+            }
+            .font(.sans(12, .semibold))
+            .foregroundStyle(Theme.navy)
+            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity)
+            .padding(.top, 4)
+        }
+    }
+
+    private func planCard(_ product: Product) -> some View {
+        let isSelected = selected?.id == product.id
+        let isYearly = product.id == PremiumStore.yearlyID
+        return Button {
+            withAnimation(.easeInOut(duration: 0.15)) { selectedID = product.id }
+        } label: {
+            HStack(alignment: .center, spacing: 14) {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 20, weight: .light))
+                    .foregroundStyle(isSelected ? Theme.navy : Theme.muted)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 8) {
+                        Text(planTitle(product))
+                            .font(.sans(16, .semibold))
+                            .foregroundStyle(Theme.ink)
+                        if isYearly {
+                            Text(L("НАЈИСПЛАТЛИВО", "BEST VALUE"))
+                                .font(.sans(9, .bold))
+                                .tracking(1)
+                                .foregroundStyle(Theme.goldLight)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(Capsule().fill(Theme.navy))
+                        }
+                    }
+                    Text(planDetail(product))
+                        .font(.sans(12))
+                        .foregroundStyle(Theme.inkSoft)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 8)
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(product.displayPrice)
+                        .font(.sans(16, .semibold))
+                        .foregroundStyle(Theme.ink)
+                    Text(product.periodWord.map { "/ \($0)" } ?? L("еднаш", "once"))
+                        .font(.sans(11))
+                        .foregroundStyle(Theme.muted)
+                }
+            }
+            .padding(16)
+            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Theme.surface))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(isSelected ? Theme.navy : Theme.hairline, lineWidth: isSelected ? 1.5 : 0.75)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func planTitle(_ product: Product) -> String {
+        product.id == PremiumStore.yearlyID ? L("Годишно", "Yearly") : L("Месечно", "Monthly")
+    }
+
+    private func planDetail(_ product: Product) -> String {
+        var parts: [String] = []
+        if let monthly = product.monthlyEquivalent { parts.append(L("\(monthly) месечно", "\(monthly) a month")) }
+        if let trial = trialText(product) { parts.append(L("\(trial) бесплатно", "\(trial) free")) }
+        if parts.isEmpty { parts.append(L("Откажи кога сакаш", "Cancel anytime")) }
+        return parts.joined(separator: " · ")
+    }
+
+    /// Пробата се нуди само ако корисникот уште не ја искористил.
+    private func trialText(_ product: Product) -> String? {
+        guard product.id == PremiumStore.yearlyID, premium.trialEligible else { return nil }
+        return product.freeTrialText
+    }
+
+    private func ctaTitle(_ product: Product) -> String {
+        if let trial = trialText(product) { return L("Пробај \(trial) бесплатно", "Try \(trial) free") }
+        return L("Претплати се · \(product.displayPrice)", "Subscribe · \(product.displayPrice)")
+    }
+
+    private func disclosure(_ product: Product) -> String {
+        let period = product.periodWord ?? L("период", "period")
+        let renew = L("Претплатата се обновува автоматски и се наплаќа \(product.displayPrice) на \(period) преку твојот Apple ID, сè додека не ја откажеш најмалку 24 часа пред крајот на периодот. Откажуваш кога сакаш во Поставки на iPhone → твоето име → Претплати.",
+                      "The subscription renews automatically and \(product.displayPrice) per \(period) is charged to your Apple ID until you cancel at least 24 hours before the end of the period. Cancel anytime in iPhone Settings → your name → Subscriptions.")
+        if let trial = trialText(product) {
+            return L("\(trial) бесплатно, потоа \(product.displayPrice) на \(period). ", "\(trial) free, then \(product.displayPrice) per \(period). ") + renew
+        }
+        return renew
     }
 
     private func benefit(_ icon: String, _ text: String) -> some View {

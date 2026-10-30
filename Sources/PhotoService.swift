@@ -17,7 +17,7 @@ struct PhotoCredit: Codable, Hashable {
 /// Секоја слика се проверува на самиот телефон (Vision) — ако има лице или човек, не се прикажува.
 enum PhotoService {
 
-    private static let userAgent = "Valise/2.1 (iOS travel packing app)"
+    private static let userAgent = "Tripdrobe/2.6 (iOS travel packing app)"
     private static let maxCandidates = 48
     /// Колку проверени фотографии бараме за Story (секогаш истиот број ако ги има).
     static let storyTarget = 8

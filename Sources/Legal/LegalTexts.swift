@@ -28,7 +28,7 @@ enum LegalTexts {
 
     Важи од: 28 октомври 2026
 
-    Valise („апликацијата“) ја развива и одржува [Име и презиме], [Адреса, град], Северна Македонија („ние“). Ние сме одговорни за обработката на твоите лични податоци. За сè што е поврзано со приватноста пиши на [е-пошта за поддршка].
+    Tripdrobe („апликацијата“) ја развива и одржува [Име и презиме], [Адреса, град], Северна Македонија („ние“). Ние сме одговорни за обработката на твоите лични податоци. За сè што е поврзано со приватноста пиши на [е-пошта за поддршка].
 
     Накратко: собираме само она што е потребно за апликацијата да работи. Немаме реклами, не го следиме твоето однесување и не продаваме податоци.
 
@@ -83,7 +83,7 @@ enum LegalTexts {
 
     ## Деца
 
-    Valise не е наменета за деца под 13 години. При регистрација прашуваме за датумот на раѓање, не создаваме акаунт за помлади од 13 години и не го чуваме датумот. Ако дознаеме дека имаме податоци од дете под 13 години, ги бришеме. Во државите каде што до 16 години е потребна согласност од родител, помладите корисници ја користат апликацијата со дозвола од родител.
+    Tripdrobe не е наменета за деца под 13 години. При регистрација прашуваме за датумот на раѓање, не создаваме акаунт за помлади од 13 години и не го чуваме датумот. Ако дознаеме дека имаме податоци од дете под 13 години, ги бришеме. Во државите каде што до 16 години е потребна согласност од родител, помладите корисници ја користат апликацијата со дозвола од родител.
 
     ## Промени
 
@@ -99,7 +99,7 @@ enum LegalTexts {
 
     Effective: October 28, 2026
 
-    Valise (“the app”) is developed and run by [Full name], [Address, city], North Macedonia (“we”). We are responsible for processing your personal data. For anything about privacy, write to [support email].
+    Tripdrobe (“the app”) is developed and run by [Full name], [Address, city], North Macedonia (“we”). We are responsible for processing your personal data. For anything about privacy, write to [support email].
 
     In short: we collect only what the app needs to work. No ads, no behavioural tracking, and we never sell data.
 
@@ -154,7 +154,7 @@ enum LegalTexts {
 
     ## Children
 
-    Valise is not intended for children under 13. At sign-up we ask for a date of birth, we don't create an account for anyone under 13, and we don't keep the date. If we learn that we hold data from a child under 13, we delete it. Where local law requires parental consent up to age 16, younger users use the app with a parent's permission.
+    Tripdrobe is not intended for children under 13. At sign-up we ask for a date of birth, we don't create an account for anyone under 13, and we don't keep the date. If we learn that we hold data from a child under 13, we delete it. Where local law requires parental consent up to age 16, younger users use the app with a parent's permission.
 
     ## Changes
 
@@ -170,19 +170,25 @@ enum LegalTexts {
 
     Важи од: 28 октомври 2026
 
-    Овие услови важат за апликацијата Valise што ја нуди [Име и презиме], [Адреса, град], Северна Македонија („ние“). Кога создаваш акаунт или ја користиш апликацијата, се согласуваш со нив и со Политиката за приватност.
+    Овие услови важат за апликацијата Tripdrobe што ја нуди [Име и презиме], [Адреса, град], Северна Македонија („ние“). Кога создаваш акаунт или ја користиш апликацијата, се согласуваш со нив и со Политиката за приватност.
 
     ## 1. Кој може да ја користи
 
     Мора да имаш најмалку 13 години. Ако си помлад од полнолетството во твојата држава, ти треба дозвола од родител. Акаунтот е личен и ти си одговорен за пристапот до него.
 
-    ## 2. Што нуди Valise
+    ## 2. Што нуди Tripdrobe
 
     Листи за пакување, прогноза, правила за багаж, гардероба, аутфити и заеднички патувања. Прогнозата, правилата за багаж на авиокомпаниите и предлозите за пакување се само информативни и може да се сменат или да не се точни. Пред патување секогаш провери ги правилата кај авиокомпанијата. Не одговараме за доплати за багаж, заборавени работи или одлуки донесени врз основа на прогнозата.
 
     ## 3. Premium
 
-    Premium е еднократно купување преку App Store. Ги отклучува дополнителните можности на сите твои уреди со истиот Apple ID. Плаќањето, сметките и враќањето пари ги води Apple според своите услови, па барањето за враќање пари се праќа до Apple. Купувањето можеш да го вратиш на нов уред со „Врати купување“. Ако во иднина воведеме претплата, цената, периодот и автоматското обновување ќе бидат јасно прикажани пред плаќањето.
+    Бесплатно можеш да направиш колку сакаш патувања со листа за пакување. Premium (прогноза, авиокомпании и багаж, гардероба и аутфити, пријатели, Story, „Пред излез“ и теми) се купува преку App Store како месечна или годишна претплата. Цената, периодот и условите на пробата се прикажани пред плаќањето.
+
+    - **Претплатата се обновува автоматски** и се наплаќа преку твојот Apple ID на крајот на секој период, сè додека не ја откажеш најмалку 24 часа пред крајот на тековниот период.
+    - **Бесплатна проба:** ако ја има, на крајот на пробата се наплаќа првиот период, освен ако не ја откажеш барем 24 часа пред тоа. Пробата се нуди еднаш по Apple ID.
+    - **Откажување и управување:** Поставки на iPhone → твоето име → Претплати. По откажувањето Premium останува до крајот на платениот период.
+
+    Плаќањето, сметките и враќањето пари ги води Apple според своите услови, па барањето за враќање пари се праќа до Apple. Купувањето можеш да го вратиш на нов уред со „Врати купување“. Ако ја смениме цената на претплатата, Apple однапред ќе те извести и ќе побара согласност кога тоа е потребно.
 
     ## 4. Твојата содржина
 
@@ -192,7 +198,7 @@ enum LegalTexts {
 
     ## 5. Авторски права
 
-    Ако мислиш дека содржина во Valise ги крши твоите авторски права, пиши на [е-пошта за поддршка]. Опиши го делото, каде се наоѓа и остави контакт. Ако пријавата е основана, ја отстрануваме содржината, а акаунтите што постојано кршат туѓи права ги исклучуваме. Фотографиите од дестинациите се од Wikimedia Commons и се прикажуваат со авторот и лиценцата.
+    Ако мислиш дека содржина во Tripdrobe ги крши твоите авторски права, пиши на [е-пошта за поддршка]. Опиши го делото, каде се наоѓа и остави контакт. Ако пријавата е основана, ја отстрануваме содржината, а акаунтите што постојано кршат туѓи права ги исклучуваме. Фотографиите од дестинациите се од Wikimedia Commons и се прикажуваат со авторот и лиценцата.
 
     ## 6. Престанок
 
@@ -220,19 +226,25 @@ enum LegalTexts {
 
     Effective: October 28, 2026
 
-    These terms apply to the Valise app offered by [Full name], [Address, city], North Macedonia (“we”). By creating an account or using the app you agree to them and to the Privacy Policy.
+    These terms apply to the Tripdrobe app offered by [Full name], [Address, city], North Macedonia (“we”). By creating an account or using the app you agree to them and to the Privacy Policy.
 
     ## 1. Who can use it
 
     You must be at least 13 years old. If you are under the age of majority where you live, you need a parent's permission. Your account is personal and you are responsible for access to it.
 
-    ## 2. What Valise offers
+    ## 2. What Tripdrobe offers
 
     Packing lists, forecasts, baggage rules, a wardrobe, outfits and shared trips. Forecasts, airline baggage rules and packing suggestions are for information only and may change or be inaccurate. Always check your airline's rules before you travel. We are not responsible for baggage fees, forgotten items or decisions made based on the forecast.
 
     ## 3. Premium
 
-    Premium is a one-time purchase through the App Store. It unlocks extra features on all your devices that use the same Apple ID. Payments, billing and refunds are handled by Apple under its own terms, so refund requests go to Apple. You can restore your purchase on a new device with “Restore purchase”. If we ever introduce a subscription, the price, the billing period and automatic renewal will be shown clearly before you pay.
+    You can create as many trips with a packing list as you like for free. Premium (forecast, airlines and baggage, wardrobe and outfits, friends, Story, “Before you leave” and themes) is bought through the App Store as a monthly or yearly subscription. The price, the billing period and any trial terms are shown before you pay.
+
+    - **Subscriptions renew automatically** and are charged to your Apple ID at the end of each period until you cancel at least 24 hours before the end of the current period.
+    - **Free trial:** if offered, the first period is charged when the trial ends unless you cancel at least 24 hours before. A trial is offered once per Apple ID.
+    - **Cancel and manage:** iPhone Settings → your name → Subscriptions. After cancelling, Premium stays active until the end of the paid period.
+
+    Payments, billing and refunds are handled by Apple under its own terms, so refund requests go to Apple. You can restore your purchase on a new device with “Restore purchase”. If we change a subscription price, Apple notifies you in advance and asks for consent where required.
 
     ## 4. Your content
 
@@ -242,7 +254,7 @@ enum LegalTexts {
 
     ## 5. Copyright
 
-    If you believe content in Valise infringes your copyright, write to [support email]. Describe the work, where it appears and how to reach you. If the notice is valid we remove the content, and we close accounts that repeatedly infringe. Destination photos come from Wikimedia Commons and are shown with their author and licence.
+    If you believe content in Tripdrobe infringes your copyright, write to [support email]. Describe the work, where it appears and how to reach you. If the notice is valid we remove the content, and we close accounts that repeatedly infringe. Destination photos come from Wikimedia Commons and are shown with their author and licence.
 
     ## 6. Ending
 

@@ -68,7 +68,7 @@ struct WardrobeView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("VALISE")
+                Text("TRIPDROBE")
                     .font(.sans(12, .semibold))
                     .tracking(4)
                     .foregroundStyle(Theme.navy)
@@ -269,6 +269,7 @@ struct WardrobeView: View {
 
 /// Главни табови: Патувања и Гардероба.
 struct MainTabView: View {
+    @EnvironmentObject private var premium: PremiumStore
     @State private var tab = 0
 
     var body: some View {
@@ -277,7 +278,16 @@ struct MainTabView: View {
                 .modifier(TabBarLook())
                 .tabItem { Label(L("Патувања", "Trips"), systemImage: "airplane") }
                 .tag(0)
-            WardrobeView()
+            Group {
+                if premium.isPremium {
+                    WardrobeView()
+                } else {
+                    PremiumGateView(icon: "hanger",
+                                    title: L("Твојата гардероба,\nспремна за пат.", "Your wardrobe,\nready to travel."),
+                                    detail: L("Фотографирај ја облеката, составувај аутфити и испланирај што ќе облечеш секој ден од патувањето. Листата сама брои колку парчиња ти требаат.",
+                                              "Photograph your clothes, build outfits and plan what you'll wear each day of the trip. The list counts how many pieces you need."))
+                }
+            }
                 .modifier(TabBarLook())
                 .tabItem { Label(L("Гардероба", "Wardrobe"), systemImage: "hanger") }
                 .tag(1)

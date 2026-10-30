@@ -43,7 +43,6 @@ enum WeatherService {
     }
 
     /// Apple Maps (MapKit) — без клуч и без трошок.
-    /// id е негативен за да не се меша со GeoNames бројките од Open-Meteo.
     private static func searchApple(_ query: String) async -> [Place] {
         let request = MKLocalSearch.Request()
         request.naturalLanguageQuery = query
@@ -53,27 +52,45 @@ enum WeatherService {
         var seen = Set<String>()
         var places: [Place] = []
         for item in response.mapItems {
-            let mark = item.placemark
-            let coordinate = mark.coordinate
-            let name = item.name ?? mark.locality ?? query
-            let countryCode = mark.isoCountryCode ?? ""
-            let key = name.lowercased() + "|" + countryCode
+            let place = Self.place(from: item, name: nil)
+            let key = place.name.lowercased() + "|" + place.countryCode
             if seen.contains(key) { continue }
             seen.insert(key)
-
-            let raw = Int(coordinate.latitude * 1000) &* 100_003 &+ Int(coordinate.longitude * 1000)
-            let id = -((raw % 999_999_937 + 999_999_937) % 999_999_937) - 1
-            places.append(Place(id: id,
-                                name: name,
-                                region: mark.administrativeArea,
-                                country: mark.country ?? "",
-                                countryCode: countryCode,
-                                latitude: coordinate.latitude,
-                                longitude: coordinate.longitude,
-                                timezone: item.timeZone?.identifier))
+            places.append(place)
             if places.count >= 8 { break }
         }
         return places
+    }
+
+    /// Предлог од автоматското дополнување (MKLocalSearchCompleter) → место со координати.
+    static func resolve(_ completion: MKLocalSearchCompletion) async -> Place? {
+        let request = MKLocalSearch.Request(completion: completion)
+        request.resultTypes = .address
+        guard let response = try? await MKLocalSearch(request: request).start(),
+              let item = response.mapItems.first else { return nil }
+        return place(from: item, name: completion.title)
+    }
+
+    /// MKMapItem → Place. id е негативен за да не се меша со GeoNames бројките од Open-Meteo.
+    static func place(from item: MKMapItem, name: String?) -> Place {
+        let mark = item.placemark
+        let coordinate = mark.coordinate
+        let raw = Int(coordinate.latitude * 1000) &* 100_003 &+ Int(coordinate.longitude * 1000)
+        let id = -((raw % 999_999_937 + 999_999_937) % 999_999_937) - 1
+        return Place(id: id,
+                     name: name ?? item.name ?? mark.locality ?? "",
+                     region: mark.administrativeArea,
+                     country: mark.country ?? "",
+                     countryCode: mark.isoCountryCode ?? "",
+                     latitude: coordinate.latitude,
+                     longitude: coordinate.longitude,
+                     timezone: item.timeZone?.identifier)
+    }
+
+    /// Open-Meteo пребарување (само тест-верзии).
+    static func searchOpenMeteoIfAllowed(_ query: String) async -> [Place] {
+        guard !AppConfig.weatherKitEnabled else { return [] }
+        return (try? await searchOpenMeteo(query)) ?? []
     }
 
     private static func searchOpenMeteo(_ query: String) async throws -> [Place] {

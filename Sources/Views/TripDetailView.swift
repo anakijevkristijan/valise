@@ -6,6 +6,7 @@ struct TripDetailView: View {
     @EnvironmentObject private var store: TripStore
     @EnvironmentObject private var account: AccountService
     @EnvironmentObject private var wardrobe: WardrobeStore
+    @EnvironmentObject private var premium: PremiumStore
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("userName") private var userName: String = ""
@@ -27,6 +28,7 @@ struct TripDetailView: View {
     @State private var showAccount = false
     @State private var isInviting = false
     @State private var inviteResult: InviteResult?
+    @State private var showPaywall = false
 
     struct InviteResult: Identifiable {
         let id = UUID()
@@ -65,17 +67,28 @@ struct TripDetailView: View {
                     topBar(trip)
                     titleBlock(trip)
                     BoardingPassCard(trip: trip)
-                    companionsSection(trip)
-                    weatherSection(trip)
-                    TripOutfitsSection(trip: trip)
-                    BagFitCard(trip: trip)
+                    if premium.isPremium {
+                        companionsSection(trip)
+                        weatherSection(trip)
+                        TripOutfitsSection(trip: trip)
+                        BagFitCard(trip: trip)
+                    } else {
+                        // Бесплатно: само листата за пакување. Поканет во туѓо патување — ги гледа сопатниците.
+                        if !trip.travelers.isEmpty { companionsSection(trip) }
+                        PremiumTeaserCard()
+                    }
                     tabPicker(trip)
 
                     Group {
                         if tab == .packing {
                             packingSection(trip)
-                        } else {
+                        } else if premium.isPremium {
                             exitSection(trip)
+                        } else {
+                            PremiumLockRow(icon: "house",
+                                           title: L("Последен круг низ домот", "One last walk through home"),
+                                           detail: L("Шпорет, прозорци, полнач, клучеви — листа за мирен излез од дома.",
+                                                     "Stove, windows, charger, keys — a checklist for leaving home calmly."))
                         }
                     }
                     .transition(.opacity)
@@ -113,10 +126,17 @@ struct TripDetailView: View {
         .fullScreenCover(isPresented: $showEdit) {
             TripWizardView(editing: trip) { _ in }
                 .environmentObject(store)
+                .environmentObject(premium)
         }
         .sheet(isPresented: $showStory) {
             StorySheet(trip: trip)
                 .presentationCornerRadius(28)
+        }
+        .sheet(isPresented: $showPaywall) {
+            PremiumSheet().environmentObject(premium)
+        }
+        .onChange(of: premium.isPremium) { _, unlocked in
+            if unlocked { Task { await refreshWeather(force: true) } }
         }
         .sheet(isPresented: $showAccount) {
             AccountView(startWith: .signUp)
@@ -188,10 +208,10 @@ struct TripDetailView: View {
             CircleIconButton(systemName: "chevron.left") { dismiss() }
             Spacer()
             Button {
-                showStory = true
+                if premium.isPremium { showStory = true } else { showPaywall = true }
             } label: {
                 HStack(spacing: 6) {
-                    Image(systemName: "camera.aperture")
+                    Image(systemName: premium.isPremium ? "camera.aperture" : "lock.fill")
                         .font(.system(size: 13, weight: .regular))
                     Text("STORY")
                         .font(.sans(11, .semibold))
@@ -210,8 +230,10 @@ struct TripDetailView: View {
                 Button(L("Уреди патување", "Edit trip"), systemImage: "pencil") {
                     showEdit = true
                 }
-                Button(L("Освежи прогноза", "Refresh forecast"), systemImage: "arrow.clockwise") {
-                    Task { await refreshWeather(force: true) }
+                if premium.isPremium {
+                    Button(L("Освежи прогноза", "Refresh forecast"), systemImage: "arrow.clockwise") {
+                        Task { await refreshWeather(force: true) }
+                    }
                 }
                 Button(L("Состави ја листата одново", "Rebuild the list"), systemImage: "wand.and.stars") {
                     confirmRegenerate = true
@@ -263,6 +285,11 @@ struct TripDetailView: View {
                 HStack(spacing: 8) {
                     ForEach(trip.travelers) { companion in
                         Menu {
+                            if !companion.hasAccount && companion.inviteKey != nil {
+                                ShareLink(item: TripStore.inviteMessage(friend: companion.name, trip: trip, me: userName)) {
+                                    Label(L("Испрати покана за Tripdrobe", "Send a Tripdrobe invite"), systemImage: "envelope")
+                                }
+                            }
                             ShareLink(item: trip.shareText(for: companion, from: userName)) {
                                 Label(L("Испрати му/ѝ листа", "Send them the list"), systemImage: "paperplane")
                             }
@@ -320,11 +347,17 @@ struct TripDetailView: View {
                     }
 
                     Menu {
-                        Button(L("Од контакти", "From contacts"), systemImage: "person.crop.circle.badge.plus") {
-                            pickContact()
-                        }
-                        Button(L("Само име", "Just a name"), systemImage: "character.cursor.ibeam") {
-                            showAddCompanion = true
+                        if premium.isPremium {
+                            Button(L("Од контакти", "From contacts"), systemImage: "person.crop.circle.badge.plus") {
+                                pickContact()
+                            }
+                            Button(L("Само име", "Just a name"), systemImage: "character.cursor.ibeam") {
+                                showAddCompanion = true
+                            }
+                        } else {
+                            Button(L("Пријатели — Premium", "Friends — Premium"), systemImage: "lock.fill") {
+                                showPaywall = true
+                            }
                         }
                     } label: {
                         HStack(spacing: 6) {
@@ -378,7 +411,7 @@ struct TripDetailView: View {
         switch outcome {
         case .joined:
             inviteResult = InviteResult(
-                title: L("\(first) е на Valise ✓", "\(first) is on Valise ✓"),
+                title: L("\(first) е на Tripdrobe ✓", "\(first) is on Tripdrobe ✓"),
                 detail: L("Додаден/а е во патувањето. Кај неа/него веќе се гледа истата листа — штиклирањето се синхронизира.",
                           "They've been added to the trip and already see the same list — ticks sync both ways."),
                 shareMessage: nil)
@@ -388,7 +421,7 @@ struct TripDetailView: View {
                 detail: "", shareMessage: nil)
         case .invited(_, let message):
             inviteResult = InviteResult(
-                title: L("\(first) уште нема Valise", "\(first) isn't on Valise yet"),
+                title: L("\(first) уште нема Tripdrobe", "\(first) isn't on Tripdrobe yet"),
                 detail: L("Испрати покана. Кога ќе се регистрира со истиот број или е-пошта, патувањето автоматски ќе го/ја чека.",
                           "Send an invite. Once they sign up with the same number or email, the trip will be waiting for them."),
                 shareMessage: message)

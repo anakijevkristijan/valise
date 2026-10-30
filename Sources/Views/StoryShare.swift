@@ -42,7 +42,7 @@ struct StoryCardView: View {
             }
 
             VStack(spacing: 0) {
-                Text("VALISE")
+                Text("TRIPDROBE")
                     .font(.sans(11, .semibold))
                     .tracking(5)
                     .foregroundStyle(foreground)
