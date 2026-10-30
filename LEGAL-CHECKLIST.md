@@ -15,20 +15,15 @@
 - Лицата не се зачувуваат на сликите од гардеробата.
 - Premium е годишна или месечна претплата преку Apple. До копчето стојат цената, периодот, автоматското обновување, пробата и како се откажува, со линкови до Условите и Политиката и „Врати купување“.
 
-## 1. Твоите податоци во текстовите
-Политиката и Условите бараат име, адреса и е-пошта за контакт. Прати ми:
-- име и презиме;
-- адреса (може и поштенски фах);
-- е-пошта за поддршка (подобро посебна, на пр. valise.app@…).
-
-Јас ќе ги внесам и во апликацијата и на веб-страницата.
+## 1. Твоите податоци во текстовите ✅
+Кристијан Анакијев, ул. Христо Татарчев 47ј 1/22, 1000 Скопје, tripdrobe@gmail.com — внесено во апликацијата и на веб-страницата (30.10.2026). Промена: `legal/config.json` → `build.py`.
 
 ## 2. Јавна веб-страница (бесплатно, GitHub Pages)
 Apple бара јавен линк до Политиката за приватност и до страницата за поддршка.
 1. github.com → **New repository** → име `tripdrobe-legal` → **Public** → Create.
 2. **Add file → Upload files** → четирите датотеки од `Tripdrobe-legal-site.zip` → Commit.
 3. **Settings → Pages** → Branch `main`, папка `/ (root)` → Save.
-4. За 1–2 минути страницата е на `https://ТВОЕ-КОРИСНИЧКО-ИМЕ.github.io/tripdrobe-legal/`.
+4. За 1–2 минути страницата е на `https://anakijevkristijan.github.io/tripdrobe-legal/`.
 
 ## 3. Firebase
 1. **Firestore → Rules** → залепи го новиот `firestore.rules` → **Publish**.
@@ -36,8 +31,8 @@ Apple бара јавен линк до Политиката за приватн
 
 ## 4. App Store Connect (кога ќе имаш платена сметка)
 - **App Information:**
-  - Privacy Policy URL: `…/tripdrobe-legal/privacy.html`
-  - Support URL: `…/tripdrobe-legal/support.html`
+  - Privacy Policy URL: `https://anakijevkristijan.github.io/tripdrobe-legal/privacy.html`
+  - Support URL: `https://anakijevkristijan.github.io/tripdrobe-legal/support.html`
 - **License Agreement:** остави го стандардниот EULA на Apple. Нашите Услови се дополнителни и ги имаат задолжителните делови за Apple.
 - **App Privacy.** Tracking = **No**. Ниту еден податок не се користи за следење, а сите се „Linked to the user“, со цел „App Functionality“. Пријави ги:
   - Contact Info: Name, Email Address, Phone Number;

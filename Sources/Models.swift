@@ -157,7 +157,7 @@ enum Activity: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .photo: return "camera"
         case .walking: return "figure.walk"
-        case .dining: return "wineglass"
+        case .dining: return "fork.knife"
         case .work: return "laptopcomputer"
         case .fitness: return "dumbbell"
         case .beach: return "beach.umbrella"

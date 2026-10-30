@@ -10,7 +10,7 @@ enum LegalDoc: String, Identifiable {
 enum LegalTexts {
     /// Е-пошта за поддршка (празно додека не се внесе вистинска).
     static let supportEmail: String = {
-        let value = "[support email]"
+        let value = "tripdrobe@gmail.com"
         return value.hasPrefix("[") ? "" : value
     }()
 
@@ -26,9 +26,9 @@ enum LegalTexts {
     static let privacyMK = #"""
     # Политика за приватност
 
-    Важи од: 28 октомври 2026
+    Важи од: 30 октомври 2026
 
-    Tripdrobe („апликацијата“) ја развива и одржува [Име и презиме], [Адреса, град], Северна Македонија („ние“). Ние сме одговорни за обработката на твоите лични податоци. За сè што е поврзано со приватноста пиши на [е-пошта за поддршка].
+    Tripdrobe („апликацијата“) ја развива и одржува Кристијан Анакијев, ул. Христо Татарчев 47ј 1/22, 1000 Скопје, Северна Македонија („ние“). Ние сме одговорни за обработката на твоите лични податоци. За сè што е поврзано со приватноста пиши на tripdrobe@gmail.com.
 
     Накратко: собираме само она што е потребно за апликацијата да работи. Немаме реклами, не го следиме твоето однесување и не продаваме податоци.
 
@@ -77,7 +77,7 @@ enum LegalTexts {
 
     ## Твоите права
 
-    Имаш право да побараш пристап до податоците, исправка, бришење, ограничување на обработката и пренос, како и да се спротивставиш на обработката. Повеќето можеш сам во апликацијата, а за сè друго пиши на [е-пошта за поддршка]. Ќе ти одговориме најдоцна за 30 дена. Имаш право на приговор до Агенцијата за заштита на личните податоци (azlp.mk) или до надлежниот орган во државата каде што живееш.
+    Имаш право да побараш пристап до податоците, исправка, бришење, ограничување на обработката и пренос, како и да се спротивставиш на обработката. Повеќето можеш сам во апликацијата, а за сè друго пиши на tripdrobe@gmail.com. Ќе ти одговориме најдоцна за 30 дена. Имаш право на приговор до Агенцијата за заштита на личните податоци (azlp.mk) или до надлежниот орган во државата каде што живееш.
 
     **Жители на Калифорнија:** не продаваме и не „споделуваме“ лични податоци според CCPA/CPRA и имаш право да дознаеш кои податоци ги имаме и да побараш бришење. Апликацијата не следи корисници низ други апликации и сајтови, па сигналите „Do Not Track“ немаат што да сменат.
 
@@ -91,15 +91,15 @@ enum LegalTexts {
 
     ## Контакт
 
-    [Име и презиме], [Адреса, град], Северна Македонија · [е-пошта за поддршка]
+    Кристијан Анакијев, ул. Христо Татарчев 47ј 1/22, 1000 Скопје, Северна Македонија · tripdrobe@gmail.com
     """#
 
     static let privacyEN = #"""
     # Privacy Policy
 
-    Effective: October 28, 2026
+    Effective: October 30, 2026
 
-    Tripdrobe (“the app”) is developed and run by [Full name], [Address, city], North Macedonia (“we”). We are responsible for processing your personal data. For anything about privacy, write to [support email].
+    Tripdrobe (“the app”) is developed and run by Kristijan Anakijev, Hristo Tatarchev 47j 1/22, 1000 Skopje, North Macedonia (“we”). We are responsible for processing your personal data. For anything about privacy, write to tripdrobe@gmail.com.
 
     In short: we collect only what the app needs to work. No ads, no behavioural tracking, and we never sell data.
 
@@ -148,7 +148,7 @@ enum LegalTexts {
 
     ## Your rights
 
-    You can request access, correction, deletion, restriction or portability of your data, and you can object to processing. Most of this you can do yourself in the app; for anything else write to [support email]. We reply within 30 days. You may complain to the Personal Data Protection Agency of North Macedonia (azlp.mk) or to the data protection authority where you live.
+    You can request access, correction, deletion, restriction or portability of your data, and you can object to processing. Most of this you can do yourself in the app; for anything else write to tripdrobe@gmail.com. We reply within 30 days. You may complain to the Personal Data Protection Agency of North Macedonia (azlp.mk) or to the data protection authority where you live.
 
     **California residents:** we do not sell or “share” personal information under the CCPA/CPRA, and you have the right to know what we hold and to ask for deletion. The app does not track you across other apps or websites, so “Do Not Track” signals have nothing to change.
 
@@ -162,15 +162,15 @@ enum LegalTexts {
 
     ## Contact
 
-    [Full name], [Address, city], North Macedonia · [support email]
+    Kristijan Anakijev, Hristo Tatarchev 47j 1/22, 1000 Skopje, North Macedonia · tripdrobe@gmail.com
     """#
 
     static let termsMK = #"""
     # Услови за користење
 
-    Важи од: 28 октомври 2026
+    Важи од: 30 октомври 2026
 
-    Овие услови важат за апликацијата Tripdrobe што ја нуди [Име и презиме], [Адреса, град], Северна Македонија („ние“). Кога создаваш акаунт или ја користиш апликацијата, се согласуваш со нив и со Политиката за приватност.
+    Овие услови важат за апликацијата Tripdrobe што ја нуди Кристијан Анакијев, ул. Христо Татарчев 47ј 1/22, 1000 Скопје, Северна Македонија („ние“). Кога создаваш акаунт или ја користиш апликацијата, се согласуваш со нив и со Политиката за приватност.
 
     ## 1. Кој може да ја користи
 
@@ -198,7 +198,7 @@ enum LegalTexts {
 
     ## 5. Авторски права
 
-    Ако мислиш дека содржина во Tripdrobe ги крши твоите авторски права, пиши на [е-пошта за поддршка]. Опиши го делото, каде се наоѓа и остави контакт. Ако пријавата е основана, ја отстрануваме содржината, а акаунтите што постојано кршат туѓи права ги исклучуваме. Фотографиите од дестинациите се од Wikimedia Commons и се прикажуваат со авторот и лиценцата.
+    Ако мислиш дека содржина во Tripdrobe ги крши твоите авторски права, пиши на tripdrobe@gmail.com. Опиши го делото, каде се наоѓа и остави контакт. Ако пријавата е основана, ја отстрануваме содржината, а акаунтите што постојано кршат туѓи права ги исклучуваме. Фотографиите од дестинациите се од Wikimedia Commons и се прикажуваат со авторот и лиценцата.
 
     ## 6. Престанок
 
@@ -218,15 +218,15 @@ enum LegalTexts {
 
     ## 10. Контакт
 
-    [Име и презиме], [Адреса, град], Северна Македонија · [е-пошта за поддршка]
+    Кристијан Анакијев, ул. Христо Татарчев 47ј 1/22, 1000 Скопје, Северна Македонија · tripdrobe@gmail.com
     """#
 
     static let termsEN = #"""
     # Terms of Use
 
-    Effective: October 28, 2026
+    Effective: October 30, 2026
 
-    These terms apply to the Tripdrobe app offered by [Full name], [Address, city], North Macedonia (“we”). By creating an account or using the app you agree to them and to the Privacy Policy.
+    These terms apply to the Tripdrobe app offered by Kristijan Anakijev, Hristo Tatarchev 47j 1/22, 1000 Skopje, North Macedonia (“we”). By creating an account or using the app you agree to them and to the Privacy Policy.
 
     ## 1. Who can use it
 
@@ -254,7 +254,7 @@ enum LegalTexts {
 
     ## 5. Copyright
 
-    If you believe content in Tripdrobe infringes your copyright, write to [support email]. Describe the work, where it appears and how to reach you. If the notice is valid we remove the content, and we close accounts that repeatedly infringe. Destination photos come from Wikimedia Commons and are shown with their author and licence.
+    If you believe content in Tripdrobe infringes your copyright, write to tripdrobe@gmail.com. Describe the work, where it appears and how to reach you. If the notice is valid we remove the content, and we close accounts that repeatedly infringe. Destination photos come from Wikimedia Commons and are shown with their author and licence.
 
     ## 6. Ending
 
@@ -274,6 +274,6 @@ enum LegalTexts {
 
     ## 10. Contact
 
-    [Full name], [Address, city], North Macedonia · [support email]
+    Kristijan Anakijev, Hristo Tatarchev 47j 1/22, 1000 Skopje, North Macedonia · tripdrobe@gmail.com
     """#
 }
