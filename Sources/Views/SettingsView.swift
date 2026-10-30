@@ -113,8 +113,8 @@ struct SettingsView: View {
                 dismiss()
             }
         } message: {
-            Text(L("Патувањата и гардеробата остануваат на твојот акаунт и се враќаат кога ќе се најавиш повторно.",
-                   "Your trips and wardrobe stay in your account and come back when you sign in again."))
+            Text(L("Патувањата и гардеробата остануваат на твојот акаунт и се враќаат кога ќе се најавиш повторно. На овој телефон апликацијата почнува од почеток.",
+                   "Your trips and wardrobe stay in your account and come back when you sign in again. On this phone the app starts fresh."))
         }
         .presentationCornerRadius(28)
     }

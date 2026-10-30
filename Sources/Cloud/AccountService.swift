@@ -28,6 +28,15 @@ final class AccountService: ObservableObject {
 
     var isSignedIn: Bool { profile != nil }
 
+    /// Сè лично на телефонот. По одјава апликацијата почнува од почеток, како нова:
+    /// јазик, возраст, име, телефон, тема, филтри. Остануваат само купениот Premium
+    /// (врзан за Apple ID, не за акаунтот) и блокадата за возраст под 13 години.
+    private static let personalKeys = [
+        "userName", PhoneID.phoneStorageKey, "lastOrigin", PhoneStepView.askedKey,
+        Theme.storageKey, "homeFilter", "accountStepDone",
+        "languageChosen", AppLanguage.storageKey, AgeGateView.verifiedKey
+    ]
+
     /// Најавен (и веднаш при старт, пред Firebase да јави) — за да нема трепкање на екранот за најава.
     var hasSession: Bool { profile != nil || Auth.auth().currentUser != nil }
 
@@ -79,7 +88,7 @@ final class AccountService: ObservableObject {
             if previous != nil {
                 store?.wipeLocal()
                 wardrobe?.wipeLocal()
-                for key in ["userName", PhoneID.phoneStorageKey, "lastOrigin", "phoneAsked"] {
+                for key in Self.personalKeys {
                     UserDefaults.standard.removeObject(forKey: key)
                 }
             }
