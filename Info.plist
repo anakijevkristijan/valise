@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>ValiseSignInWithApple</key>
+	<string>$(VALISE_STORE_BUILD)</string>
+	<key>ValiseWeatherKit</key>
+	<string>$(VALISE_STORE_BUILD)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>google-signin</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.345917634107-ufvtfk9ha82bl2mqcf9vahpc6tvokpsc</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>
