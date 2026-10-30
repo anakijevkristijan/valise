@@ -55,6 +55,7 @@ struct HomeView: View {
             }
         }
         .task { await store.refreshAllUpcoming() }
+        .onAppear(perform: openScreenshotTrip)
         .fullScreenCover(isPresented: $showWizard, onDismiss: openPendingTrip) {
             TripWizardView { newID in
                 pendingTripID = newID
@@ -278,5 +279,14 @@ struct HomeView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             path.append(id)
         }
+    }
+
+    /// Слики за App Store: веднаш го отвора демо-патувањето (само Debug).
+    private func openScreenshotTrip() {
+        guard ScreenshotMode.isOn, ScreenshotMode.opensTrip, path.isEmpty,
+              let id = ScreenshotMode.heroTripID else { return }
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) { path = [id] }
     }
 }

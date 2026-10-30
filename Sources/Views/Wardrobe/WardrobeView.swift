@@ -8,7 +8,7 @@ struct WardrobeView: View {
 
     enum Pane: String { case pieces, outfits }
 
-    @State private var section: Pane = .pieces
+    @State private var section: Pane = ScreenshotMode.screen == "looks" ? .outfits : .pieces
     @State private var season: Season?
     @State private var showAddItem = false
     @State private var editingItem: WardrobeItem?
@@ -270,7 +270,7 @@ struct WardrobeView: View {
 /// Главни табови: Патувања и Гардероба.
 struct MainTabView: View {
     @EnvironmentObject private var premium: PremiumStore
-    @State private var tab = 0
+    @State private var tab = ScreenshotMode.tab
 
     var body: some View {
         TabView(selection: $tab) {

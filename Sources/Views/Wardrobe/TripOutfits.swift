@@ -86,6 +86,13 @@ struct TripOutfitsSection: View {
                 .environmentObject(wardrobe)
                 .presentationCornerRadius(28)
         }
+        .task {
+            // Слики за App Store (само Debug): отвори го вториот ден.
+            guard ScreenshotMode.isOn, ScreenshotMode.screen == "day",
+                  let date = trip.days.dropFirst().first ?? trip.days.first else { return }
+            try? await Task.sleep(nanoseconds: 1_200_000_000)
+            pickingDay = PickDay(date: date)
+        }
     }
 
     private func dayCard(_ date: Date, wear: [UUID: Int]) -> some View {

@@ -56,51 +56,68 @@ struct TripDetailView: View {
         }
     }
 
+    /// Слики за App Store (само Debug): лизни до бараниот дел или отвори Story.
+    private func showScreenshot(_ proxy: ScrollViewProxy) async {
+        guard ScreenshotMode.isOn else { return }
+        try? await Task.sleep(nanoseconds: 700_000_000)
+        if let anchor = ScreenshotMode.anchor {
+            proxy.scrollTo(anchor, anchor: .top)
+        }
+        if ScreenshotMode.screen == "story" { showStory = true }
+    }
+
     // MARK: Распоред
 
     private func content(_ trip: Trip) -> some View {
         ZStack {
             PaperBackground()
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 28) {
-                    topBar(trip)
-                    titleBlock(trip)
-                    BoardingPassCard(trip: trip)
-                    if premium.isPremium {
-                        companionsSection(trip)
-                        weatherSection(trip)
-                        TripOutfitsSection(trip: trip)
-                        BagFitCard(trip: trip)
-                    } else {
-                        // Бесплатно: само листата за пакување. Поканет во туѓо патување — ги гледа сопатниците.
-                        if !trip.travelers.isEmpty { companionsSection(trip) }
-                        PremiumTeaserCard()
-                    }
-                    tabPicker(trip)
-
-                    Group {
-                        if tab == .packing {
-                            packingSection(trip)
-                        } else if premium.isPremium {
-                            exitSection(trip)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 28) {
+                        topBar(trip)
+                        titleBlock(trip)
+                        BoardingPassCard(trip: trip)
+                        if premium.isPremium {
+                            companionsSection(trip)
+                            weatherSection(trip)
+                                .id("shot-weather")
+                            TripOutfitsSection(trip: trip)
+                                .id("shot-outfits")
+                            BagFitCard(trip: trip)
+                                .id("shot-bags")
                         } else {
-                            PremiumLockRow(icon: "house",
-                                           title: L("Последен круг низ домот", "One last walk through home"),
-                                           detail: L("Шпорет, прозорци, полнач, клучеви — листа за мирен излез од дома.",
-                                                     "Stove, windows, charger, keys — a checklist for leaving home calmly."))
+                            // Бесплатно: само листата за пакување. Поканет во туѓо патување — ги гледа сопатниците.
+                            if !trip.travelers.isEmpty { companionsSection(trip) }
+                            PremiumTeaserCard()
                         }
+                        tabPicker(trip)
+                            .id("shot-packing")
+
+                        Group {
+                            if tab == .packing {
+                                packingSection(trip)
+                            } else if premium.isPremium {
+                                exitSection(trip)
+                            } else {
+                                PremiumLockRow(icon: "house",
+                                               title: L("Последен круг низ домот", "One last walk through home"),
+                                               detail: L("Шпорет, прозорци, полнач, клучеви — листа за мирен излез од дома.",
+                                                         "Stove, windows, charger, keys — a checklist for leaving home calmly."))
+                            }
+                        }
+                        .transition(.opacity)
                     }
-                    .transition(.opacity)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 60)
+                    .frame(maxWidth: 680)
+                    .frame(maxWidth: .infinity)
+                    .containerRelativeFrame(.horizontal)
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 60)
-                .frame(maxWidth: 680)
-                .frame(maxWidth: .infinity)
-                .containerRelativeFrame(.horizontal)
+                .scrollIndicators(.hidden)
+                .refreshable { await refreshWeather(force: true) }
+                .task { await showScreenshot(proxy) }
             }
-            .scrollIndicators(.hidden)
-            .refreshable { await refreshWeather(force: true) }
         }
         .task(priority: .background) { await PhotoService.prefetchStory(for: trip.destination) }
         .sensoryFeedback(.selection, trigger: trip.packedCount)

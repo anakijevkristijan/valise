@@ -13,7 +13,7 @@ struct SettingsView: View {
     @AppStorage(AppLanguage.storageKey) private var language: String = AppLanguage.mk.rawValue
 
     @State private var draftName = ""
-    @State private var confirmReset = false
+    @State private var confirmSignOut = false
     @State private var legalDoc: LegalDoc?
 
     var body: some View {
@@ -60,15 +60,6 @@ struct SettingsView: View {
                         infoRow("suitcase", L("Патувања", "Trips"), "\(store.trips.count)")
                         Hairline()
                         infoRow("airplane", L("Авиокомпании во базата", "Airlines in the database"), "\(Airlines.all.count - 1)")
-                        Hairline()
-                        infoRow("clock", L("Мерки за багаж", "Baggage sizes"), Airlines.dataUpdated)
-                        Hairline()
-                        infoRow("cloud.sun", L("Прогноза", "Forecast"), AppConfig.weatherKitEnabled ? "Apple Weather" : "Open-Meteo")
-                        Hairline()
-                        infoRow("map", L("Пребарување места", "Place search"), "Apple Maps")
-                        Hairline()
-                        infoRow("photo", L("Фотографии", "Photos"), "Wikimedia Commons")
-                        WeatherCreditView()
                     }
                     .luxCard(padding: 20)
 
@@ -80,14 +71,16 @@ struct SettingsView: View {
                         .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    Button(role: .destructive) {
-                        confirmReset = true
-                    } label: {
-                        Text(L("Избриши ги сите патувања", "Delete all trips"))
-                            .foregroundStyle(Theme.terracotta)
-                            .frame(maxWidth: .infinity)
+                    if account.isSignedIn {
+                        Button {
+                            confirmSignOut = true
+                        } label: {
+                            Text(L("Одјави се", "Sign out"))
+                                .foregroundStyle(Theme.navy)
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(SecondaryButtonStyle())
                     }
-                    .buttonStyle(SecondaryButtonStyle())
 
                     Text("TRIPDROBE 2.6")
                         .font(.sans(10, .semibold))
@@ -100,9 +93,10 @@ struct SettingsView: View {
             }
         }
         .onAppear { draftName = userName }
+        .onChange(of: userName) { _, latest in draftName = latest }   // пр. сменето во Акаунт
         .onDisappear(perform: save)
         .sheet(isPresented: $showAccount) {
-            AccountView(startWith: .signUp)
+            AccountView(startWith: .signUp, onDeleteAllTrips: { store.deleteAll() })
                 .environmentObject(account)
         }
         .sheet(isPresented: $showPremium) {
@@ -112,8 +106,15 @@ struct SettingsView: View {
         .sheet(item: $legalDoc) { doc in
             LegalView(doc: doc)
         }
-        .confirmationDialog(L("Да се избришат сите патувања?", "Delete all trips?"), isPresented: $confirmReset, titleVisibility: .visible) {
-            Button(L("Избриши сè", "Delete everything"), role: .destructive) { store.deleteAll() }
+        .confirmationDialog(L("Да се одјавиш?", "Sign out?"), isPresented: $confirmSignOut, titleVisibility: .visible) {
+            Button(L("Одјави се", "Sign out"), role: .destructive) {
+                save()
+                account.signOut()
+                dismiss()
+            }
+        } message: {
+            Text(L("Патувањата и гардеробата остануваат на твојот акаунт и се враќаат кога ќе се најавиш повторно.",
+                   "Your trips and wardrobe stay in your account and come back when you sign in again."))
         }
         .presentationCornerRadius(28)
     }
@@ -247,9 +248,14 @@ struct SettingsView: View {
         dismiss()
     }
 
+    /// Името се зачувува и на акаунтот, за да е исто насекаде.
+    /// По одјава ништо не се запишува (инаку старото име би останало за следниот акаунт).
     private func save() {
         let trimmed = draftName.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmed.isEmpty { userName = trimmed }
+        guard !trimmed.isEmpty, account.hasSession, trimmed != userName else { return }
+        userName = trimmed
+        let phone = account.phone
+        Task { await account.updateProfile(name: trimmed, phone: phone) }
     }
 
     private func infoRow(_ icon: String, _ title: String, _ value: String) -> some View {

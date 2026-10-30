@@ -52,7 +52,8 @@ final class AccountService: ObservableObject {
             currentUID = user.uid
             Session.uid = user.uid
             let storedName = UserDefaults.standard.string(forKey: "userName") ?? ""
-            let name = user.displayName ?? storedName
+            // Едно име насекаде: внесеното на телефонот, а ако го нема — тоа од акаунтот.
+            let name = storedName.isEmpty ? (user.displayName ?? "") : storedName
             profile = Profile(uid: user.uid, email: user.email ?? "", name: name)
             if storedName.isEmpty, !name.isEmpty {
                 UserDefaults.standard.set(name, forKey: "userName")

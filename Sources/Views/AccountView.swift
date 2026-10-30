@@ -19,9 +19,14 @@ struct AccountView: View {
     @State private var error: String?
     @State private var info: String?
     @State private var confirmDelete = false
+    @State private var confirmDeleteTrips = false
 
-    init(startWith mode: Mode = .signUp) {
+    /// Од Профил: „Избриши ги сите патувања“ стои тука, а одјавата е во Профил.
+    private let onDeleteAllTrips: (() -> Void)?
+
+    init(startWith mode: Mode = .signUp, onDeleteAllTrips: (() -> Void)? = nil) {
         _mode = State(initialValue: mode)
+        self.onDeleteAllTrips = onDeleteAllTrips
     }
 
     var body: some View {
@@ -62,6 +67,15 @@ struct AccountView: View {
         } message: {
             Text(L("Твоите заеднички патувања ќе се избришат од облакот, а од туѓите ќе излезеш. Ова не може да се врати.",
                    "Your shared trips will be removed from the cloud and you'll leave other people's trips. This can't be undone."))
+        }
+        .confirmationDialog(L("Да се избришат сите патувања?", "Delete all trips?"), isPresented: $confirmDeleteTrips, titleVisibility: .visible) {
+            Button(L("Избриши ги сите", "Delete all"), role: .destructive) {
+                onDeleteAllTrips?()
+                info = L("Сите патувања се избришани.", "All trips have been deleted.")
+            }
+        } message: {
+            Text(L("Акаунтот и гардеробата остануваат. Од заедничките патувања ќе излезеш.",
+                   "Your account and wardrobe stay. You'll leave any shared trips."))
         }
     }
 
@@ -269,19 +283,34 @@ struct AccountView: View {
             .buttonStyle(PrimaryButtonStyle())
 
             HStack(spacing: 10) {
-                Button {
-                    account.signOut()
-                    dismiss()
-                } label: {
-                    Text(L("Одјави се", "Sign out")).frame(maxWidth: .infinity)
+                if onDeleteAllTrips != nil {
+                    Button {
+                        confirmDeleteTrips = true
+                    } label: {
+                        Text(L("Избриши патувања", "Delete all trips"))
+                            .foregroundStyle(Theme.terracotta)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(SecondaryButtonStyle())
+                } else {
+                    Button {
+                        account.signOut()
+                        dismiss()
+                    } label: {
+                        Text(L("Одјави се", "Sign out")).frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(SecondaryButtonStyle())
                 }
-                .buttonStyle(SecondaryButtonStyle())
 
                 Button {
                     confirmDelete = true
                 } label: {
                     Text(L("Избриши акаунт", "Delete account"))
                         .foregroundStyle(Theme.terracotta)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(SecondaryButtonStyle())

@@ -26,6 +26,15 @@ struct ValiseApp: App {
 
     init() {
         FirebaseApp.configure()
+        // Само за сликите за App Store (Debug во симулатор) — во TestFlight/App Store isOn е false.
+        if ScreenshotMode.isOn {
+            ScreenshotMode.prepareDefaults()
+            let trips = TripStore()
+            let closet = WardrobeStore()
+            ScreenshotMode.seed(trips: trips, wardrobe: closet)
+            _store = StateObject(wrappedValue: trips)
+            _wardrobe = StateObject(wrappedValue: closet)
+        }
     }
 
     var body: some Scene {
@@ -60,6 +69,7 @@ struct RootView: View {
     /// 0 = јазик, 4 = возраст (пред да се внесе било што), 1 = име, 2 = акаунт (задолжителен),
     /// 5 = телефон (по најавата, може да се прескокне), 3 = почетна
     private var stage: Int {
+        if ScreenshotMode.isOn { return 3 }
         if !languageChosen { return 0 }
         if account.hasSession {
             if userName.isEmpty { return 1 }

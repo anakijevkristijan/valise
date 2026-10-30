@@ -37,8 +37,21 @@ final class PremiumStore: ObservableObject {
 
     private var updatesTask: Task<Void, Never>?
 
+    /// App Store и TestFlight немаат embedded.mobileprovision (Apple го трга при потпишување).
+    /// Sideloadly и Xcode на телефон секогаш го имаат. Во симулатор е тест.
+    private static var isSideloaded: Bool {
+        #if targetEnvironment(simulator)
+        return true
+        #else
+        return Bundle.main.path(forResource: "embedded", ofType: "mobileprovision") != nil
+        #endif
+    }
+
     init() {
         isPremium = UserDefaults.standard.bool(forKey: Self.storageKey)
+        // Веднаш при старт, а не дури кога ќе се вчитаат производите — за тест-отклучувањето
+        // никогаш да не се појави во App Store/TestFlight (пр. без интернет или пред да се направат претплатите).
+        isStoreInstall = !Self.isSideloaded
         updatesTask = Task { [weak self] in
             for await update in Transaction.updates {
                 if case .verified(let transaction) = update {
@@ -62,7 +75,7 @@ final class PremiumStore: ObservableObject {
         products = Self.allIDs.compactMap { id in loaded.first { $0.id == id } }
         // App Store и TestFlight имаат потврда (receipt) од Apple; Sideloadly нема.
         let hasReceipt = Bundle.main.appStoreReceiptURL.map { FileManager.default.fileExists(atPath: $0.path) } ?? false
-        isStoreInstall = hasReceipt || !products.isEmpty
+        isStoreInstall = !Self.isSideloaded || hasReceipt || !products.isEmpty
         if let subscription = product(Self.yearlyID)?.subscription {
             trialEligible = await subscription.isEligibleForIntroOffer
         }
