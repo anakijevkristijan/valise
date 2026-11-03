@@ -791,6 +791,7 @@ struct TripDetailView: View {
             let newValue = max(1, entry.quantity + delta)
             entry.quantity = newValue
             entry.wornCount = min(entry.wornCount, newValue)
+            entry.quantityEdited = true
         }
     }
 
@@ -1031,7 +1032,7 @@ struct PackingRow: View {
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(L("Во аутфитите \(share.have) од планирани \(item.quantity)",
                                       "\(share.have) in outfits of \(item.quantity) planned"))
-            } else if item.quantity > 1 {
+            } else if item.category != .documents {
                 Text("×\(item.quantity)")
                     .font(.codes(17))
                     .foregroundStyle(item.isPacked ? Theme.muted : Theme.navy)

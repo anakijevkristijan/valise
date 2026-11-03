@@ -115,6 +115,12 @@ struct RootView: View {
                 Task { await store.refreshAllUpcoming() }
             }
         }
+        .onChange(of: premium.isPremium) { _, unlocked in
+            // Штом е купен Premium: паметни бројки и прогноза за сите патувања
+            guard unlocked else { return }
+            store.applySmartQuantities()
+            Task { await store.refreshAllUpcoming() }
+        }
     }
 }
 

@@ -18,8 +18,44 @@ enum PhoneID {
         "TR": "90", "DE": "49", "AT": "43", "CH": "41", "IT": "39", "FR": "33",
         "ES": "34", "PT": "351", "NL": "31", "BE": "32", "GB": "44", "IE": "353",
         "SE": "46", "NO": "47", "DK": "45", "FI": "358", "PL": "48", "CZ": "420",
-        "SK": "421", "US": "1", "CA": "1", "AU": "61", "AE": "971"
+        "SK": "421", "US": "1", "CA": "1", "AU": "61", "AE": "971",
+        "MC": "377", "LU": "352", "LI": "423", "IS": "354", "EE": "372", "LV": "371", "LT": "370",
+        "UA": "380", "MD": "373", "CY": "357", "MT": "356", "IL": "972", "SA": "966", "QA": "974",
+        "KW": "965", "BH": "973", "OM": "968", "EG": "20", "MA": "212", "TN": "216", "ZA": "27",
+        "NG": "234", "KE": "254", "IN": "91", "PK": "92", "CN": "86", "HK": "852", "TW": "886",
+        "JP": "81", "KR": "82", "SG": "65", "MY": "60", "TH": "66", "VN": "84", "PH": "63",
+        "ID": "62", "NZ": "64", "MX": "52", "BR": "55", "AR": "54", "CL": "56", "CO": "57",
+        "PE": "51", "GE": "995", "AM": "374", "AZ": "994"
     ]
+
+    /// Земјите за избор на повикувачки код, по азбучен ред на тековниот јазик.
+    static var regions: [String] {
+        callingCodes.keys.sorted { regionName($0) < regionName($1) }
+    }
+
+    static func callingCode(for region: String) -> String {
+        callingCodes[region] ?? "389"
+    }
+
+    static func regionName(_ region: String) -> String {
+        AppLanguage.current.locale.localizedString(forRegionCode: region) ?? region
+    }
+
+    static func flag(_ region: String) -> String {
+        var result = ""
+        for scalar in region.uppercased().unicodeScalars {
+            if let flagScalar = UnicodeScalar(127397 + scalar.value) {
+                result.unicodeScalars.append(flagScalar)
+            }
+        }
+        return result
+    }
+
+    /// Земјата на телефонот — од неа се зема почетниот код (+389 во Македонија).
+    static var defaultRegion: String {
+        let region = Locale.current.region?.identifier ?? "MK"
+        return callingCodes[region] != nil ? region : "MK"
+    }
 
     /// Повикувачки код: од мојот број ако го имам, инаку од регионот на телефонот.
     static var defaultCallingCode: String {

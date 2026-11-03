@@ -234,6 +234,8 @@ struct PackingItem: Codable, Identifiable, Hashable {
     /// Само за делот „Заедно“: кој го носи (id на сопатник).
     /// nil = локално „јас“, кај патување со акаунти „уште не е одлучено“.
     var assignee: UUID?
+    /// Бројката е рачно сменета — новата прогноза повеќе не ја менува.
+    var quantityEdited: Bool?
 
     /// Парчиња во торбата (без облеченото).
     var bagUnits: Int { max(0, quantity - wornCount) }

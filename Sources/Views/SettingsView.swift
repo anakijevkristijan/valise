@@ -383,6 +383,8 @@ struct PremiumSheet: View {
     @EnvironmentObject private var premium: PremiumStore
     @Environment(\.dismiss) private var dismiss
     @State private var selectedID = PremiumStore.yearlyID
+    /// Купено од овој прозорец — по отклучувањето сам се затвора.
+    @State private var purchasedHere = false
     @State private var legalDoc: LegalDoc?
     @State private var manageSubscriptions = false
 
@@ -426,7 +428,7 @@ struct PremiumSheet: View {
                     }
 
                     VStack(alignment: .leading, spacing: 14) {
-                        benefit("cloud.sun", L("Прогноза за секој ден и листа според времето", "Day-by-day forecast and a list that fits the weather"))
+                        benefit("cloud.sun", L("Прогноза за секој ден и колку од секое парче да спакуваш", "Day-by-day forecast and how many of each item to pack"))
                         benefit("airplane", L("Багаж за 140+ авиокомпании и дали сè ќе собере", "Baggage rules for 140+ airlines and whether it all fits"))
                         benefit("hanger", L("Гардероба и аутфити по денови", "Your wardrobe and outfits for every day"))
                         benefit("person.2", L("Патувања со пријатели — кој што носи", "Trips with friends — who brings what"))
@@ -442,7 +444,19 @@ struct PremiumSheet: View {
                     } else if !premium.allowsTestUnlock {
                         // App Store / TestFlight, но производите уште не се вчитале
                         VStack(spacing: 12) {
-                            ProgressView().tint(Theme.navy)
+                            if premium.isLoadingProducts || !premium.didLoad {
+                                ProgressView().tint(Theme.navy)
+                            } else {
+                                Text(premium.canMakePayments
+                                     ? L("Не можам да се поврзам со App Store. Провери дали имаш интернет и дали си најавен во App Store (Поставки → твоето име → Media & Purchases), па обиди се повторно.",
+                                         "Couldn't reach the App Store. Check that you're online and signed in to the App Store (Settings → your name → Media & Purchases), then try again.")
+                                     : L("Купувањата во апликации се исклучени на овој iPhone (Поставки → Screen Time → Content & Privacy Restrictions).",
+                                         "In-app purchases are turned off on this iPhone (Settings → Screen Time → Content & Privacy Restrictions)."))
+                                    .font(.sans(12))
+                                    .foregroundStyle(Theme.muted)
+                                    .multilineTextAlignment(.center)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
                             Button(L("Обиди се повторно", "Try again")) {
                                 Task { await premium.load() }
                             }
@@ -479,6 +493,13 @@ struct PremiumSheet: View {
             LegalView(doc: doc)
         }
         .manageSubscriptionsSheet(isPresented: $manageSubscriptions)
+        .sensoryFeedback(.success, trigger: premium.isPremium)
+        .onChange(of: premium.isPremium) { _, unlocked in
+            // Штом е купено, прозорецот се затвора и сè е веднаш отклучено
+            if unlocked && purchasedHere {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { dismiss() }
+            }
+        }
         .presentationCornerRadius(28)
     }
 
@@ -502,6 +523,14 @@ struct PremiumSheet: View {
                     Text(L("Следно обновување: \(Fmt.longDate(date))", "Renews on \(Fmt.longDate(date))"))
                         .font(.sans(13))
                         .foregroundStyle(Theme.inkSoft)
+                }
+                if premium.isSandbox {
+                    Text(L("Тест-верзија (TestFlight): претплатата се обновува забрзано, приближно еднаш дневно, и ништо не се наплаќа. Во App Store трае цел месец или година.",
+                           "Test version (TestFlight): the subscription renews faster, about once a day, and nothing is charged. In the App Store it lasts a full month or year."))
+                        .font(.sans(11))
+                        .foregroundStyle(Theme.muted)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Button(L("Управувај со претплатата", "Manage subscription")) {
                     manageSubscriptions = true
@@ -539,6 +568,7 @@ struct PremiumSheet: View {
 
             if let product = selected {
                 Button {
+                    purchasedHere = true
                     Task { await premium.purchase(product) }
                 } label: {
                     HStack(spacing: 10) {

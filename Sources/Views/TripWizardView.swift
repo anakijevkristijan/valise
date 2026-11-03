@@ -1454,6 +1454,8 @@ struct BagCountRow: View {
                     Circle()
                         .strokeBorder(Theme.hairline, lineWidth: 1.2)
                         .frame(width: 26, height: 26)
+                        .frame(width: 48, height: 48)      // поголема површина за допир
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(L("Додај \(bag.displayTitle)", "Add \(bag.displayTitle)"))
@@ -1461,17 +1463,19 @@ struct BagCountRow: View {
                 HStack(spacing: 0) {
                     Button { onChange(count - 1) } label: {
                         Image(systemName: count == 1 ? "xmark" : "minus")
-                            .font(.system(size: 11, weight: .bold))
-                            .frame(width: 30, height: 30)
+                            .font(.system(size: 13, weight: .bold))
+                            .frame(width: 44, height: 40)
+                            .contentShape(Rectangle())
                     }
                     .accessibilityLabel(L("Помалку", "Fewer"))
                     Text("\(count)")
-                        .font(.codes(17))
-                        .frame(minWidth: 16)
+                        .font(.codes(18))
+                        .frame(minWidth: 18)
                     Button { onChange(min(maxCount, count + 1)) } label: {
                         Image(systemName: "plus")
-                            .font(.system(size: 11, weight: .bold))
-                            .frame(width: 30, height: 30)
+                            .font(.system(size: 13, weight: .bold))
+                            .frame(width: 44, height: 40)
+                            .contentShape(Rectangle())
                     }
                     .disabled(count >= maxCount)
                     .opacity(count >= maxCount ? 0.4 : 1)
@@ -1479,12 +1483,13 @@ struct BagCountRow: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(Theme.goldLight)
-                .padding(.horizontal, 2)
                 .background(Capsule().fill(Theme.navy))
+                .sensoryFeedback(.selection, trigger: count)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
+        .padding(.leading, 16)
+        .padding(.trailing, 8)
+        .padding(.vertical, 10)
     }
 }
 

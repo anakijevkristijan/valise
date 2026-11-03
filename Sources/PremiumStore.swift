@@ -23,11 +23,17 @@ final class PremiumStore: ObservableObject {
     @Published private(set) var products: [Product] = []
     @Published private(set) var isWorking = false
     @Published private(set) var didLoad = false
+    /// Производите се вчитуваат токму сега (за знакот за вчитување).
+    @Published private(set) var isLoadingProducts = false
+    /// false = купувањата се исклучени на телефонот (Screen Time / родителска контрола).
+    @Published private(set) var canMakePayments = true
     /// Инсталирано од App Store или TestFlight (потпишано од Apple).
     @Published private(set) var isStoreInstall = false
     /// Активниот план (ID на производот) и кога истекува претплатата.
     @Published private(set) var activeProductID: String?
     @Published private(set) var expirationDate: Date?
+    /// Купено во тест-околина (TestFlight/sandbox): обновувањата се забрзани и бесплатни.
+    @Published private(set) var isSandbox = false
     /// Дали корисникот може да ја добие бесплатната проба (само еднаш по Apple ID).
     @Published private(set) var trialEligible = false
     @Published var errorMessage: String?
@@ -71,6 +77,9 @@ final class PremiumStore: ObservableObject {
     func product(_ id: String) -> Product? { products.first { $0.id == id } }
 
     func load() async {
+        isLoadingProducts = true
+        defer { isLoadingProducts = false }
+        canMakePayments = AppStore.canMakePayments
         let loaded = (try? await Product.products(for: Self.allIDs)) ?? []
         products = Self.allIDs.compactMap { id in loaded.first { $0.id == id } }
         // App Store и TestFlight имаат потврда (receipt) од Apple; Sideloadly нема.
@@ -92,9 +101,15 @@ final class PremiumStore: ObservableObject {
             switch result {
             case .success(let verification):
                 if case .verified(let transaction) = verification {
+                    // Веднаш отклучено — без да се чека на целата листа од App Store
+                    activeProductID = transaction.productID
+                    expirationDate = transaction.expirationDate
+                    isSandbox = transaction.environment == .sandbox
+                    setPremium(true)
                     await transaction.finish()
                 }
-                await refreshEntitlements()
+                // Проверката со App Store продолжува во позадина
+                Task { await refreshEntitlements() }
             case .userCancelled, .pending:
                 break
             @unknown default:
@@ -136,6 +151,7 @@ final class PremiumStore: ObservableObject {
         }
         activeProductID = best?.productID
         expirationDate = best?.expirationDate
+        isSandbox = best?.environment == .sandbox
         if best != nil {
             setPremium(true)
         } else if isStoreInstall {

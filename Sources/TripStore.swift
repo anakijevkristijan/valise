@@ -243,11 +243,20 @@ final class TripStore: ObservableObject {
             $0.weather = result.days
             $0.weatherSource = result.source
             $0.weatherUpdatedAt = Date()
+            // Маиците, долгите ракави, џемперите и јакните се усогласуваат со новата прогноза
+            PackingEngine.syncWithWeather(&$0)
         }
     }
 
     private static func autoRefreshInterval(for trip: Trip) -> TimeInterval {
         trip.daysUntil > WeatherService.forecastHorizonDays ? 24 * 3600 : 2 * 3600
+    }
+
+    /// По купување Premium: паметни бројки во сите претстојни патувања (рачно сменетото останува).
+    func applySmartQuantities() {
+        for trip in upcoming {
+            mutate(trip.id) { PackingEngine.applySmartQuantities(&$0) }
+        }
     }
 
     /// При отворање на апликацијата и враќање во неа.
