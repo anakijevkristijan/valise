@@ -51,6 +51,39 @@ enum PhoneID {
         return result
     }
 
+    /// Код на земјата + локален број → „+38970123456“ (без почетната нула). Празно ако нема цифри.
+    static func compose(region: String, local: String) -> String {
+        var digits = local.filter { $0.isASCII && $0.isNumber }
+        while digits.hasPrefix("0") { digits.removeFirst() }
+        return digits.isEmpty ? "" : "+" + callingCode(for: region) + digits
+    }
+
+    /// „+38970123456“ → („MK“, „70123456“). Број без код → земјата на телефонот и бројот каков што е.
+    static func split(_ full: String) -> (region: String, local: String) {
+        let trimmed = full.trimmingCharacters(in: .whitespacesAndNewlines)
+        var digits = trimmed.filter { $0.isASCII && $0.isNumber }
+        let international = trimmed.hasPrefix("+") || trimmed.hasPrefix("00")
+        if trimmed.hasPrefix("00"), digits.count >= 2 { digits.removeFirst(2) }
+        guard international, !digits.isEmpty else { return (defaultRegion, trimmed) }
+
+        let preferred = defaultRegion
+        let preferredCode = callingCode(for: preferred)
+        if digits.hasPrefix(preferredCode) {
+            return (preferred, String(digits.dropFirst(preferredCode.count)))
+        }
+        // Најдолгиот код што одговара (за +1 — САД)
+        let ordered = callingCodes.sorted { a, b in
+            if a.value.count != b.value.count { return a.value.count > b.value.count }
+            if a.key == "US" { return true }
+            if b.key == "US" { return false }
+            return a.key < b.key
+        }
+        if let match = ordered.first(where: { digits.hasPrefix($0.value) }) {
+            return (match.key, String(digits.dropFirst(match.value.count)))
+        }
+        return (preferred, digits)
+    }
+
     /// Земјата на телефонот — од неа се зема почетниот код (+389 во Македонија).
     static var defaultRegion: String {
         let region = Locale.current.region?.identifier ?? "MK"

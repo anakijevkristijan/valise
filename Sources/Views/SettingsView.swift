@@ -29,6 +29,7 @@ struct SettingsView: View {
                     }
 
                     accountCard
+                    premiumCard
 
                     VStack(alignment: .leading, spacing: 10) {
                         Eyebrow(L("Твоето име", "Your name"))
@@ -186,6 +187,38 @@ struct SettingsView: View {
                          : L("Резервна копија и заеднички патувања", "Backup and shared trips"))
                         .font(.sans(12))
                         .foregroundStyle(Theme.inkSoft)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.muted)
+            }
+            .luxCard(padding: 14, radius: 18)
+        }
+        .buttonStyle(PressableStyle())
+    }
+
+    // MARK: Premium
+
+    /// Premium: купи, или (ако е купено) управувај со претплатата.
+    private var premiumCard: some View {
+        Button { showPremium = true } label: {
+            HStack(spacing: 14) {
+                Image(systemName: premium.isPremium ? "checkmark.seal" : "sparkles")
+                    .font(.system(size: 18, weight: .light))
+                    .foregroundStyle(Theme.navy)
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(Theme.goldPale))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(premium.isPremium ? "Tripdrobe Premium" : L("Пробај Premium", "Try Premium"))
+                        .font(.sans(15, .semibold))
+                        .foregroundStyle(Theme.ink)
+                    Text(premium.isPremium
+                         ? L("Активно · управувај со претплатата", "Active · manage your subscription")
+                         : L("Прогноза, авиокомпании, гардероба, пријатели", "Forecast, airlines, wardrobe, friends"))
+                        .font(.sans(12))
+                        .foregroundStyle(Theme.inkSoft)
+                        .lineLimit(1)
                 }
                 Spacer()
                 Image(systemName: "chevron.right")

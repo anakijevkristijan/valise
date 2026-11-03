@@ -165,7 +165,7 @@ struct AccountView: View {
                 secureField
                 if mode == .signUp {
                     Hairline().padding(.leading, 18)
-                    field(L("Телефон (по избор)", "Phone (optional)"), text: $phone, content: .telephoneNumber, keyboard: .phonePad)
+                    phoneField(L("Телефон (по избор)", "Phone (optional)"))
                 }
             }
             .luxCard(padding: 0)
@@ -262,7 +262,7 @@ struct AccountView: View {
             VStack(spacing: 0) {
                 field(L("Име", "Name"), text: $name, content: .name)
                 Hairline().padding(.leading, 18)
-                field(L("Телефон", "Phone"), text: $phone, content: .telephoneNumber, keyboard: .phonePad)
+                phoneField(L("Телефон", "Phone"))
             }
             .luxCard(padding: 0)
 
@@ -322,6 +322,19 @@ struct AccountView: View {
     }
 
     // MARK: Делови
+
+    /// Телефон со кодот на земјата (+389 веќе внесено).
+    private func phoneField(_ label: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label.uppercased())
+                .font(.sans(9, .semibold))
+                .tracking(1.6)
+                .foregroundStyle(Theme.muted)
+            PhoneNumberField(number: $phone, fontSize: 19)
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 12)
+    }
 
     private func field(_ label: String, text: Binding<String>, content: UITextContentType, keyboard: UIKeyboardType = .default) -> some View {
         VStack(alignment: .leading, spacing: 4) {
