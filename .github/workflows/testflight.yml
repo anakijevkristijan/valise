@@ -87,9 +87,19 @@ jobs:
         working-directory: ${{ env.APP_DIR }}
         run: |
           set -o pipefail
-          # App Store бара Xcode 26 или понов — постарите ги прескокнуваме
-          CANDIDATES=$(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -vi beta | sort -Vr \
-            | while read -r X; do V=$(basename "$X" .app | sed 's/Xcode_//'); [ "${V%%.*}" -ge 26 ] 2>/dev/null && echo "$X"; done | head -2)
+          # App Store бара Xcode 26 или понов — постарите ги прескокнуваме (земаме најмногу 2 најнови)
+          CANDIDATES=""
+          COUNT=0
+          for X in $(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -vi beta | sort -Vr); do
+            V=$(basename "$X" .app)
+            V=${V#Xcode_}
+            if [ "${V%%.*}" -ge 26 ] 2>/dev/null; then
+              CANDIDATES="$CANDIDATES $X"
+              COUNT=$((COUNT + 1))
+              [ "$COUNT" -ge 2 ] && break
+            fi
+          done
+          echo "Xcode: $CANDIDATES"
           if [ -z "$CANDIDATES" ]; then
             echo "::error::На овој Mac нема Xcode 26 или понов. Пушти повторно и избери macos-26."
             echo "## На овој Mac нема Xcode 26 — пушти повторно со macos-26" >> "$GITHUB_STEP_SUMMARY"
