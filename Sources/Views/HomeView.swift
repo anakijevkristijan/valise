@@ -139,11 +139,11 @@ struct HomeView: View {
     }
 
     private func subtitle(for trip: Trip) -> String {
-        if trip.isOngoing { return L("Уживај во \(trip.destination.name).", "Enjoy \(trip.destination.name).") }
+        if trip.isOngoing { return L("Уживај во \(trip.placeSummary).", "Enjoy \(trip.placeSummary).") }
         if trip.daysUntil <= 3 {
-            return L("\(trip.destination.name) е речиси тука. Време е за пакување.", "\(trip.destination.name) is almost here. Time to pack.")
+            return L("\(trip.placeSummary) е речиси тука. Време е за пакување.", "\(trip.placeSummary) is almost here. Time to pack.")
         }
-        return L("Твојата карта за \(trip.destination.name) е спремна.", "Your ticket to \(trip.destination.name) is ready.")
+        return L("Твојата карта за \(trip.placeSummary) е спремна.", "Your ticket to \(trip.placeSummary) is ready.")
     }
 
     // MARK: Патувања — пасови во мрежа

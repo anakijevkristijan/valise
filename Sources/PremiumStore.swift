@@ -34,6 +34,9 @@ final class PremiumStore: ObservableObject {
     @Published private(set) var expirationDate: Date?
     /// Купено во тест-околина (TestFlight/sandbox): обновувањата се забрзани и бесплатни.
     @Published private(set) var isSandbox = false
+    /// Само за тестирање во TestFlight: апликацијата се однесува како бесплатна иако Premium е купен.
+    /// Во App Store (вистинско купување) нема ефект.
+    @Published private(set) var simulatesFree = UserDefaults.standard.bool(forKey: "testSimulateFree")
     /// Дали корисникот може да ја добие бесплатната проба (само еднаш по Apple ID).
     @Published private(set) var trialEligible = false
     @Published var errorMessage: String?
@@ -105,6 +108,8 @@ final class PremiumStore: ObservableObject {
                     activeProductID = transaction.productID
                     expirationDate = transaction.expirationDate
                     isSandbox = transaction.environment == .sandbox
+                    simulatesFree = false
+                    UserDefaults.standard.set(false, forKey: "testSimulateFree")
                     setPremium(true)
                     await transaction.finish()
                 }
@@ -153,11 +158,18 @@ final class PremiumStore: ObservableObject {
         expirationDate = best?.expirationDate
         isSandbox = best?.environment == .sandbox
         if best != nil {
-            setPremium(true)
+            setPremium(!(simulatesFree && isSandbox))
         } else if isStoreInstall {
             // Во App Store верзијата важи само вистинско купување
             setPremium(false)
         }
+    }
+
+    /// TestFlight: вклучи/исклучи „бесплатна верзија“ за тестирање.
+    func setSimulatesFree(_ on: Bool) async {
+        simulatesFree = on
+        UserDefaults.standard.set(on, forKey: "testSimulateFree")
+        await refreshEntitlements()
     }
 
     private func setPremium(_ value: Bool) {

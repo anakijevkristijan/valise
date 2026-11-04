@@ -11,12 +11,14 @@ settings:
     SWIFT_VERSION: "5.0"
 
 packages:
+  # 12.19.3+ — безбедносна поправка за Firestore (компромитирани eMudhra сертификати, октомври 2026)
   Firebase:
     url: https://github.com/firebase/firebase-ios-sdk
-    from: 11.0.0
+    from: 12.19.3
   GoogleSignIn:
     url: https://github.com/google/GoogleSignIn-iOS
-    from: 8.0.0
+    minVersion: 8.0.0
+    maxVersion: 10.0.0
 
 targets:
   Valise:

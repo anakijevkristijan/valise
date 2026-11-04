@@ -24,6 +24,7 @@ struct PremiumTeaserCard: View {
                 VStack(alignment: .leading, spacing: 9) {
                     row("cloud.sun", L("Прогноза и колку од секое парче да спакуваш", "Forecast and how many of each to pack"))
                     row("airplane", L("Авиокомпанија, багаж и дали ќе собере", "Airline, baggage and whether it fits"))
+                    row("map", L("Повеќе градови во едно патување", "Several cities in one trip"))
                     row("hanger", L("Аутфити од твојата гардероба", "Outfits from your own wardrobe"))
                     row("person.2", L("Пријатели и заедничка листа", "Friends and a shared list"))
                     row("camera.aperture", L("Story и „Пред излез“", "Story and “Before you leave”"))

@@ -218,8 +218,8 @@ final class TripStore: ObservableObject {
     static func inviteMessage(friend name: String, trip: Trip, me: String) -> String {
         let first = name.split(separator: " ").first.map(String.init) ?? name
         let range = Fmt.range(trip.startDate, trip.endDate)
-        return L("Здраво \(first)! ✈︎ Патувам за \(trip.destination.name) (\(range)) и те додадов во Tripdrobe. Симни ја апликацијата и регистрирај се со твојот број — патувањето и листата ќе те чекаат. — \(me)",
-                 "Hi \(first)! ✈︎ I'm going to \(trip.destination.name) (\(range)) and added you on Tripdrobe. Get the app and sign up with your number — the trip and packing list will be waiting. — \(me)")
+        return L("Здраво \(first)! ✈︎ Патувам за \(trip.placeSummary) (\(range)) и те додадов во Tripdrobe. Симни ја апликацијата и регистрирај се со твојот број — патувањето и листата ќе те чекаат. — \(me)",
+                 "Hi \(first)! ✈︎ I'm going to \(trip.placeSummary) (\(range)) and added you on Tripdrobe. Get the app and sign up with your number — the trip and packing list will be waiting. — \(me)")
     }
 
     // MARK: Прогноза — се освежува при секое отворање
@@ -237,7 +237,7 @@ final class TripStore: ObservableObject {
         refreshing.insert(id)
         defer { refreshing.remove(id) }
 
-        let result = await WeatherService.fetchWeather(for: current.destination, from: current.startDate, to: current.endDate)
+        let result = await WeatherService.fetchWeather(for: current.allStops)
         guard !result.days.isEmpty else { return }
         mutate(id) {
             $0.weather = result.days

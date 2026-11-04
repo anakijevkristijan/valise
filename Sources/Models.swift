@@ -306,6 +306,8 @@ struct WeatherDay: Codable, Hashable, Identifiable {
     var code: Int
     /// true = истиот ден лани (проценка), не прогноза.
     var fromLastYear: Bool?
+    /// Градот (кај патување низ повеќе градови).
+    var place: String?
 
     var id: Date { date }
     var isEstimate: Bool { fromLastYear ?? false }
@@ -373,6 +375,22 @@ struct Companion: Codable, Hashable, Identifiable {
     }
 }
 
+// MARK: - Град во патувањето (повеќе градови, Premium)
+
+struct TripStop: Codable, Hashable, Identifiable {
+    var id: UUID = UUID()
+    var place: Place
+    var startDate: Date
+    var endDate: Date
+    /// Перална машина во сместувањето во овој град.
+    var hasLaundry: Bool = false
+
+    var dayCount: Int {
+        let diff = Calendar.current.dateComponents([.day], from: startDate.startOfDay, to: endDate.startOfDay).day ?? 0
+        return max(1, diff + 1)
+    }
+}
+
 // MARK: - Патување
 
 struct Trip: Codable, Identifiable, Hashable {
@@ -411,6 +429,85 @@ struct Trip: Codable, Identifiable, Hashable {
     var outfitDays: [String: [UUID]]?
     /// Парчиња од гардеробата што веќе се спакувани.
     var outfitPacked: [UUID]?
+    /// Градовите по ред (Premium). nil или еден = патување во еден град (`destination`).
+    var stops: [TripStop]?
+    /// Своето име на патувањето (по избор). Без него — „Париз“ / „Грција“ автоматски.
+    var name: String?
+
+    // MARK: Градови и име
+
+    /// Сите градови по ред; кај обично патување — само дестинацијата.
+    var allStops: [TripStop] {
+        if let stops, !stops.isEmpty { return stops }
+        return [TripStop(place: destination, startDate: startDate, endDate: endDate, hasLaundry: hasLaundry)]
+    }
+
+    var isMultiStop: Bool { (stops?.count ?? 0) > 1 }
+
+    /// Во кој град си тој ден (на ден на преселба — новиот град, таму спиеш).
+    func stopIndex(on date: Date) -> Int {
+        let day = date.startOfDay
+        let list = allStops
+        if let index = list.lastIndex(where: { $0.startDate.startOfDay <= day && day <= $0.endDate.startOfDay }) {
+            return index
+        }
+        return list.lastIndex(where: { $0.startDate.startOfDay <= day }) ?? 0
+    }
+
+    func stop(on date: Date) -> TripStop {
+        allStops[stopIndex(on: date)]
+    }
+
+    /// Имиња на државите по ред, без повторување (на јазикот на апликацијата).
+    var countryNames: [String] {
+        var names: [String] = []
+        for stop in allStops {
+            let name = AppLanguage.current.locale.localizedString(forRegionCode: stop.place.countryCode) ?? stop.place.country
+            if !names.contains(name) { names.append(name) }
+        }
+        return names
+    }
+
+    /// Каде одиш: „Париз“; повеќе градови во една држава — „Грција“; повеќе држави — „Грција и Италија“.
+    var placeSummary: String {
+        guard isMultiStop else { return destination.name }
+        return Trip.joined(countryNames)
+    }
+
+    /// Името: своето, или автоматско — „Патување во Париз“ / „Greece trip“.
+    var title: String {
+        if let name, !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return name.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return autoTitle
+    }
+
+    var autoTitle: String {
+        L("Патување во \(placeSummary)", "\(placeSummary) trip")
+    }
+
+    /// „Солун → Лефкада → Миконос“
+    var stopsText: String {
+        allStops.map(\.place.name).joined(separator: " → ")
+    }
+
+    /// На картата: „Солун +2“.
+    var destinationLabel: String {
+        isMultiStop ? "\(destination.name) +\(allStops.count - 1)" : destination.name
+    }
+
+    /// За споредба дали прогнозата важи (исти градови и датуми).
+    var weatherBasisKey: String {
+        allStops.map { "\($0.place.id)-\($0.startDate.startOfDay.timeIntervalSince1970)-\($0.endDate.startOfDay.timeIntervalSince1970)" }
+            .joined(separator: "|")
+    }
+
+    /// „Грција“, „Грција и Италија“, „Грција, Италија и Хрватска“.
+    static func joined(_ names: [String]) -> String {
+        guard names.count > 1, let last = names.last else { return names.first ?? "" }
+        let head = names.dropLast().joined(separator: ", ")
+        return head + L(" и ", " & ") + last
+    }
 
     /// Синхронизирано со акаунт.
     var isCloud: Bool { ownerUID != nil }
@@ -485,8 +582,8 @@ struct Trip: Codable, Identifiable, Hashable {
     var airline: Airline? { Airlines.find(airlineID) }
 
     var isInternational: Bool {
-        guard let origin else { return destination.countryCode.uppercased() != "MK" }
-        return origin.countryCode.uppercased() != destination.countryCode.uppercased()
+        let home = (origin?.countryCode ?? "MK").uppercased()
+        return allStops.contains { $0.place.countryCode.uppercased() != home }
     }
 
     var originCode: String { origin?.code ?? "———" }
@@ -548,13 +645,14 @@ struct Trip: Codable, Identifiable, Hashable {
     var weatherSummary: WeatherSummary { WeatherSummary(days: weather) }
 
     var routeText: String {
-        if let origin { return "\(origin.name) → \(destination.name)" }
-        return destination.name
+        if let origin { return "\(origin.name) → \(stopsText)" }
+        return stopsText
     }
 
     var shareText: String {
         var lines: [String] = []
-        lines.append("✈︎ \(originCode) → \(destinationCode) · \(destination.name) \(destination.flag)")
+        lines.append("✈︎ \(originCode) → \(destinationCode) · \(title) \(destination.flag)")
+        if isMultiStop { lines.append(stopsText) }
         lines.append("\(Fmt.range(startDate, endDate)) · \(Fmt.days(dayCount))")
         lines.append(L("Багаж", "Bag") + ": \(bag.displayTitle) (\(bag.limitText))")
         if !togetherItems.isEmpty {
@@ -594,8 +692,8 @@ struct Trip: Codable, Identifiable, Hashable {
     func shareText(for companion: Companion, from me: String) -> String {
         let mine = togetherItems.filter { $0.assignee == companion.id }
         var lines: [String] = []
-        lines.append(L("Здраво \(companion.firstName)! ✈︎ \(destination.name), \(Fmt.range(startDate, endDate))",
-                       "Hi \(companion.firstName)! ✈︎ \(destination.name), \(Fmt.range(startDate, endDate))"))
+        lines.append(L("Здраво \(companion.firstName)! ✈︎ \(placeSummary), \(Fmt.range(startDate, endDate))",
+                       "Hi \(companion.firstName)! ✈︎ \(placeSummary), \(Fmt.range(startDate, endDate))"))
         lines.append("")
         if mine.isEmpty {
             lines.append(L("Уште немаме поделено кој што носи. Ова е заедничкото:", "We haven't split anything yet. Here's what we share:"))

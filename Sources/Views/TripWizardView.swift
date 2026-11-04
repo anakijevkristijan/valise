@@ -4,6 +4,15 @@ import UIKit
 
 // MARK: - Нацрт на патувањето
 
+/// Уште еден град во патувањето (Premium) — свои датуми и перална.
+struct DraftStop: Identifiable {
+    let id = UUID()
+    var place: Place?
+    var startDate: Date
+    var endDate: Date
+    var hasLaundry = false
+}
+
 struct TripDraft {
     var origin: Place? = LastOrigin.load()
     var destination: Place?
@@ -19,6 +28,10 @@ struct TripDraft {
     var style: TravelerStyle = .neutral
     var hasLaundry = false
     var companions: [Companion] = []
+    /// Градовите по првиот (Premium). Првиот е `destination` со `startDate`–`endDate` и `hasLaundry`.
+    var extraStops: [DraftStop] = []
+    /// Своето име на патувањето (по избор).
+    var name = ""
 
     init() {
         resetBags()
@@ -36,6 +49,17 @@ struct TripDraft {
         style = trip.style
         hasLaundry = trip.hasLaundry
         companions = trip.travelers
+        name = trip.name ?? ""
+        if trip.isMultiStop, let first = trip.allStops.first {
+            destination = first.place
+            startDate = first.startDate.startOfDay
+            endDate = first.endDate.startOfDay
+            hasLaundry = first.hasLaundry
+            extraStops = trip.allStops.dropFirst().map {
+                DraftStop(place: $0.place, startDate: $0.startDate.startOfDay,
+                          endDate: $0.endDate.startOfDay, hasLaundry: $0.hasLaundry)
+            }
+        }
 
         let options = bagOptions
         for spec in trip.allBags {
@@ -122,9 +146,44 @@ struct TripDraft {
     }
 
     var dayCount: Int {
-        let diff = Calendar.current.dateComponents([.day], from: startDate.startOfDay, to: endDate.startOfDay).day ?? 0
+        let diff = Calendar.current.dateComponents([.day], from: tripStart, to: tripEnd).day ?? 0
         return max(1, diff + 1)
     }
+
+    // MARK: Повеќе градови
+
+    var isMultiStop: Bool { !extraStops.isEmpty }
+
+    /// Сите градови со избрано место, по датумот на пристигнување.
+    var tripStops: [TripStop] {
+        guard let destination else { return [] }
+        var list = [TripStop(place: destination,
+                             startDate: startDate.startOfDay,
+                             endDate: max(endDate, startDate).startOfDay,
+                             hasLaundry: hasLaundry)]
+        for extra in extraStops {
+            guard let place = extra.place else { continue }
+            list.append(TripStop(place: place,
+                                 startDate: extra.startDate.startOfDay,
+                                 endDate: max(extra.endDate, extra.startDate).startOfDay,
+                                 hasLaundry: extra.hasLaundry))
+        }
+        return list.enumerated()
+            .sorted { $0.element.startDate == $1.element.startDate ? $0.offset < $1.offset : $0.element.startDate < $1.element.startDate }
+            .map(\.element)
+    }
+
+    var tripStart: Date { tripStops.map(\.startDate).min() ?? startDate.startOfDay }
+    var tripEnd: Date { tripStops.map(\.endDate).max() ?? max(endDate, startDate).startOfDay }
+
+    /// Нов град: пристигнуваш кога заминуваш од претходниот.
+    mutating func addStop() {
+        let arrival = (extraStops.last?.endDate ?? endDate).startOfDay
+        extraStops.append(DraftStop(place: nil, startDate: arrival, endDate: arrival.adding(days: 2)))
+    }
+
+    var stopsAreComplete: Bool { extraStops.allSatisfy { $0.place != nil } }
+    var datesAreValid: Bool { endDate >= startDate && extraStops.allSatisfy { $0.endDate >= $0.startDate } }
 }
 
 // MARK: - Волшебник
@@ -149,6 +208,7 @@ struct TripWizardView: View {
     @State private var pendingInvites: [PendingInvite] = []
     @State private var contactNote: String?
     @State private var showAirlinePicker = false
+    @State private var showCityPaywall = false
 
     private let stepCount = 5
 
@@ -159,7 +219,7 @@ struct TripWizardView: View {
             _draft = State(initialValue: TripDraft(trip: trip))
             _weather = State(initialValue: trip.weather)
             _weatherSource = State(initialValue: trip.weatherSource)
-            _weatherKey = State(initialValue: TripWizardView.weatherKey(trip.destination, trip.startDate.startOfDay, trip.endDate.startOfDay))
+            _weatherKey = State(initialValue: trip.weatherBasisKey)
         } else {
             _draft = State(initialValue: TripDraft())
             _weather = State(initialValue: [])
@@ -170,9 +230,6 @@ struct TripWizardView: View {
 
     private var isEditing: Bool { editing != nil }
 
-    private static func weatherKey(_ place: Place, _ start: Date, _ end: Date) -> String {
-        "\(place.id)-\(start.timeIntervalSince1970)-\(end.timeIntervalSince1970)"
-    }
 
     var body: some View {
         ZStack {
@@ -310,6 +367,9 @@ struct TripWizardView: View {
                         "Tap the bar above to jump to any step, or “Save” when you're done.")
                     : L("Ќе го проверам времето на дестинацијата и дали ти треба адаптер за струја.",
                         "I'll check the weather at your destination and whether you need a plug adapter.")
+        case 1 where draft.isMultiStop:
+            return L("За секој град: денот кога пристигнуваш и денот кога заминуваш.",
+                     "For each city: the day you arrive and the day you leave.")
         case 1: return L("Допри го денот на поаѓање, па денот на враќање.",
                          "Tap your departure day, then your return day.")
         case 2: return L("Ги знам мерките за рачен багаж — за да не платиш казна на излезот.",
@@ -340,19 +400,95 @@ struct TripWizardView: View {
             PlaceSearchField(label: L("Од", "From"),
                              placeholder: L("Град на поаѓање", "Departure city"),
                              selection: $draft.origin)
-            PlaceSearchField(label: L("До", "To"),
+            PlaceSearchField(label: draft.isMultiStop ? L("Прв град", "First stop") : L("До", "To"),
                              placeholder: L("Град, држава…", "City, country…"),
                              selection: $draft.destination,
                              suggestions: AppLanguage.current == .mk
                                 ? ["Рим", "Париз", "Истанбул", "Барселона", "Виена", "Атина"]
                                 : ["Rome", "Paris", "Istanbul", "Barcelona", "Vienna", "Athens"])
+
+            // Уште градови (Premium): Солун → Лефкада → Миконос
+            ForEach($draft.extraStops) { $stop in
+                let stopID = stop.id
+                HStack(alignment: .top, spacing: 8) {
+                    PlaceSearchField(label: L("Потоа", "Then"),
+                                     placeholder: L("Следен град", "Next city"),
+                                     selection: $stop.place)
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            draft.extraStops.removeAll { $0.id == stopID }
+                        }
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Theme.muted)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 18)
+                    .accessibilityLabel(L("Тргни го градот", "Remove city"))
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+
+            if draft.destination != nil {
+                Button {
+                    if premium.isPremium {
+                        withAnimation(.easeInOut(duration: 0.2)) { draft.addStop() }
+                    } else {
+                        showCityPaywall = true
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text(L("Додај уште еден град", "Add another city"))
+                            .font(.sans(14, .semibold))
+                        if !premium.isPremium {
+                            Image(systemName: "lock.fill")
+                                .font(.system(size: 10))
+                                .foregroundStyle(Theme.gold)
+                        }
+                        Spacer()
+                    }
+                    .foregroundStyle(Theme.navy)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 14)
+                    .background(RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .strokeBorder(Theme.navy.opacity(0.25), style: StrokeStyle(lineWidth: 1, dash: [4, 4])))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(PressableStyle())
+            }
+        }
+        .sheet(isPresented: $showCityPaywall) {
+            PremiumSheet().environmentObject(premium)
         }
     }
 
     // Чекор 2
     private var datesStep: some View {
         VStack(alignment: .leading, spacing: 18) {
-            DateRangeCalendar(start: $draft.startDate, end: $draft.endDate)
+            if draft.isMultiStop {
+                // Посебен календар и перална за секој град
+                VStack(alignment: .leading, spacing: 12) {
+                    cityHeader(draft.destination, number: 1)
+                    DateRangeCalendar(start: $draft.startDate, end: $draft.endDate)
+                    laundryToggle($draft.hasLaundry, city: draft.destination?.name)
+                }
+                ForEach($draft.extraStops) { $stop in
+                    let number = (draft.extraStops.firstIndex { $0.id == stop.id } ?? 0) + 2
+                    VStack(alignment: .leading, spacing: 12) {
+                        cityHeader(stop.place, number: number)
+                        DateRangeCalendar(start: $stop.startDate, end: $stop.endDate)
+                        laundryToggle($stop.hasLaundry, city: stop.place?.name)
+                    }
+                    .padding(.top, 10)
+                }
+            } else {
+                DateRangeCalendar(start: $draft.startDate, end: $draft.endDate)
+            }
 
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 Text("\(draft.dayCount)")
@@ -371,19 +507,43 @@ struct TripWizardView: View {
             .animation(.snappy, value: draft.dayCount)
             .padding(.horizontal, 4)
 
-            Toggle(isOn: $draft.hasLaundry) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(L("Ќе имам перална машина", "I'll have a washing machine"))
-                        .font(.sans(15, .medium))
-                        .foregroundStyle(Theme.ink)
-                    Text(L("Пакуваш облека за најмногу 4 дена и переш.", "Pack for at most 4 days and wash."))
-                        .font(.sans(13))
-                        .foregroundStyle(Theme.inkSoft)
-                }
+            if !draft.isMultiStop {
+                laundryToggle($draft.hasLaundry, city: nil)
             }
-            .tint(Theme.navy)
-            .luxCard(padding: 18)
         }
+    }
+
+    private func cityHeader(_ place: Place?, number: Int) -> some View {
+        HStack(spacing: 10) {
+            Text("\(number)")
+                .font(.codes(15))
+                .foregroundStyle(Theme.goldLight)
+                .frame(width: 28, height: 28)
+                .background(Circle().fill(Theme.navy))
+            Text(place.map { "\($0.flag)  \($0.name)" } ?? "—")
+                .font(.serif(24))
+                .foregroundStyle(Theme.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+    }
+
+    private func laundryToggle(_ isOn: Binding<Bool>, city: String?) -> some View {
+        Toggle(isOn: isOn) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(city.map { L("Перална машина во \($0)", "Washing machine in \($0)") }
+                     ?? L("Ќе имам перална машина", "I'll have a washing machine"))
+                    .font(.sans(15, .medium))
+                    .foregroundStyle(Theme.ink)
+                Text(city == nil
+                     ? L("Пакуваш облека за најмногу 4 дена и переш.", "Pack for at most 4 days and wash.")
+                     : L("Таму переш — понатаму ти треба помалку облека.", "You wash there, so you need fewer clothes after."))
+                    .font(.sans(13))
+                    .foregroundStyle(Theme.inkSoft)
+            }
+        }
+        .tint(Theme.navy)
+        .luxCard(padding: 18)
     }
 
     private var dayWord: String {
@@ -788,16 +948,20 @@ struct TripWizardView: View {
     // Чекор 5
     private var previewTrip: Trip? {
         guard let destination = draft.destination else { return nil }
+        let stops = draft.tripStops
         var trip = Trip(origin: draft.origin,
-                        destination: destination,
-                        startDate: draft.startDate.startOfDay,
-                        endDate: max(draft.endDate, draft.startDate).startOfDay,
+                        destination: stops.first?.place ?? destination,
+                        startDate: draft.tripStart,
+                        endDate: draft.tripEnd,
                         transport: draft.transport,
                         airlineID: draft.transport == .plane && premium.isPremium ? draft.airlineID : nil,
                         bag: draft.primaryBag,
                         activities: Activity.allCases.filter { draft.activities.contains($0) },
                         style: draft.style,
-                        hasLaundry: draft.hasLaundry)
+                        hasLaundry: stops.contains { $0.hasLaundry })
+        trip.stops = stops.count > 1 ? stops : nil
+        let typedName = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        trip.name = typedName.isEmpty ? nil : typedName
         trip.bags = draft.resolvedBags
         trip.weather = weather
         trip.weatherSource = weatherSource
@@ -815,9 +979,28 @@ struct TripWizardView: View {
         VStack(alignment: .leading, spacing: 22) {
             if let trip = previewTrip {
                 BoardingPassCard(trip: trip)
+
+                // Име на патувањето (по избор)
+                VStack(alignment: .leading, spacing: 8) {
+                    Eyebrow(L("Име на патувањето", "Trip name"))
+                    TextField("", text: $draft.name,
+                              prompt: Text(trip.autoTitle).foregroundColor(Theme.muted.opacity(0.7)))
+                        .font(.serif(24))
+                        .foregroundStyle(Theme.ink)
+                        .textInputAutocapitalization(.sentences)
+                        .submitLabel(.done)
+                    Hairline()
+                    Text(L("По избор. Ако го оставиш празно, ќе пишува „\(trip.autoTitle)“.",
+                           "Optional. Leave it empty and it will say “\(trip.autoTitle)”."))
+                        .font(.sans(12))
+                        .foregroundStyle(Theme.muted)
+                }
             }
 
             VStack(alignment: .leading, spacing: 14) {
+                if draft.isMultiStop, let trip = previewTrip {
+                    summaryRow(icon: "map", text: trip.stopsText)
+                }
                 summaryRow(icon: draft.transport.icon, text: transportText)
                 summaryRow(icon: draft.primaryBag.kind.icon, text: draft.bagsSummary)
                 if !draft.companions.isEmpty {
@@ -889,18 +1072,21 @@ struct TripWizardView: View {
         return draft.transport.title
     }
 
+    /// Исти градови и датуми = истата прогноза (како `Trip.weatherBasisKey`).
     private var reviewWeatherKey: String {
-        guard let d = draft.destination else { return "" }
-        return TripWizardView.weatherKey(d, draft.startDate.startOfDay, draft.endDate.startOfDay)
+        draft.tripStops
+            .map { "\($0.place.id)-\($0.startDate.startOfDay.timeIntervalSince1970)-\($0.endDate.startOfDay.timeIntervalSince1970)" }
+            .joined(separator: "|")
     }
 
     @MainActor
     private func loadWeather() async {
-        guard premium.isPremium, let destination = draft.destination else { return }
+        let stops = draft.tripStops
+        guard premium.isPremium, !stops.isEmpty else { return }
         let key = reviewWeatherKey
         if key == weatherKey && !weather.isEmpty { return }
         isLoadingWeather = true
-        let result = await WeatherService.fetchWeather(for: destination, from: draft.startDate, to: draft.endDate)
+        let result = await WeatherService.fetchWeather(for: stops)
         weather = result.days
         weatherSource = result.source
         weatherKey = key
@@ -934,8 +1120,8 @@ struct TripWizardView: View {
 
     private var canContinue: Bool {
         switch step {
-        case 0: return draft.destination != nil
-        case 1: return draft.endDate >= draft.startDate
+        case 0: return draft.destination != nil && draft.stopsAreComplete
+        case 1: return draft.datesAreValid
         case 2: return !draft.resolvedBags.isEmpty && draft.totalVolume > 0
         default: return true
         }
@@ -959,7 +1145,8 @@ struct TripWizardView: View {
     }
 
     private var canSave: Bool {
-        draft.destination != nil && draft.endDate >= draft.startDate && !draft.resolvedBags.isEmpty && draft.totalVolume > 0
+        draft.destination != nil && draft.stopsAreComplete && draft.datesAreValid
+            && !draft.resolvedBags.isEmpty && draft.totalVolume > 0
     }
 
     /// Ги зачувува промените, без да се губи спакуваното, сопатниците и рачно додаденото.
@@ -988,9 +1175,7 @@ struct TripWizardView: View {
             updated.memberUIDs = original.memberUIDs
         }
 
-        let sameBasis = original.destination.id == updated.destination.id
-            && original.startDate.startOfDay == updated.startDate
-            && original.endDate.startOfDay == updated.endDate
+        let sameBasis = original.weatherBasisKey == updated.weatherBasisKey
         if !weather.isEmpty && weatherKey == reviewWeatherKey {
             updated.weather = weather
             updated.weatherSource = weatherSource
@@ -1637,6 +1822,13 @@ struct WeatherDayCell: View {
                 .font(.sans(9, .semibold))
                 .tracking(1.2)
                 .foregroundStyle(Theme.muted)
+            if let place = day.place {
+                // Кај повеќе градови: во кој град си тој ден
+                Text(CityCode.code(for: place))
+                    .font(.sans(9, .bold))
+                    .tracking(1)
+                    .foregroundStyle(Theme.gold)
+            }
             HStack(spacing: 1) {
                 Text(Fmt.day(day.date))
                     .font(.codes(15))

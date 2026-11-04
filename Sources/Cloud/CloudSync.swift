@@ -359,7 +359,7 @@ final class CloudSync {
                 .collection("trips").document(trip.id.uuidString)
                 .setData([
                     "fromName": fromName,
-                    "destination": trip.destination.name,
+                    "destination": trip.placeSummary,
                     "startDate": trip.startDate.timeIntervalSince1970,
                     "createdAt": Date().timeIntervalSince1970
                 ])

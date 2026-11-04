@@ -30,6 +30,7 @@ struct SettingsView: View {
 
                     accountCard
                     premiumCard
+                    if premium.isSandbox { testFreeSwitch }
 
                     VStack(alignment: .leading, spacing: 10) {
                         Eyebrow(L("Твоето име", "Your name"))
@@ -228,6 +229,25 @@ struct SettingsView: View {
             .luxCard(padding: 14, radius: 18)
         }
         .buttonStyle(PressableStyle())
+    }
+
+    /// Само во TestFlight (тест-купување): да се види апликацијата без Premium.
+    private var testFreeSwitch: some View {
+        Toggle(isOn: Binding(get: { premium.simulatesFree },
+                             set: { on in Task { await premium.setSimulatesFree(on) } })) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(L("Тест: бесплатна верзија", "Test: free version"))
+                    .font(.sans(14, .medium))
+                    .foregroundStyle(Theme.ink)
+                Text(L("Само во TestFlight — да видиш како изгледа апликацијата без Premium.",
+                       "TestFlight only — see the app without Premium."))
+                    .font(.sans(11))
+                    .foregroundStyle(Theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .tint(Theme.navy)
+        .luxCard(padding: 14, radius: 18)
     }
 
     // MARK: Теми
@@ -463,6 +483,7 @@ struct PremiumSheet: View {
                     VStack(alignment: .leading, spacing: 14) {
                         benefit("cloud.sun", L("Прогноза за секој ден и колку од секое парче да спакуваш", "Day-by-day forecast and how many of each item to pack"))
                         benefit("airplane", L("Багаж за 140+ авиокомпании и дали сè ќе собере", "Baggage rules for 140+ airlines and whether it all fits"))
+                        benefit("map", L("Повеќе градови во едно патување, со перална каде ја има", "Several cities in one trip, with laundry where you have it"))
                         benefit("hanger", L("Гардероба и аутфити по денови", "Your wardrobe and outfits for every day"))
                         benefit("person.2", L("Патувања со пријатели — кој што носи", "Trips with friends — who brings what"))
                         benefit("camera.aperture", L("Story за Instagram", "Stories for Instagram"))

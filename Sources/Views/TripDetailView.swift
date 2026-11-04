@@ -272,11 +272,11 @@ struct TripDetailView: View {
     private func titleBlock(_ trip: Trip) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Eyebrow("\(trip.destination.flag)  \(trip.destination.country)", color: Theme.gold)
+                Eyebrow(headerEyebrow(trip), color: Theme.gold)
                 Spacer()
                 Pill(text: trip.countdownText, icon: "calendar")
             }
-            Text(trip.destination.name)
+            Text(trip.title)
                 .font(.serif(44))
                 .foregroundStyle(Theme.ink)
                 .lineLimit(2)
@@ -287,8 +287,17 @@ struct TripDetailView: View {
         }
     }
 
+    /// „🇫🇷  France“; повеќе градови — знамињата и државите.
+    private func headerEyebrow(_ trip: Trip) -> String {
+        guard trip.isMultiStop else { return "\(trip.destination.flag)  \(trip.destination.country)" }
+        var flags: [String] = []
+        for stop in trip.allStops where !flags.contains(stop.place.flag) { flags.append(stop.place.flag) }
+        return flags.joined(separator: " ") + "  " + Trip.joined(trip.countryNames)
+    }
+
     private func heroDetail(_ trip: Trip) -> String {
         var parts = [Fmt.range(trip.startDate, trip.endDate), Fmt.nights(trip.nightCount), trip.transport.title]
+        if trip.isMultiStop { parts.insert(trip.stopsText, at: 0) }
         if let airline = trip.airline, airline.id != "other" { parts.append(airline.name) }
         return parts.joined(separator: " · ")
     }

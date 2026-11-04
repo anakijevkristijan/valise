@@ -148,6 +148,28 @@ enum WeatherService {
         return f
     }()
 
+    /// Повеќе градови: прогноза за секој град во неговите датуми, споена по денови.
+    /// На ден на преселба важи новиот град (таму спиеш).
+    static func fetchWeather(for stops: [TripStop]) async -> (days: [WeatherDay], source: WeatherSource) {
+        if stops.count <= 1, let only = stops.first {
+            return await fetchWeather(for: only.place, from: only.startDate, to: only.endDate)
+        }
+        var byDay: [Date: WeatherDay] = [:]
+        var sources: [WeatherSource] = []
+        for stop in stops {
+            let result = await fetchWeather(for: stop.place, from: stop.startDate, to: stop.endDate)
+            if result.source != .none && !sources.contains(result.source) { sources.append(result.source) }
+            for day in result.days {
+                var labelled = day
+                labelled.place = stop.place.name
+                byDay[day.date.startOfDay] = labelled
+            }
+        }
+        let days = byDay.values.sorted { $0.date < $1.date }
+        let source: WeatherSource = sources.isEmpty ? .none : (sources.count == 1 ? sources[0] : .mixed)
+        return (days, source)
+    }
+
     /// Секој ден од патувањето: прогноза каде што ја има, инаку истиот ден лани (означен).
     static func fetchWeather(for place: Place, from start: Date, to end: Date) async -> (days: [WeatherDay], source: WeatherSource) {
         let today = Date().startOfDay

@@ -199,7 +199,7 @@ enum PackingEngine {
         var b = Builder()
 
         let days = trip.dayCount
-        let clothDays = trip.hasLaundry ? min(days, 4) : days
+        let clothDays = clothingDays(for: trip)
         let w = trip.weatherSummary
         let acts = Set(trip.activities)
         let isPlane = trip.transport == .plane
@@ -328,8 +328,14 @@ enum PackingEngine {
         b.add("phoneCharger", .electronics, vol: 0.15, kg: 0.1)
         b.add("powerbank", .electronics, vol: 0.25, kg: 0.25, note: isPlane ? "handOnly" : nil)
         b.add("headphones", .electronics, vol: 0.2, kg: 0.06)
-        if let plug = adapterType(from: trip.origin?.countryCode ?? "MK", to: trip.destination.countryCode) {
-            b.add("adapter.\(plug)", .electronics, vol: 0.1, kg: 0.08, note: "plugNote")
+        // Адаптер за секоја држава со друг штекер (кај повеќе градови може и повеќе)
+        var plugs: [String] = []
+        for stop in trip.allStops {
+            if let plug = adapterType(from: trip.origin?.countryCode ?? "MK", to: stop.place.countryCode),
+               !plugs.contains(plug) {
+                plugs.append(plug)
+                b.add("adapter.\(plug)", .electronics, vol: 0.1, kg: 0.08, note: "plugNote")
+            }
         }
 
         // Додатоци
@@ -450,12 +456,13 @@ enum PackingEngine {
                            coldestLow: lows.min() ?? 12,
                            isEstimate: false)
         }
-        let latitude = trip.destination.latitude
-        let distance = min(abs(latitude), 70)
-        let yearly = 30 - 0.28 * distance                // просечна дневна температура во годината
-        let swing = min(0.24 * distance, 11)             // разлика лето–зима
-        let warmestDay = latitude >= 0 ? 200.0 : 17.0    // крај на јули / средина на јануари
         let highs = trip.days.map { date -> Double in
+            // Географската ширина на градот каде си тој ден
+            let latitude = trip.stop(on: date).place.latitude
+            let distance = min(abs(latitude), 70)
+            let yearly = 30 - 0.28 * distance                // просечна дневна температура во годината
+            let swing = min(0.24 * distance, 11)             // разлика лето–зима
+            let warmestDay = latitude >= 0 ? 200.0 : 17.0    // крај на јули / средина на јануари
             let day = Double(Calendar.current.ordinality(of: .day, in: .year, for: date) ?? 180)
             return yearly + swing * cos((day - warmestDay) / 365 * 2 * .pi)
         }
@@ -464,6 +471,27 @@ enum PackingEngine {
                        warmestHigh: (highs.max() ?? high) + 3,
                        coldestLow: high - 11,
                        isEstimate: true)
+    }
+
+    // MARK: Перење
+
+    /// Колку дена облека треба: најдолгиот период без перење.
+    /// Во сместување со перална се пере на секои 4 дена и пред да се замине во следниот град.
+    static func clothingDays(for trip: Trip) -> Int {
+        let stops = trip.allStops
+        guard stops.contains(where: \.hasLaundry) else { return trip.dayCount }
+        let days = trip.days
+        var sinceWash = 0
+        var longest = 0
+        for (index, date) in days.enumerated() {
+            sinceWash += 1
+            longest = max(longest, sinceWash)
+            let here = trip.stopIndex(on: date)
+            guard stops[here].hasLaundry else { continue }
+            let leavingTomorrow = index + 1 < days.count && trip.stopIndex(on: days[index + 1]) != here
+            if sinceWash >= 4 || (leavingTomorrow && sinceWash >= 2) { sinceWash = 0 }
+        }
+        return max(1, min(longest, trip.dayCount))
     }
 
     // MARK: Облека според новата прогноза
@@ -580,6 +608,12 @@ enum PackingEngine {
                 copy.id = old.id
                 copy.isPacked = old.isPacked
                 copy.assignee = old.assignee
+                if old.quantityEdited == true {
+                    // Рачно сменетата бројка останува
+                    copy.quantity = old.quantity
+                    copy.wornCount = old.wornCount
+                    copy.quantityEdited = true
+                }
             }
             return copy
         }

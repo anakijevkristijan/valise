@@ -154,7 +154,7 @@ struct BoardingPassCard: View {
                 }
                 .padding(.bottom, 26)
                 Spacer(minLength: 4)
-                cityBlock(code: trip.destinationCode, name: trip.destination.name, alignment: .trailing)
+                cityBlock(code: trip.destinationCode, name: trip.destinationLabel, alignment: .trailing)
             }
             .padding(.top, isStory ? 16 : 22)
         }
@@ -260,7 +260,7 @@ struct TicketRow: View {
                         .font(.codes(22))
                 }
                 .foregroundStyle(Theme.ink)
-                Text("\(trip.destination.name) · \(Fmt.ticketDate(trip.startDate)) — \(Fmt.ticketDate(trip.endDate))")
+                Text("\(trip.title) · \(Fmt.ticketDate(trip.startDate)) — \(Fmt.ticketDate(trip.endDate))")
                     .font(.sans(12))
                     .foregroundStyle(Theme.inkSoft)
                     .lineLimit(1)
@@ -359,7 +359,7 @@ struct PassTile: View {
                 .foregroundStyle(Theme.ticketText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
-            Text(trip.destination.name)
+            Text(trip.title)
                 .font(.sans(11, .medium))
                 .foregroundStyle(Theme.ticketText.opacity(0.75))
                 .lineLimit(1)
