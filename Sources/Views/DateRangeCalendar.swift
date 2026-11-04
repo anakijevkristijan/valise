@@ -14,11 +14,25 @@ struct DateRangeCalendar: View {
     /// По изборот на враќањето календарот се собира; „Промени датуми“ го отвора повторно.
     @State private var collapsed = false
 
-    private let minimum = Date().startOfDay
+    /// Најран ден што може да се избере (пр. вториот град — не пред заминувањето од првиот).
+    let earliest: Date?
+    /// Изборот е готов и календарот се собра (екранот оди на следниот град).
+    var onCollapse: (() -> Void)? = nil
+    /// Календарот повторно се отвори („Промени датуми“).
+    var onExpand: (() -> Void)? = nil
+    /// Повеќе градови: „Пристигнување → Заминување“ наместо „Поаѓање → Враќање“.
+    var arriveLeave = false
 
-    init(start: Binding<Date>, end: Binding<Date>) {
+    private var minimum: Date { max(Date().startOfDay, earliest?.startOfDay ?? .distantPast) }
+
+    init(start: Binding<Date>, end: Binding<Date>, earliest: Date? = nil, arriveLeave: Bool = false,
+         onCollapse: (() -> Void)? = nil, onExpand: (() -> Void)? = nil) {
         _start = start
         _end = end
+        self.earliest = earliest
+        self.arriveLeave = arriveLeave
+        self.onCollapse = onCollapse
+        self.onExpand = onExpand
         _month = State(initialValue: DateRangeCalendar.firstOfMonth(start.wrappedValue))
     }
 
@@ -42,6 +56,7 @@ struct DateRangeCalendar: View {
             if collapsed {
                 Button {
                     withAnimation(.easeInOut(duration: 0.25)) { collapsed = false }
+                    onExpand?()
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "calendar")
@@ -95,14 +110,14 @@ struct DateRangeCalendar: View {
     private var selectionHeader: some View {
         HStack(alignment: .top, spacing: 12) {
             endpointBlock(.start,
-                          label: L("Поаѓање", "Departure"),
+                          label: arriveLeave ? L("Пристигнување", "Arrive") : L("Поаѓање", "Departure"),
                           date: start)
             Image(systemName: "arrow.right")
                 .font(.system(size: 13, weight: .light))
                 .foregroundStyle(Theme.gold)
                 .padding(.top, 22)
             endpointBlock(.end,
-                          label: L("Враќање", "Return"),
+                          label: arriveLeave ? L("Заминување", "Leave") : L("Враќање", "Return"),
                           date: editing == .end && end.startOfDay == start.startOfDay ? nil : end)
         }
     }
@@ -110,6 +125,7 @@ struct DateRangeCalendar: View {
     private func endpointBlock(_ point: Endpoint, label: String, date: Date?) -> some View {
         let active = editing == point
         return Button {
+            if collapsed { onExpand?() }
             withAnimation(.easeInOut(duration: 0.2)) {
                 collapsed = false
                 editing = point
@@ -309,6 +325,7 @@ struct DateRangeCalendar: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
             if editing == .start && end.startOfDay >= start.startOfDay {
                 withAnimation(.easeInOut(duration: 0.3)) { collapsed = true }
+                onCollapse?()
             }
         }
     }
@@ -318,8 +335,10 @@ struct DateRangeCalendar: View {
     private var quickLengths: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(editing == .end
-                 ? L("Сега допри го денот на враќање — или избери траење:", "Now tap your return day — or pick a length:")
-                 : L("Брзо траење од поаѓањето:", "Quick length from departure:"))
+                 ? (arriveLeave ? L("Сега допри го денот кога заминуваш — или избери траење:", "Now tap the day you leave — or pick a length:")
+                                : L("Сега допри го денот на враќање — или избери траење:", "Now tap your return day — or pick a length:"))
+                 : (arriveLeave ? L("Брзо траење од пристигнувањето:", "Quick length from arrival:")
+                                : L("Брзо траење од поаѓањето:", "Quick length from departure:")))
                 .font(.sans(12))
                 .foregroundStyle(editing == .end ? Theme.gold : Theme.muted)
             ScrollView(.horizontal) {

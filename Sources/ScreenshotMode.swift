@@ -187,6 +187,8 @@ enum ScreenshotMode {
                 let name: String
                 let category: WardrobeCategory
                 let seasons: [Season]?
+                /// Вид (маица, џемпер…), по избор — инаку се погодува од името.
+                let kind: WardrobeKind?
             }
             struct Look: Decodable {
                 let name: String
@@ -204,7 +206,8 @@ enum ScreenshotMode {
         var idsByFile: [String: UUID] = [:]
         for piece in manifest.pieces {
             guard let image = UIImage(contentsOfFile: folder.appendingPathComponent(piece.file).path) else { continue }
-            let item = WardrobeItem(name: piece.name, category: piece.category, seasons: piece.seasons ?? [])
+            let item = WardrobeItem(name: piece.name, category: piece.kind?.category ?? piece.category,
+                                    seasons: piece.seasons ?? [], kindID: piece.kind?.rawValue).migratedKind()
             wardrobe.add(item, image: image)
             idsByFile[piece.file] = item.id
         }

@@ -1,12 +1,48 @@
 import SwiftUI
 import UIKit
+import Combine
+import UserNotifications
 import FirebaseCore
 import GoogleSignIn
 
 /// Ориентација според големината на прозорецот:
 /// мал екран (обичен iPhone, затворен iPhone Duo) → само исправено;
 /// голем (отворен iPhone Duo, iPad) → сите насоки, како iPad.
-final class AppDelegate: NSObject, UIApplicationDelegate {
+final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+    func application(_ application: UIApplication,
+                     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        // Потсетниците: прикажи ги и кога апликацијата е отворена, допир → отвори го патувањето
+        UNUserNotificationCenter.current().delegate = self
+        return true
+    }
+
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                            willPresent notification: UNNotification,
+                                            withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        completionHandler([.banner, .list, .sound])
+    }
+
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                            didReceive response: UNNotificationResponse,
+                                            withCompletionHandler completionHandler: @escaping () -> Void) {
+        let raw = response.notification.request.content.userInfo["tripID"] as? String
+        if let raw, let id = UUID(uuidString: raw) {
+            Task { @MainActor in NotificationRouter.shared.open(id) }
+        }
+        completionHandler()
+    }
+
+    // Известувања од пријателите: токенот од Apple оди во Firebase Messaging
+    func application(_ application: UIApplication,
+                     didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        PushService.shared.setAPNSToken(deviceToken)
+    }
+
+    func application(_ application: UIApplication,
+                     didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        print("Tripdrobe: push registration failed — \(error)")
+    }
+
     func application(_ application: UIApplication,
                      supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
         if UIDevice.current.userInterfaceIdiom == .pad { return .all }
@@ -26,6 +62,7 @@ struct ValiseApp: App {
 
     init() {
         FirebaseApp.configure()
+        PushService.shared.start()
         // Само за сликите за App Store (Debug во симулатор) — во TestFlight/App Store isOn е false.
         if ScreenshotMode.isOn {
             ScreenshotMode.prepareDefaults()
@@ -65,6 +102,15 @@ struct RootView: View {
     @AppStorage(AgeGateView.verifiedKey) private var ageVerified: Bool = false
     @AppStorage(PhoneStepView.askedKey) private var phoneAsked: Bool = false
     @AppStorage(PhoneID.phoneStorageKey) private var storedPhone: String = ""
+    @AppStorage(PremiumOfferView.shownKey) private var offerShown: Bool = false
+    @State private var showOffer = false
+
+    /// Понудата за Premium: еднаш по најавата, кога почетната е отворена и App Store ги вратил цените.
+    /// Не се покажува ако Premium е веќе активен или ако продавницата не одговара (без интернет).
+    private var offerReady: Bool {
+        stage == 3 && !ScreenshotMode.isOn && !offerShown
+            && premium.didLoad && premium.storeAvailable && !premium.isPremium
+    }
 
     /// 0 = јазик, 4 = возраст (пред да се внесе било што), 1 = име, 2 = акаунт (задолжителен),
     /// 5 = телефон (по најавата, може да се прескокне), 3 = почетна
@@ -112,14 +158,42 @@ struct RootView: View {
         .tint(Theme.navy)
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
-                Task { await store.refreshAllUpcoming() }
+                Task {
+                    // Прво дали Premium е уште активен (истечена или откажана претплата), па прогнозата
+                    await premium.refreshEntitlements()
+                    await store.refreshAllUpcoming()
+                    await NotificationRouter.shared.refreshAuthorization()
+                    await TripReminders.reschedule(trips: store.trips, premium: premium.isPremium)
+                }
             }
+        }
+        .task { await NotificationRouter.shared.refreshAuthorization() }
+        // Потсетниците се закажуваат одново по секоја промена (бројките „уште N работи“ да се точни)
+        .onReceive(store.$trips.debounce(for: .seconds(1.5), scheduler: RunLoop.main)) { trips in
+            Task { await TripReminders.reschedule(trips: trips, premium: premium.isPremium) }
         }
         .onChange(of: premium.isPremium) { _, unlocked in
             // Штом е купен Premium: паметни бројки и прогноза за сите патувања
+            Task { await TripReminders.reschedule(trips: store.trips, premium: unlocked) }
             guard unlocked else { return }
             store.applySmartQuantities()
             Task { await store.refreshAllUpcoming() }
+        }
+        .onChange(of: offerReady, initial: true) { _, ready in
+            guard ready else { return }
+            Task {
+                // Почетната прво да се појави, па понудата
+                try? await Task.sleep(for: .milliseconds(700))
+                guard offerReady else { return }
+                offerShown = true
+                showOffer = true
+            }
+        }
+        .fullScreenCover(isPresented: $showOffer) {
+            PremiumOfferView()
+                .environmentObject(premium)
+                .preferredColorScheme(.light)
+                .tint(Theme.navy)
         }
     }
 }

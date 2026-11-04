@@ -6,14 +6,21 @@ struct OutfitCollage: View {
     let items: [WardrobeItem]
     @EnvironmentObject private var wardrobe: WardrobeStore
 
-    /// Позиција (центар 0…1) и големина (дел од ширината) по категорија.
-    private static func slot(_ category: WardrobeCategory) -> (x: CGFloat, y: CGFloat, size: CGFloat) {
-        switch category {
+    /// Позиција (центар 0…1) и големина (дел од ширината) по вид и група.
+    private static func slot(_ item: WardrobeItem) -> (x: CGFloat, y: CGFloat, size: CGFloat) {
+        switch item.effectiveKind {
+        case .skirt?: return (0.50, 0.68, 0.48)          // сукњата е долу, како панталоните
+        case .swimwear?: return (0.50, 0.42, 0.44)
+        case .sportswear?: return (0.50, 0.45, 0.56)
+        default: break
+        }
+        switch item.category {
         case .outerwear: return (0.33, 0.33, 0.58)
         case .top: return (0.64, 0.30, 0.50)
         case .dress: return (0.50, 0.42, 0.66)
         case .bottom: return (0.50, 0.68, 0.52)
         case .shoes: return (0.76, 0.85, 0.32)
+        case .active: return (0.50, 0.45, 0.50)
         case .bag: return (0.22, 0.80, 0.32)
         case .accessory: return (0.84, 0.13, 0.24)
         }
@@ -24,7 +31,7 @@ struct OutfitCollage: View {
             let side = min(geo.size.width, geo.size.height)
             ZStack {
                 ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                    let slot = Self.slot(item.category)
+                    let slot = Self.slot(item)
                     let sameBefore = items.prefix(index).filter { $0.category == item.category }.count
                     let nudge = CGFloat(sameBefore) * 0.08
                     let isPhoto = item.isPhoto ?? false
@@ -39,6 +46,8 @@ struct OutfitCollage: View {
                             .rotationEffect(.degrees(tilt))
                             .position(x: geo.size.width * min(slot.x + nudge, 0.85),
                                       y: geo.size.height * min(slot.y + nudge * 0.5, 0.88))
+                            // Маицата под џемперот, џемперот под јакната
+                            .zIndex(item.layer)
                     }
                 }
                 if items.isEmpty {
@@ -199,7 +208,7 @@ struct SeasonFilter: View {
 
 // MARK: - Листата наспроти аутфитите
 
-/// „Горни дела 3/5 · Долни дела 2/2 …“ — зелено кога е исполнето, црвено кога фали.
+/// „Маици и топови 3/5 · Џемпер / дуксер 1/2 …“ — зелено кога е исполнето, црвено кога е над планираното.
 struct TargetChips: View {
     let targets: [ClothingTarget]
 
@@ -228,9 +237,9 @@ struct TargetChips: View {
 }
 
 enum TargetText {
-    /// „2 горни дела, 1 пар обувки“ — или nil ако сè е покриено.
+    /// „2 маици, 1 џемпер или дуксер“ — или nil ако сè е покриено.
     static func missing(_ targets: [ClothingTarget]) -> String? {
-        let parts = targets.filter { $0.missing > 0 }.map { $0.category.count($0.missing) }
+        let parts = targets.filter { $0.missing > 0 }.map { $0.countText($0.missing) }
         return parts.isEmpty ? nil : parts.joined(separator: ", ")
     }
 
@@ -510,11 +519,11 @@ struct OutfitBuilderView: View {
         }
         guard adding else { return }
 
-        // Предупредување: аутфитите го надминуваат планираното во листата (пр. 7 маици, а планирани 6)
+        // Предупредување: аутфитите го надминуваат планираното во листата (пр. 7 маици, а планирани 6) —
+        // само за редот каде што се брои ова парче (џемперот не ги полни маиците)
         if let trip,
            let target = wardrobe.targets(for: trip, extra: selected, excludingOutfit: existing?.id)
-               .first(where: { $0.category == item.category }),
-           target.over > 0 {
+               .first(where: { item.packingKeys.contains($0.key) && $0.over > 0 }) {
             show(L("Го надминуваш планираното: \(target.label). Листата предвидува \(target.need).",
                    "Over the plan: \(target.label). The list planned \(target.need)."))
             return

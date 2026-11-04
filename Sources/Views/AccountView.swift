@@ -266,16 +266,21 @@ struct AccountView: View {
             }
             .luxCard(padding: 0)
 
-            note(L("Со бројот пријателите те наоѓаат од нивните контакти. Потврда со SMS ќе додадеме пред објавување.",
-                   "Your number lets friends find you from their contacts. SMS verification comes before launch."))
+            note(L("Со бројот пријателите те наоѓаат од нивните контакти. Еден број може да биде само во еден акаунт.",
+                   "Your number lets friends find you from their contacts. A number can belong to only one account."))
 
             if let info { message(info, color: Theme.sage) }
             if let error { message(error, color: Theme.terracotta) }
 
             Button {
                 Task {
-                    await account.updateProfile(name: name, phone: phone)
-                    info = L("Зачувано.", "Saved.")
+                    info = nil
+                    error = nil
+                    if let failure = await account.updateProfile(name: name, phone: phone) {
+                        error = failure
+                    } else {
+                        info = L("Зачувано.", "Saved.")
+                    }
                 }
             } label: {
                 Text(L("Зачувај", "Save"))

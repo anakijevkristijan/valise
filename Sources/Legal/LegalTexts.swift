@@ -44,6 +44,8 @@ enum LegalTexts {
 
     **Гардероба и аутфити.** Фотографии од облека што ги правиш или избираш, категории, сезони, аутфити и план по денови. Пред да се зачува сликата, апликацијата го отстранува лицето, а слика на која останува лице не се зачувува. Гардеробата ја гледаш само ти.
 
+    **Известувања.** Потсетниците за пакување ги закажува самиот телефон и ништо не се праќа. За известувањата од пријателите (на пример, кога некој те додава во патување или те означува да понесеш нешто) чуваме технички токен за известувања на твојот уред, поврзан со акаунтот, и јазикот на апликацијата. Ги исклучуваш во Профил или во Поставки на iPhone; токенот се брише кога ќе се одјавиш.
+
     **Контакти.** Кога каниш пријател, го користиме само контактот што ќе го избереш (име и број или е-пошта) за да направиме шифриран клуч за поканата. Твојот именик не се праќа никаде.
 
     **Купувања.** Плаќањето го води Apple. Ние добиваме само потврда дека Premium е купен, без податоци за картичката.
@@ -61,6 +63,7 @@ enum LegalTexts {
     Само со услугите без кои апликацијата не може да работи:
 
     - **Google (Firebase Authentication, Cloud Firestore, Google Sign-In)** – најава и чување на податоците.
+    - **Google (Firebase Cloud Messaging, Cloud Functions) и Apple (Push Notification service)** – праќање известувања од пријателите.
     - **Apple** – Најава со Apple, купувања преку App Store, пребарување места (Apple Maps / MapKit) и, во верзијата од App Store, прогнозата (Apple Weather / WeatherKit). Се праќаат тоа што го пребаруваш, координатите на дестинацијата и датумите.
     - **Open-Meteo** – прогноза само во тест-верзиите. Се праќаат координатите на дестинацијата и датумите.
     - **Wikimedia (Wikipedia, Wikidata, Commons)** – фотографии од дестинацијата. Се праќаат името и координатите на местото.
@@ -115,6 +118,8 @@ enum LegalTexts {
 
     **Wardrobe and outfits.** Photos of clothes you take or choose, categories, seasons, outfits and your day-by-day plan. Before a photo is saved, the app removes any face, and a photo that still shows a face is not saved. Your wardrobe is visible only to you.
 
+    **Notifications.** Packing reminders are scheduled by your phone itself and nothing is sent anywhere. For notifications from friends (for example, when someone adds you to a trip or asks you to bring something) we store a technical notification token for your device, linked to your account, together with the app language. You can turn them off in Profile or in iPhone Settings; the token is removed when you sign out.
+
     **Contacts.** When you invite a friend, we use only the contact you pick (name and phone or email) to create an encrypted invite key. Your address book is never uploaded.
 
     **Purchases.** Payments are handled by Apple. We only receive confirmation that Premium was bought, never card details.
@@ -132,6 +137,7 @@ enum LegalTexts {
     Only with the services the app cannot work without:
 
     - **Google (Firebase Authentication, Cloud Firestore, Google Sign-In)** – sign-in and data storage.
+    - **Google (Firebase Cloud Messaging, Cloud Functions) and Apple (Push Notification service)** – delivering notifications from friends.
     - **Apple** – Sign in with Apple, App Store purchases, place search (Apple Maps / MapKit) and, in the App Store version, the forecast (Apple Weather / WeatherKit); what you search for, the destination's coordinates and the dates are sent.
     - **Open-Meteo** – forecast in test builds only; the destination's coordinates and dates are sent.
     - **Wikimedia (Wikipedia, Wikidata, Commons)** – destination photos; the place's name and coordinates are sent.

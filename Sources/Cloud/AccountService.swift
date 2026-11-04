@@ -34,7 +34,9 @@ final class AccountService: ObservableObject {
     private static let personalKeys = [
         "userName", PhoneID.phoneStorageKey, "lastOrigin", PhoneStepView.askedKey,
         Theme.storageKey, "homeFilter", "accountStepDone",
-        "languageChosen", AppLanguage.storageKey, AgeGateView.verifiedKey
+        "languageChosen", AppLanguage.storageKey, AgeGateView.verifiedKey,
+        PremiumOfferView.shownKey, TripReminders.enabledKey, TripReminders.askedKey,
+        PushService.friendAlertsKey
     ]
 
     /// Најавен (и веднаш при старт, пред Firebase да јави) — за да нема трепкање на екранот за најава.
@@ -107,7 +109,17 @@ final class AccountService: ObservableObject {
             change.displayName = name
             try? await change.commitChanges()
             UserDefaults.standard.set(name, forKey: "userName")
-            savePhone(phone)
+            // Бројот се зачувува само ако не е веќе во друг акаунт; инаку го покажува чекорот за телефон
+            if let normalized = PhoneID.normalize(phone) {
+                switch await checkPhone(normalized) {
+                case .free, .mine:
+                    savePhone(phone)
+                case .taken:
+                    pendingPhoneProblem = PhoneProblem(number: phone, message: Self.phoneTakenMessage)
+                case .offline:
+                    pendingPhoneProblem = PhoneProblem(number: phone, message: Self.phoneOfflineMessage)
+                }
+            }
             profile = Profile(uid: result.user.uid, email: result.user.email ?? email, name: name)
             await afterSignIn()
             return nil
@@ -202,6 +214,8 @@ final class AccountService: ObservableObject {
     func signOut() {
         isWorking = true
         Task {
+            // Овој телефон повеќе не добива известувања за овој акаунт
+            await PushService.shared.removeToken()
             await Self.waitForUploads(timeout: 5)
             GIDSignIn.sharedInstance.signOut()
             try? Auth.auth().signOut()
@@ -266,7 +280,10 @@ final class AccountService: ObservableObject {
 
     // MARK: Профил
 
-    func updateProfile(name: String, phone: String) async {
+    /// Име и телефон. Враќа порака ако бројот не може да се зачува
+    /// (веќе е додаден во друг акаунт, или нема интернет за да се провери).
+    @discardableResult
+    func updateProfile(name: String, phone: String) async -> String? {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmed.isEmpty {
             UserDefaults.standard.set(trimmed, forKey: "userName")
@@ -277,8 +294,64 @@ final class AccountService: ObservableObject {
             }
             profile?.name = trimmed
         }
+
+        // Нов број: прво дали е веќе во друг акаунт
+        let typed = phone.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let normalized = PhoneID.normalize(typed), normalized != self.phone {
+            switch await checkPhone(normalized) {
+            case .taken: return Self.phoneTakenMessage
+            case .offline: return Self.phoneOfflineMessage
+            case .free, .mine: break
+            }
+        }
+
+        let hadPhone = !self.phone.isEmpty
         savePhone(phone)
+        if hadPhone && self.phone.isEmpty {
+            await store?.cloud?.removePhone()
+        }
         await afterSignIn()
+        return nil
+    }
+
+    // MARK: Еден број — еден акаунт
+
+    enum PhoneCheck { case free, mine, taken, offline }
+
+    /// Број при регистрација што не можеше да се зачува — го покажува чекорот за телефон.
+    struct PhoneProblem: Equatable {
+        let number: String
+        let message: String
+    }
+
+    @Published var pendingPhoneProblem: PhoneProblem?
+
+    /// Дали бројот е веќе додаден во друг акаунт (по шифрираниот клуч, истиот што го користат пријателите).
+    func checkPhone(_ normalized: String) async -> PhoneCheck {
+        guard let uid = Auth.auth().currentUser?.uid else { return .offline }
+        let key = PhoneID.phoneKey(normalized)
+        do {
+            let snapshot = try await Firestore.firestore().collection("lookup").document(key).getDocument(source: .server)
+            guard snapshot.exists, let owner = snapshot.data()?["uid"] as? String else { return .free }
+            return owner == uid ? .mine : .taken
+        } catch {
+            return .offline
+        }
+    }
+
+    static var phoneTakenMessage: String {
+        let mail = LegalTexts.supportEmail
+        if mail.isEmpty {
+            return L("Овој број веќе е додаден во друг акаунт. Ако е твој, најави се во тој акаунт.",
+                     "This number is already added to another account. If it's yours, sign in to that account.")
+        }
+        return L("Овој број веќе е додаден во друг акаунт. Ако е твој, најави се во тој акаунт или пиши ни на \(mail).",
+                 "This number is already added to another account. If it's yours, sign in to that account or write to us at \(mail).")
+    }
+
+    static var phoneOfflineMessage: String {
+        L("Не можам да го проверам бројот — провери дали имаш интернет и обиди се повторно.",
+          "Couldn't check the number — make sure you're online and try again.")
     }
 
     private func savePhone(_ phone: String) {
@@ -296,8 +369,12 @@ final class AccountService: ObservableObject {
         let phoneKey = PhoneID.normalize(phone).map { PhoneID.phoneKey($0) }
         let emailKey = profile.email.isEmpty ? nil : PhoneID.emailKey(profile.email)
         let name = UserDefaults.standard.string(forKey: "userName") ?? profile.name
-        await cloud.registerProfile(name: name, phoneKey: phoneKey, emailKey: emailKey)
-        await cloud.joinPendingInvites(myKeys: [phoneKey, emailKey].compactMap { $0 }, myName: name)
+        let mine = await cloud.registerProfile(name: name, phoneKey: phoneKey, emailKey: emailKey)
+        // Поканите само за мојот број (не за број што е на друг акаунт)
+        let keys = [phoneKey, emailKey].compactMap { $0 }.filter { mine.contains($0) }
+        await cloud.joinPendingInvites(myKeys: keys, myName: name)
+        // Известувањата од пријателите доаѓаат на овој телефон
+        await PushService.shared.upload()
     }
 
     // MARK: Пораки за грешки

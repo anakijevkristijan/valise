@@ -44,7 +44,7 @@ enum Catalog {
         "booking": ("Потврда за сместување", "Accommodation confirmation"),
         "cards": ("Платежни картички", "Payment cards"),
         // Облека
-        "tshirts": ("Маици", "T-shirts"),
+        "tshirts": ("Маици и топови", "T-shirts and tops"),
         "underwear": ("Долна облека", "Underwear"),
         "socks": ("Чорапи", "Socks"),
         "shorts": ("Шорцеви / лесни панталони", "Shorts / light trousers"),
@@ -71,6 +71,7 @@ enum Catalog {
         "dressShoes": ("Елегантни чевли", "Dress shoes"),
         "trainingShoes": ("Патики за тренинг", "Training shoes"),
         "hikingBoots": ("Планинарски чевли", "Hiking boots"),
+        "boots": ("Чизми / боти", "Boots"),
         // Хигиена
         "toothbrush": ("Четка за заби", "Toothbrush"),
         "toothpaste": ("Паста за заби", "Toothpaste"),

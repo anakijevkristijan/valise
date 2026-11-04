@@ -11,6 +11,7 @@ struct HomeView: View {
     @State private var showSettings = false
     @State private var pendingTripID: UUID?
     @AppStorage("homeFilter") private var filter: PassFilter = .upcoming
+    @ObservedObject private var router = NotificationRouter.shared
 
     enum PassFilter: String, CaseIterable {
         case upcoming, past, all
@@ -56,6 +57,8 @@ struct HomeView: View {
         }
         .task { await store.refreshAllUpcoming() }
         .onAppear(perform: openScreenshotTrip)
+        .onAppear(perform: openFromNotification)
+        .onChange(of: router.openTripID) { _, _ in openFromNotification() }
         .fullScreenCover(isPresented: $showWizard, onDismiss: openPendingTrip) {
             TripWizardView { newID in
                 pendingTripID = newID
@@ -278,6 +281,17 @@ struct HomeView: View {
         pendingTripID = nil
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             path.append(id)
+        }
+    }
+
+    /// Допир на потсетник → се отвора тоа патување.
+    private func openFromNotification() {
+        guard let id = router.openTripID else { return }
+        router.openTripID = nil
+        guard store.trip(id) != nil else { return }
+        showSettings = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            path = [id]
         }
     }
 

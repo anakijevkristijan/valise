@@ -183,7 +183,32 @@ struct TripDraft {
     }
 
     var stopsAreComplete: Bool { extraStops.allSatisfy { $0.place != nil } }
-    var datesAreValid: Bool { endDate >= startDate && extraStops.allSatisfy { $0.endDate >= $0.startDate } }
+
+    /// Секој град почнува најрано кога заминуваш од претходниот (ист ден е дозволен).
+    var datesAreValid: Bool {
+        guard endDate >= startDate else { return false }
+        var previousEnd = endDate.startOfDay
+        for stop in extraStops {
+            if stop.endDate < stop.startDate || stop.startDate.startOfDay < previousEnd { return false }
+            previousEnd = stop.endDate.startOfDay
+        }
+        return true
+    }
+
+    /// Ако претходниот град сега завршува подоцна, следниот се поместува (со истото траење).
+    mutating func chainStops() {
+        var previousEnd = max(endDate, startDate).startOfDay
+        for index in extraStops.indices {
+            let stop = extraStops[index]
+            if stop.startDate.startOfDay < previousEnd {
+                let length = max(0, Calendar.current.dateComponents([.day], from: stop.startDate.startOfDay,
+                                                                    to: stop.endDate.startOfDay).day ?? 0)
+                extraStops[index].startDate = previousEnd
+                extraStops[index].endDate = previousEnd.adding(days: length)
+            }
+            previousEnd = max(extraStops[index].endDate, extraStops[index].startDate).startOfDay
+        }
+    }
 }
 
 // MARK: - Волшебник
@@ -198,6 +223,8 @@ struct TripWizardView: View {
 
     @State private var draft: TripDraft
     @State private var step = 0
+    /// Каде да лизне екранот (полето што се пишува, следниот град…).
+    @State private var scrollTarget: String?
     @State private var weather: [WeatherDay]
     @State private var weatherSource: WeatherSource
     @State private var isLoadingWeather = false
@@ -241,23 +268,35 @@ struct TripWizardView: View {
                     .padding(.horizontal, 24)
                     .padding(.top, 6)
 
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 28) {
-                        titleBlock
-                        stepContent
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 28) {
+                            titleBlock
+                            stepContent
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.top, 26)
+                        .padding(.bottom, 40)
+                        .frame(maxWidth: 620)
+                        .frame(maxWidth: .infinity)
+                        .containerRelativeFrame(.horizontal)
                     }
-                    .padding(.horizontal, 24)
-                    .padding(.top, 26)
-                    .padding(.bottom, 40)
-                    .frame(maxWidth: 620)
-                    .frame(maxWidth: .infinity)
-                    .containerRelativeFrame(.horizontal)
+                    .scrollDismissesKeyboard(.interactively)
+                    .scrollIndicators(.hidden)
+                    // Нов чекор = нов ScrollView, секогаш од врвот
+                    .id(step)
+                    .transition(.opacity)
+                    // Екранот го следи она што го пополнуваш (поле над тастатурата, следниот град)
+                    .onChange(of: scrollTarget) { _, target in
+                        guard let target else { return }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                            withAnimation(.easeInOut(duration: 0.35)) {
+                                proxy.scrollTo(target, anchor: .top)
+                            }
+                            scrollTarget = nil
+                        }
+                    }
                 }
-                .scrollDismissesKeyboard(.interactively)
-                .scrollIndicators(.hidden)
-                // Нов чекор = нов ScrollView, секогаш од врвот
-                .id(step)
-                .transition(.opacity)
 
                 bottomBar
             }
@@ -399,13 +438,17 @@ struct TripWizardView: View {
         VStack(alignment: .leading, spacing: 14) {
             PlaceSearchField(label: L("Од", "From"),
                              placeholder: L("Град на поаѓање", "Departure city"),
-                             selection: $draft.origin)
+                             selection: $draft.origin,
+                             onFocus: { scrollTarget = "place-origin" })
+                .id("place-origin")
             PlaceSearchField(label: draft.isMultiStop ? L("Прв град", "First stop") : L("До", "To"),
                              placeholder: L("Град, држава…", "City, country…"),
                              selection: $draft.destination,
                              suggestions: AppLanguage.current == .mk
                                 ? ["Рим", "Париз", "Истанбул", "Барселона", "Виена", "Атина"]
-                                : ["Rome", "Paris", "Istanbul", "Barcelona", "Vienna", "Athens"])
+                                : ["Rome", "Paris", "Istanbul", "Barcelona", "Vienna", "Athens"],
+                             onFocus: { scrollTarget = "place-destination" })
+                .id("place-destination")
 
             // Уште градови (Premium): Солун → Лефкада → Миконос
             ForEach($draft.extraStops) { $stop in
@@ -413,7 +456,9 @@ struct TripWizardView: View {
                 HStack(alignment: .top, spacing: 8) {
                     PlaceSearchField(label: L("Потоа", "Then"),
                                      placeholder: L("Следен град", "Next city"),
-                                     selection: $stop.place)
+                                     selection: $stop.place,
+                                     autoFocus: true,
+                                     onFocus: { scrollTarget = "place-\(stopID)" })
                     Button {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             draft.extraStops.removeAll { $0.id == stopID }
@@ -429,6 +474,7 @@ struct TripWizardView: View {
                     .padding(.top, 18)
                     .accessibilityLabel(L("Тргни го градот", "Remove city"))
                 }
+                .id("place-\(stopID)")
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
@@ -474,17 +520,28 @@ struct TripWizardView: View {
                 // Посебен календар и перална за секој град
                 VStack(alignment: .leading, spacing: 12) {
                     cityHeader(draft.destination, number: 1)
-                    DateRangeCalendar(start: $draft.startDate, end: $draft.endDate)
+                    DateRangeCalendar(start: $draft.startDate, end: $draft.endDate, arriveLeave: true,
+                                      onCollapse: { scrollTarget = draft.extraStops.first.map { "city-\($0.id)" } },
+                                      onExpand: { scrollTarget = "city-first" })
                     laundryToggle($draft.hasLaundry, city: draft.destination?.name)
                 }
+                .id("city-first")
                 ForEach($draft.extraStops) { $stop in
-                    let number = (draft.extraStops.firstIndex { $0.id == stop.id } ?? 0) + 2
+                    let stopID = stop.id
+                    let index = draft.extraStops.firstIndex { $0.id == stopID } ?? 0
+                    // Не пред заминувањето од претходниот град
+                    let previousEnd = index == 0 ? draft.endDate : draft.extraStops[index - 1].endDate
+                    let nextID: UUID? = index + 1 < draft.extraStops.count ? draft.extraStops[index + 1].id : nil
                     VStack(alignment: .leading, spacing: 12) {
-                        cityHeader(stop.place, number: number)
-                        DateRangeCalendar(start: $stop.startDate, end: $stop.endDate)
+                        cityHeader(stop.place, number: index + 2)
+                        DateRangeCalendar(start: $stop.startDate, end: $stop.endDate,
+                                          earliest: previousEnd, arriveLeave: true,
+                                          onCollapse: { scrollTarget = nextID.map { "city-\($0)" } },
+                                          onExpand: { scrollTarget = "city-\(stopID)" })
                         laundryToggle($stop.hasLaundry, city: stop.place?.name)
                     }
                     .padding(.top, 10)
+                    .id("city-\(stopID)")
                 }
             } else {
                 DateRangeCalendar(start: $draft.startDate, end: $draft.endDate)
@@ -511,6 +568,10 @@ struct TripWizardView: View {
                 laundryToggle($draft.hasLaundry, city: nil)
             }
         }
+        // Следниот град секогаш по претходниот: ако првиот сега завршува подоцна, вториот се поместува
+        .onAppear { draft.chainStops() }
+        .onChange(of: draft.endDate) { _, _ in draft.chainStops() }
+        .onChange(of: draft.extraStops.map(\.endDate)) { _, _ in draft.chainStops() }
     }
 
     private func cityHeader(_ place: Place?, number: Int) -> some View {
@@ -1246,6 +1307,10 @@ struct PlaceSearchField: View {
     let placeholder: String
     @Binding var selection: Place?
     var suggestions: [String] = []
+    /// Ново празно поле (следен град) — тастатурата веднаш се отвора.
+    var autoFocus = false
+    /// Полето доби фокус — екранот лизга за да е над тастатурата.
+    var onFocus: (() -> Void)? = nil
 
     @StateObject private var completer = PlaceCompleter()
     @State private var query = ""
@@ -1377,6 +1442,13 @@ struct PlaceSearchField: View {
         .onChange(of: query) { _, newValue in
             failed = false
             completer.update(newValue)
+        }
+        .onChange(of: focused) { _, isFocused in
+            if isFocused { onFocus?() }
+        }
+        .onAppear {
+            guard autoFocus, selection == nil else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { focused = true }
         }
         .task(id: query) { await loadFallback() }
     }

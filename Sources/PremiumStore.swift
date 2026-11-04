@@ -39,12 +39,18 @@ final class PremiumStore: ObservableObject {
     @Published private(set) var simulatesFree = UserDefaults.standard.bool(forKey: "testSimulateFree")
     /// Дали корисникот може да ја добие бесплатната проба (само еднаш по Apple ID).
     @Published private(set) var trialEligible = false
+    /// false = претплатата е откажана и Premium трае само до `expirationDate`.
+    @Published private(set) var willAutoRenew = true
+    /// Плаќањето не поминало и Apple се обидува повторно (grace period / billing retry).
+    @Published private(set) var hasBillingIssue = false
     @Published var errorMessage: String?
 
     /// Тест-отклучување е дозволено само надвор од App Store.
     var allowsTestUnlock: Bool { didLoad && !isStoreInstall }
 
     private var updatesTask: Task<Void, Never>?
+    /// Проверка точно кога истекува претплатата, ако апликацијата е отворена во тој момент.
+    private var expiryTask: Task<Void, Never>?
 
     /// App Store и TestFlight немаат embedded.mobileprovision (Apple го трга при потпишување).
     /// Sideloadly и Xcode на телефон секогаш го имаат. Во симулатор е тест.
@@ -143,13 +149,18 @@ final class PremiumStore: ObservableObject {
     }
 
     /// Активно право: претплата што не е истечена или откажана со враќање пари.
+    /// Истечена важи само ако е во „grace period“ (плаќањето не поминало, а Apple се обидува
+    /// повторно) — тогаш корисникот го задржува Premium (App Store Connect → Billing Grace Period).
     func refreshEntitlements() async {
         var best: Transaction?
         for await result in Transaction.currentEntitlements {
             guard case .verified(let transaction) = result,
                   Self.allIDs.contains(transaction.productID),
                   transaction.revocationDate == nil else { continue }
-            if let expiry = transaction.expirationDate, expiry < Date() { continue }
+            if let expiry = transaction.expirationDate, expiry < Date() {
+                guard let status = await renewalStatus(for: transaction),
+                      status.state == .inGracePeriod else { continue }
+            }
             if best == nil || (transaction.expirationDate ?? .distantPast) > (best?.expirationDate ?? .distantPast) {
                 best = transaction
             }
@@ -157,11 +168,46 @@ final class PremiumStore: ObservableObject {
         activeProductID = best?.productID
         expirationDate = best?.expirationDate
         isSandbox = best?.environment == .sandbox
+
+        willAutoRenew = true
+        hasBillingIssue = false
+        if let best, let status = await renewalStatus(for: best) {
+            if case .verified(let renewal) = status.renewalInfo {
+                willAutoRenew = renewal.willAutoRenew
+            }
+            hasBillingIssue = status.state == .inGracePeriod || status.state == .inBillingRetryPeriod
+        }
+
         if best != nil {
             setPremium(!(simulatesFree && isSandbox))
         } else if isStoreInstall {
             // Во App Store верзијата важи само вистинско купување
             setPremium(false)
+        }
+        scheduleExpiryCheck()
+    }
+
+    /// Состојбата на претплатата од Apple (обновување, откажана, проблем со плаќање).
+    private func renewalStatus(for transaction: Transaction) async -> Product.SubscriptionInfo.Status? {
+        guard let statuses = try? await product(transaction.productID)?.subscription?.status else { return nil }
+        return statuses.first { status in
+            guard case .verified(let latest) = status.transaction else { return false }
+            return latest.originalID == transaction.originalID
+        }
+    }
+
+    /// Ако апликацијата е отворена кога истекува претплатата, Premium се проверува тогаш, а не дури при следно палење.
+    private func scheduleExpiryCheck() {
+        expiryTask?.cancel()
+        expiryTask = nil
+        guard let date = expirationDate else { return }
+        let delay = date.timeIntervalSinceNow + 5
+        // Само за блиски датуми (месечна, TestFlight); годишната се проверува при отворање на апликацијата
+        guard delay > 0, delay < 60 * 60 * 24 * 40 else { return }
+        expiryTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(delay))
+            guard !Task.isCancelled else { return }
+            await self?.refreshEntitlements()
         }
     }
 
@@ -202,6 +248,19 @@ extension Product {
         case .week: return value == 1 ? L("7 дена", "7 days") : L("\(value * 7) дена", "\(value * 7) days")
         case .month: return value == 1 ? L("1 месец", "1 month") : L("\(value) месеци", "\(value) months")
         case .year: return L("\(value) година", "\(value) year")
+        default: return nil
+        }
+    }
+
+    /// Колку дена трае бесплатната проба (за „Ден 7“ во понудата).
+    var freeTrialDays: Int? {
+        guard let offer = subscription?.introductoryOffer, offer.paymentMode == .freeTrial else { return nil }
+        let value = offer.period.value
+        switch offer.period.unit {
+        case .day: return value
+        case .week: return value * 7
+        case .month: return value * 30
+        case .year: return value * 365
         default: return nil
         }
     }

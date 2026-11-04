@@ -260,6 +260,7 @@ final class CloudSync {
     func upload(_ trip: Trip) async {
         guard var data = CloudCodec.encode(trip, myUID: uid) else { return }
         data["updatedAt"] = Date().timeIntervalSince1970
+        data["editedBy"] = uid   // за известувањата: кој ја направи промената
         do {
             try await ref(trip.id).setData(data, merge: true)
         } catch {
@@ -273,15 +274,17 @@ final class CloudSync {
         Task {
             try? await ref(trip.id).updateData([
                 "lists.\(uid)": map,
-                "updatedAt": Date().timeIntervalSince1970
+                "updatedAt": Date().timeIntervalSince1970,
+                "editedBy": uid
             ])
         }
     }
 
     func push(old: Trip, new: Trip) {
         guard new.isCloud else { return }
-        let changes = CloudCodec.updates(old: old, new: new, myUID: uid)
+        var changes = CloudCodec.updates(old: old, new: new, myUID: uid)
         guard !changes.isEmpty else { return }
+        changes["editedBy"] = uid   // за известувањата: кој ја направи промената
         Task {
             do {
                 try await ref(new.id).updateData(changes)
@@ -336,19 +339,52 @@ final class CloudSync {
     }
 
     /// Ги регистрира моите клучеви за пријателите да можат да ме најдат.
-    func registerProfile(name: String, phoneKey: String?, emailKey: String?) async {
-        var user: [String: Any] = ["name": name]
-        if let phoneKey { user["phoneHash"] = PhoneID.bareHash(phoneKey) }
-        if let emailKey { user["emailHash"] = PhoneID.bareHash(emailKey) }
-        try? await db.collection("users").document(uid).setData(user, merge: true)
-
+    /// Број што е веќе на друг акаунт не се презема (ниту поканите за него). Враќа кои клучеви се мои.
+    @discardableResult
+    func registerProfile(name: String, phoneKey: String?, emailKey: String?) async -> Set<String> {
+        // Прво клучевите — правилата бараат бројот во профилот да е мој во /lookup
+        var mine: Set<String> = []
         for key in [phoneKey, emailKey].compactMap({ $0 }) {
             let doc = db.collection("lookup").document(key)
             if let existing = try? await doc.getDocument(), existing.exists {
-                if (existing.data()?["uid"] as? String) == uid { continue }
-                continue // бројот веќе е зафатен од друг акаунт
+                if (existing.data()?["uid"] as? String) == uid { mine.insert(key) }
+                continue // зафатен од друг акаунт
             }
-            try? await doc.setData(["uid": uid])
+            if (try? await doc.setData(["uid": uid])) != nil { mine.insert(key) }
+        }
+
+        let userRef = db.collection("users").document(uid)
+        var user: [String: Any] = ["name": name]
+        if let phoneKey {
+            let previous = (try? await userRef.getDocument())?.data()?["phoneHash"] as? String
+            if mine.contains(phoneKey) {
+                user["phoneHash"] = PhoneID.bareHash(phoneKey)
+                // Сменет број: стариот се ослободува за друг акаунт
+                if let previous, "p_" + previous != phoneKey { await release("p_" + previous) }
+            } else if previous == PhoneID.bareHash(phoneKey) {
+                // Стар запис со туѓ број — се трга
+                user["phoneHash"] = FieldValue.delete()
+            }
+        }
+        if let emailKey, mine.contains(emailKey) { user["emailHash"] = PhoneID.bareHash(emailKey) }
+        try? await userRef.setData(user, merge: true)
+        return mine
+    }
+
+    /// Бројот е тргнат од профилот: пријателите повеќе не те наоѓаат по него, а може да го внесе друг.
+    func removePhone() async {
+        let userRef = db.collection("users").document(uid)
+        if let previous = (try? await userRef.getDocument())?.data()?["phoneHash"] as? String {
+            await release("p_" + previous)
+        }
+        try? await userRef.setData(["phoneHash": FieldValue.delete()], merge: true)
+    }
+
+    /// Клучот за пребарување се брише само ако е мој.
+    private func release(_ key: String) async {
+        let doc = db.collection("lookup").document(key)
+        if let existing = try? await doc.getDocument(), (existing.data()?["uid"] as? String) == uid {
+            try? await doc.delete()
         }
     }
 
@@ -375,7 +411,8 @@ final class CloudSync {
                 do {
                     try await tripRef.updateData([
                         "memberUIDs": FieldValue.arrayUnion([uid]),
-                        "updatedAt": Date().timeIntervalSince1970
+                        "updatedAt": Date().timeIntervalSince1970,
+                        "editedBy": uid
                     ])
                     // Мојот запис меѓу сопатниците добива акаунт
                     let snapshot = try await tripRef.getDocument()
@@ -391,7 +428,7 @@ final class CloudSync {
                         if !linked {
                             list.append(["id": UUID().uuidString, "name": myName, "uid": uid])
                         }
-                        try await tripRef.updateData(["companions": list])
+                        try await tripRef.updateData(["companions": list, "editedBy": uid])
                     }
                 } catch {
                     print("Valise: join failed — \(error)")

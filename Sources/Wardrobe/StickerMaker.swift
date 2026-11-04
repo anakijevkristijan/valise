@@ -50,7 +50,8 @@ enum StickerMaker {
                 return .sticker(framedPhoto(image))
             }
 
-            guard let lifted = liftSubject(image) else { return .noSubject }
+            // Без рачно означување: само главниот предмет (најголем и најблиску до средината; кај обувки — двете)
+            guard let lifted = liftSubject(image, mainOnly: crop == nil) else { return .noSubject }
             if largestFace(in: lifted) != nil { return .hasFace }
 
             let radius = max(6, CGFloat(max(lifted.width, lifted.height)) * 0.012)
@@ -71,13 +72,15 @@ enum StickerMaker {
     }
 
     /// Apple „кревање предмет“ (iOS 17): го враќа предметот без позадина.
-    private static func liftSubject(_ image: CGImage) -> CGImage? {
+    /// `mainOnly` — од повеќе предмети на сликата (перница, закачалка…) само главниот.
+    private static func liftSubject(_ image: CGImage, mainOnly: Bool) -> CGImage? {
         let request = VNGenerateForegroundInstanceMaskRequest()
         let handler = VNImageRequestHandler(cgImage: image, options: [:])
         do {
             try handler.perform([request])
             guard let observation = request.results?.first, !observation.allInstances.isEmpty else { return nil }
-            let buffer = try observation.generateMaskedImage(ofInstances: observation.allInstances,
+            let instances = mainOnly ? mainInstances(observation) : observation.allInstances
+            let buffer = try observation.generateMaskedImage(ofInstances: instances,
                                                              from: handler,
                                                              croppedToInstancesExtent: true)
             let masked = CIImage(cvPixelBuffer: buffer)
@@ -85,6 +88,41 @@ enum StickerMaker {
         } catch {
             return nil
         }
+    }
+
+    /// Главниот предмет: најголем и најблиску до средината на сликата.
+    /// Друг предмет што е речиси ист по големина (втората обувка од парот) исто така се зема.
+    private static func mainInstances(_ observation: VNInstanceMaskObservation) -> IndexSet {
+        let all = observation.allInstances
+        guard all.count > 1 else { return all }
+        let mask = observation.instanceMask
+        CVPixelBufferLockBaseAddress(mask, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(mask, .readOnly) }
+        guard let base = CVPixelBufferGetBaseAddress(mask) else { return all }
+        let width = CVPixelBufferGetWidth(mask)
+        let height = CVPixelBufferGetHeight(mask)
+        let rowBytes = CVPixelBufferGetBytesPerRow(mask)
+        guard width > 0, height > 0 else { return all }
+
+        // Секој пиксел од предметот носи поени — повеќе ако е поблиску до средината
+        var score = [Double](repeating: 0, count: 256)
+        let pixels = base.assumingMemoryBound(to: UInt8.self)
+        let cx = Double(width) / 2, cy = Double(height) / 2
+        let reach = (cx * cx + cy * cy).squareRoot()
+        for y in stride(from: 0, to: height, by: 2) {
+            let row = pixels + y * rowBytes
+            let dy = Double(y) - cy
+            for x in stride(from: 0, to: width, by: 2) {
+                let label = Int(row[x])
+                guard label != 0 else { continue }
+                let dx = Double(x) - cx
+                let closeness = 1 - min(1, (dx * dx + dy * dy).squareRoot() / reach)
+                score[label] += 0.35 + closeness
+            }
+        }
+        guard let best = all.max(by: { score[$0] < score[$1] }), score[best] > 0 else { return all }
+        let kept = all.filter { score[$0] >= score[best] * 0.6 }
+        return IndexSet(kept)
     }
 
     /// Исечената слика во бела рамка со заоблени агли (како полароид).

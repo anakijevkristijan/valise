@@ -1,0 +1,16 @@
+{
+  "name": "tripdrobe-functions",
+  "description": "Tripdrobe — известувања од пријателите (push)",
+  "private": true,
+  "main": "index.js",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "test": "node test.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0",
+    "firebase-functions": "^6.1.0"
+  }
+}

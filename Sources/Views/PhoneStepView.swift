@@ -11,7 +11,8 @@ struct PhoneStepView: View {
 
     /// Целиот број со кодот на земјата (+38970123456).
     @State private var phone = ""
-    @State private var invalid = false
+    /// „Провери го бројот“ или „Овој број веќе е додаден во друг акаунт…“
+    @State private var problem: String?
     @State private var saving = false
     @State private var appeared = false
 
@@ -50,10 +51,11 @@ struct PhoneStepView: View {
                         Rectangle()
                             .fill(phone.isEmpty ? Theme.hairline : Theme.navy)
                             .frame(height: 1)
-                        if invalid {
-                            Text(L("Провери го бројот.", "Please check the number."))
+                        if let problem {
+                            Text(problem)
                                 .font(.sans(13, .medium))
                                 .foregroundStyle(Theme.terracotta)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                     .padding(.bottom, 14)
@@ -107,18 +109,30 @@ struct PhoneStepView: View {
         }
         .onAppear {
             withAnimation(.easeOut(duration: 0.9)) { appeared = true }
+            // Бројот од регистрацијата не можеше да се зачува (пр. веќе е во друг акаунт)
+            if let pending = account.pendingPhoneProblem {
+                phone = pending.number
+                problem = pending.message
+                account.pendingPhoneProblem = nil
+            }
         }
+        .onChange(of: phone) { _, _ in problem = nil }
     }
 
     private func save() {
         guard PhoneID.normalize(phone) != nil else {
-            invalid = true
+            problem = L("Провери го бројот.", "Please check the number.")
             return
         }
-        invalid = false
+        problem = nil
         saving = true
         Task { @MainActor in
-            await account.updateProfile(name: userName, phone: phone)
+            // Ист број не може во два акаунта
+            if let failure = await account.updateProfile(name: userName, phone: phone) {
+                saving = false
+                withAnimation(.easeInOut(duration: 0.2)) { problem = failure }
+                return
+            }
             saving = false
             withAnimation(.easeInOut(duration: 0.3)) { asked = true }
         }

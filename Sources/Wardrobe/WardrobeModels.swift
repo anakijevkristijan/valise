@@ -39,8 +39,9 @@ enum Season: String, Codable, CaseIterable, Identifiable {
 
 // MARK: - Категорија
 
+/// Група во гардеробата. Точниот вид (маица, џемпер, сукња…) е `WardrobeKind`.
 enum WardrobeCategory: String, Codable, CaseIterable, Identifiable {
-    case outerwear, top, dress, bottom, shoes, bag, accessory
+    case outerwear, top, dress, bottom, shoes, active, bag, accessory
 
     var id: String { rawValue }
 
@@ -48,9 +49,10 @@ enum WardrobeCategory: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .outerwear: return L("Јакни и палта", "Coats and jackets")
         case .top: return L("Горни делови", "Tops")
-        case .dress: return L("Фустани", "Dresses")
-        case .bottom: return L("Панталони и сукњи", "Trousers and skirts")
+        case .dress: return L("Фустани и сукњи", "Dresses and skirts")
+        case .bottom: return L("Панталони и шорцеви", "Trousers and shorts")
         case .shoes: return L("Обувки", "Shoes")
+        case .active: return L("Плажа и спорт", "Beach and sport")
         case .bag: return L("Торби", "Bags")
         case .accessory: return L("Додатоци", "Accessories")
         }
@@ -63,6 +65,7 @@ enum WardrobeCategory: String, Codable, CaseIterable, Identifiable {
         case .dress: return L("Фустан", "Dress")
         case .bottom: return L("Долно", "Bottom")
         case .shoes: return L("Обувки", "Shoes")
+        case .active: return L("Плажа / спорт", "Beach / sport")
         case .bag: return L("Торба", "Bag")
         case .accessory: return L("Додаток", "Accessory")
         }
@@ -74,27 +77,29 @@ enum WardrobeCategory: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .outerwear: return one ? L("1 јакна", "1 jacket") : L("\(n) јакни", "\(n) jackets")
         case .top: return one ? L("1 горен дел", "1 top") : L("\(n) горни дела", "\(n) tops")
-        case .dress: return one ? L("1 фустан", "1 dress") : L("\(n) фустани", "\(n) dresses")
+        case .dress: return one ? L("1 фустан или сукња", "1 dress or skirt") : L("\(n) фустани и сукњи", "\(n) dresses and skirts")
         case .bottom: return one ? L("1 долен дел", "1 bottom") : L("\(n) долни дела", "\(n) bottoms")
         case .shoes: return one ? L("1 пар обувки", "1 pair of shoes") : L("\(n) пара обувки", "\(n) pairs of shoes")
+        case .active: return one ? L("1 парче за плажа и спорт", "1 beach or sport piece") : L("\(n) парчиња за плажа и спорт", "\(n) beach and sport pieces")
         case .bag: return one ? L("1 торба", "1 bag") : L("\(n) торби", "\(n) bags")
         case .accessory: return one ? L("1 додаток", "1 accessory") : L("\(n) додатоци", "\(n) accessories")
         }
     }
 
-    /// Општите предмети од листата за пакување што ги покрива оваа категорија.
-    var packingKeys: [String] {
+    /// Само за парчиња без вид (стара облека што уште не е подредена): редовите од листата по групата.
+    var legacyKeys: [String] {
         switch self {
         case .top: return ["tshirts", "longSleeves", "shirt", "sweater"]
         case .bottom: return ["trousers", "shorts", "longTrousers", "smartTrousers"]
         case .dress: return ["dress", "eveningDress"]
         case .outerwear: return ["lightJacket", "warmJacket"]
-        case .shoes: return ["sneakers", "sandals", "smartShoes", "dressShoes", "trainingShoes", "hikingBoots"]
+        case .shoes: return ["sneakers", "sandals", "smartShoes", "dressShoes", "trainingShoes", "hikingBoots", "boots"]
+        case .active: return ["swimwear", "sportswear"]
         default: return []
         }
     }
 
-    /// Приближен волумен во куфер (литри, свиткано).
+    /// Приближен волумен во куфер (литри, свиткано) — кога парчето нема вид.
     var volume: Double {
         switch self {
         case .outerwear: return 5.0
@@ -102,12 +107,13 @@ enum WardrobeCategory: String, Codable, CaseIterable, Identifiable {
         case .dress: return 1.8
         case .bottom: return 2.0
         case .shoes: return 3.5
+        case .active: return 0.6
         case .bag: return 2.5
         case .accessory: return 0.3
         }
     }
 
-    /// Приближна тежина (kg).
+    /// Приближна тежина (kg) — кога парчето нема вид.
     var weight: Double {
         switch self {
         case .outerwear: return 0.9
@@ -115,6 +121,7 @@ enum WardrobeCategory: String, Codable, CaseIterable, Identifiable {
         case .dress: return 0.35
         case .bottom: return 0.5
         case .shoes: return 0.8
+        case .active: return 0.2
         case .bag: return 0.5
         case .accessory: return 0.1
         }
@@ -123,13 +130,15 @@ enum WardrobeCategory: String, Codable, CaseIterable, Identifiable {
 
 // MARK: - Цел од листата наспроти аутфитите
 
-/// Листата предлага `need` (пр. 5 маици), аутфитите имаат `have` различни парчиња од тој вид.
+/// Еден ред од листата (пр. „Џемпер / дуксер“ 2): листата предлага `need`,
+/// аутфитите имаат `have` различни парчиња што се бројат токму во тој ред.
 struct ClothingTarget: Identifiable {
-    let category: WardrobeCategory
+    /// Клучот на редот во листата (пр. „sweater“).
+    let key: String
     let need: Int
     let have: Int
 
-    var id: String { category.rawValue }
+    var id: String { key }
     var missing: Int { max(0, need - have) }
     var over: Int { max(0, have - need) }
     var isMet: Bool { have >= need }
@@ -137,8 +146,11 @@ struct ClothingTarget: Identifiable {
     enum Status { case under, exact, over }
     var status: Status { have < need ? .under : (have == need ? .exact : .over) }
 
-    /// „Горни дела 3/5“
-    var label: String { "\(category.shortPlural) \(have)/\(need)" }
+    /// „Џемпер / дуксер 1/2“
+    var label: String { "\(Catalog.name(key) ?? key) \(have)/\(need)" }
+
+    /// „2 маици“, „1 џемпер или дуксер“
+    func countText(_ n: Int) -> String { PackingRowText.count(key, n) }
 
     /// Поединечни редови во листата: колку од аутфитите паѓаат на секој предмет.
     struct Share {
@@ -153,9 +165,10 @@ extension WardrobeCategory {
         switch self {
         case .outerwear: return L("Јакни", "Jackets")
         case .top: return L("Горни дела", "Tops")
-        case .dress: return L("Фустани", "Dresses")
+        case .dress: return L("Фустани и сукњи", "Dresses and skirts")
         case .bottom: return L("Долни дела", "Bottoms")
         case .shoes: return L("Обувки", "Shoes")
+        case .active: return L("Плажа и спорт", "Beach and sport")
         case .bag: return L("Торби", "Bags")
         case .accessory: return L("Додатоци", "Accessories")
         }
@@ -172,6 +185,8 @@ struct WardrobeItem: Codable, Identifiable, Hashable {
     var createdAt: Date = Date()
     /// true = исечена слика (со позадина), не стикер.
     var isPhoto: Bool?
+    /// Видот (`WardrobeKind`) како текст — непознат вид од понова верзија не ја руши гардеробата.
+    var kindID: String?
 
     var imageName: String { id.uuidString + ".png" }
 

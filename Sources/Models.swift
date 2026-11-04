@@ -236,6 +236,8 @@ struct PackingItem: Codable, Identifiable, Hashable {
     var assignee: UUID?
     /// Бројката е рачно сменета — новата прогноза повеќе не ја менува.
     var quantityEdited: Bool?
+    /// Редот е додаден сам, бидејќи го има во аутфитите (пр. сукња) — бројката ја следи гардеробата.
+    var fromOutfits: Bool?
 
     /// Парчиња во торбата (без облеченото).
     var bagUnits: Int { max(0, quantity - wornCount) }

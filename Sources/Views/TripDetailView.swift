@@ -78,6 +78,9 @@ struct TripDetailView: View {
                         topBar(trip)
                         titleBlock(trip)
                         BoardingPassCard(trip: trip)
+                        if !trip.isPast {
+                            ReminderOfferCard()
+                        }
                         if premium.isPremium {
                             companionsSection(trip)
                             weatherSection(trip)
@@ -154,6 +157,9 @@ struct TripDetailView: View {
         }
         .onChange(of: premium.isPremium) { _, unlocked in
             if unlocked { Task { await refreshWeather(force: true) } }
+        }
+        .onChange(of: wardrobe.outfitRowSignature(for: trip), initial: true) { _, _ in
+            syncOutfitRows()
         }
         .sheet(isPresented: $showAccount) {
             AccountView(startWith: .signUp)
@@ -701,9 +707,9 @@ struct TripDetailView: View {
     }
 
     private func categoryBlock(_ category: ItemCategory, items: [PackingItem], trip: Trip) -> some View {
-        // Облека и обувки: колку од секој предмет веќе е во аутфитите (синхронизирано постојано)
+        // Облека, обувки, костими, очила…: колку од секој предмет веќе е во аутфитите (синхронизирано постојано)
         let shares: [UUID: ClothingTarget.Share] =
-            (category == .clothing || category == .shoes) && !wardrobe.wearCounts(for: trip).isEmpty
+            category != .documents && !wardrobe.wearCounts(for: trip).isEmpty
             ? wardrobe.shares(for: trip) : [:]
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
@@ -801,6 +807,16 @@ struct TripDetailView: View {
             entry.quantity = newValue
             entry.wornCount = min(entry.wornCount, newValue)
             entry.quantityEdited = true
+            // Рачно сменет ред од аутфитите станува обичен — гардеробата повеќе не ја менува бројката
+            entry.fromOutfits = nil
+        }
+    }
+
+    /// Аутфитите имаат парче што листата го нема (пр. сукња) → редот сам се додава.
+    private func syncOutfitRows() {
+        guard var copy = store.trip(tripID), wardrobe.syncOutfitRows(&copy) else { return }
+        store.mutate(tripID) { trip in
+            _ = wardrobe.syncOutfitRows(&trip)
         }
     }
 
