@@ -35,6 +35,14 @@ exports.tripActivity = onDocumentUpdatedWithAuthContext("trips/{tripId}", async 
 
   const actorUID = actorOf(event, before, after);
   const events = computeEvents(before, after, actorUID);
+  logger.info("trip update", {
+    tripId: event.params.tripId,
+    authType: event.authType || null,
+    authIdIsMember: !!(event.authId && actorUID === event.authId),
+    editedBy: typeof after.editedBy === "string",
+    actor: actorUID,
+    events: events.map((e) => `${e.type}→${e.uid}`)
+  });
   if (events.length === 0) return;
 
   const tripId = event.params.tripId;
@@ -43,11 +51,11 @@ exports.tripActivity = onDocumentUpdatedWithAuthContext("trips/{tripId}", async 
 
   for (const [uid, list] of groupEvents(events)) {
     const snap = await db.collection("users").doc(uid).get();
-    if (!snap.exists) continue;
+    if (!snap.exists) { logger.info("skip: no profile", { uid }); continue; }
     const user = snap.data() || {};
-    if (user.friendAlerts === false) continue;
+    if (user.friendAlerts === false) { logger.info("skip: friend alerts off", { uid }); continue; }
     const tokens = Array.isArray(user.fcmTokens) ? user.fcmTokens.filter((t) => typeof t === "string" && t) : [];
-    if (tokens.length === 0) continue;
+    if (tokens.length === 0) { logger.info("skip: no device token", { uid }); continue; }
     const lang = user.lang === "en" ? "en" : "mk";
 
     for (const item of list) {
@@ -61,9 +69,12 @@ exports.tripActivity = onDocumentUpdatedWithAuthContext("trips/{tripId}", async 
           apns: { payload: { aps: { sound: "default", "thread-id": tripId } } }
         });
         const dead = [];
+        const codes = [];
         response.responses.forEach((r, i) => {
+          if (r.error) codes.push(r.error.code);
           if (r.error && DEAD_TOKEN.has(r.error.code)) dead.push(tokens[i]);
         });
+        logger.info("sent", { uid, type: item.type, ok: response.successCount, failed: response.failureCount, codes });
         if (dead.length > 0) {
           await snap.ref.update({ fcmTokens: FieldValue.arrayRemove(...dead) });
         }
