@@ -51,7 +51,11 @@ final class AccountService: ObservableObject {
         self.store = store
         self.wardrobe = wardrobe
         guard handle == nil else { return }
-        if let user = Auth.auth().currentUser { update(user) }
+        if let user = Auth.auth().currentUser {
+            update(user)
+            // Веднаш при старт: дали акаунтот уште постои
+            Task { await verifySession() }
+        }
         handle = Auth.auth().addStateDidChangeListener { [weak self] _, user in
             Task { @MainActor in self?.update(user) }
         }
@@ -93,6 +97,25 @@ final class AccountService: ObservableObject {
                 for key in Self.personalKeys {
                     UserDefaults.standard.removeObject(forKey: key)
                 }
+            }
+        }
+    }
+
+    // MARK: Дали акаунтот уште постои
+
+    /// Акаунтот е избришан или блокиран (пр. од Firebase Console, или на друг телефон) →
+    /// одјава на овој телефон и сè лично се брише. Без интернет — ништо не се менува.
+    func verifySession() async {
+        guard let user = Auth.auth().currentUser else { return }
+        do {
+            try await user.reload()
+            _ = try await user.getIDTokenResult(forcingRefresh: true)
+        } catch {
+            let code = (error as NSError).code
+            // 17011 нема таков корисник · 17005 оневозможен · 17021 истечена најава · 17017 неважечки токен
+            if [17011, 17005, 17021, 17017].contains(code) {
+                GIDSignIn.sharedInstance.signOut()
+                try? Auth.auth().signOut()
             }
         }
     }

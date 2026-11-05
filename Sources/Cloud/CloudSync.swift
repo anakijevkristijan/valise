@@ -329,6 +329,12 @@ final class CloudSync {
 
     /// При бришење на акаунтот: профилот и клучевите за пребарување.
     func deleteProfile(keys: [String]) async {
+        // И клучевите запишани во профилот (бројот можеби не е на овој телефон по повторна најава)
+        var keys = Set(keys)
+        if let profile = try? await db.collection("users").document(uid).getDocument().data() {
+            if let hash = profile["phoneHash"] as? String { keys.insert("p_" + hash) }
+            if let hash = profile["emailHash"] as? String { keys.insert("e_" + hash) }
+        }
         for key in keys {
             let doc = db.collection("lookup").document(key)
             if let existing = try? await doc.getDocument(), (existing.data()?["uid"] as? String) == uid {

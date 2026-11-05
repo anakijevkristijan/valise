@@ -159,6 +159,8 @@ struct RootView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 Task {
+                    // Избришан/блокиран акаунт → одјава веднаш
+                    await account.verifySession()
                     // Прво дали Premium е уште активен (истечена или откажана претплата), па прогнозата
                     await premium.refreshEntitlements()
                     await store.refreshAllUpcoming()

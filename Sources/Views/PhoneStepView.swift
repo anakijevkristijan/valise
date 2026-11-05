@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 
 /// По најавата: телефонскиот број, за пријателите да те најдат од своите контакти.
 /// Се чува само шифриран отпечаток. Може да се прескокне и да се внесе подоцна во Профил.
@@ -132,6 +133,11 @@ struct PhoneStepView: View {
                 saving = false
                 withAnimation(.easeInOut(duration: 0.2)) { problem = failure }
                 return
+            }
+            // Пријателите ќе те додаваат во патувања → прашај за известувања (еднаш)
+            if await TripReminders.authorizationStatus() == .notDetermined {
+                await TripReminders.requestPermission()
+                await NotificationRouter.shared.refreshAuthorization()
             }
             saving = false
             withAnimation(.easeInOut(duration: 0.3)) { asked = true }
