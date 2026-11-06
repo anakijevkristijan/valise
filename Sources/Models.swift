@@ -287,15 +287,26 @@ struct ChecklistItem: Codable, Identifiable, Hashable {
 // MARK: - Време
 
 enum WeatherSource: String, Codable {
-    case forecast, lastYear, mixed, none
+    case forecast, lastYear, mixed, climate, none
 
     var label: String {
         switch self {
         case .forecast: return L("Прогноза", "Forecast")
         case .lastYear: return L("Лани*", "Last year*")
         case .mixed: return L("Прогноза + лани*", "Forecast + last year*")
+        case .climate: return L("Проценка~", "Estimate~")
         case .none: return L("Нема податоци", "No data")
         }
+    }
+
+    /// Ознака според тоа што навистина има во деновите (прогноза, лани*, проценка~).
+    static func describe(_ days: [WeatherDay]) -> String {
+        guard !days.isEmpty else { return WeatherSource.none.label }
+        var parts: [String] = []
+        if days.contains(where: { !$0.isEstimate }) { parts.append(L("Прогноза", "Forecast")) }
+        if days.contains(where: \.isLastYear) { parts.append(parts.isEmpty ? L("Лани*", "Last year*") : L("лани*", "last year*")) }
+        if days.contains(where: \.isClimate) { parts.append(parts.isEmpty ? L("Проценка~", "Estimate~") : L("проценка~", "estimate~")) }
+        return parts.joined(separator: " + ")
     }
 }
 
@@ -310,9 +321,13 @@ struct WeatherDay: Codable, Hashable, Identifiable {
     var fromLastYear: Bool?
     /// Градот (кај патување низ повеќе градови).
     var place: String?
+    /// true = климатска проценка (нема податоци за денот) — само за приказ, листата не се гради од неа.
+    var fromClimate: Bool? = nil
 
     var id: Date { date }
-    var isEstimate: Bool { fromLastYear ?? false }
+    var isLastYear: Bool { fromLastYear ?? false }
+    var isClimate: Bool { fromClimate ?? false }
+    var isEstimate: Bool { isLastYear || isClimate }
 
     var icon: String {
         switch code {

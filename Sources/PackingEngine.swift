@@ -201,7 +201,8 @@ enum PackingEngine {
 
         let days = trip.dayCount
         let clothDays = clothingDays(for: trip)
-        let w = trip.weatherSummary
+        // Климатската проценка (~) е само за приказ — листата се гради од вистинските податоци
+        let w = WeatherSummary(days: trip.weather.filter { !$0.isClimate })
         let acts = Set(trip.activities)
         let isPlane = trip.transport == .plane
         let carryOnOnly = isPlane && !trip.hasCheckedBag
@@ -447,7 +448,7 @@ enum PackingEngine {
     /// Од прогнозата (просек по денови), а без прогноза (бесплатно или далечно патување) —
     /// груба климатска проценка според географската ширина на дестинацијата и датумите.
     static func climate(for trip: Trip) -> Climate {
-        let forecast = trip.weather
+        let forecast = trip.weather.filter { !$0.isClimate }
         if !forecast.isEmpty {
             let highs = forecast.map(\.maxTemp)
             let lows = forecast.map(\.minTemp)
@@ -459,13 +460,7 @@ enum PackingEngine {
         }
         let highs = trip.days.map { date -> Double in
             // Географската ширина на градот каде си тој ден
-            let latitude = trip.stop(on: date).place.latitude
-            let distance = min(abs(latitude), 70)
-            let yearly = 30 - 0.28 * distance                // просечна дневна температура во годината
-            let swing = min(0.24 * distance, 11)             // разлика лето–зима
-            let warmestDay = latitude >= 0 ? 200.0 : 17.0    // крај на јули / средина на јануари
-            let day = Double(Calendar.current.ordinality(of: .day, in: .year, for: date) ?? 180)
-            return yearly + swing * cos((day - warmestDay) / 365 * 2 * .pi)
+            ClimateEstimate.high(latitude: trip.stop(on: date).place.latitude, on: date)
         }
         let high = highs.isEmpty ? 22 : highs.reduce(0, +) / Double(highs.count)
         return Climate(high: high, low: high - 8,
