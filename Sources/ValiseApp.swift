@@ -113,11 +113,13 @@ struct RootView: View {
     }
 
     /// 0 = јазик, 4 = возраст (пред да се внесе било што), 1 = име, 2 = акаунт (задолжителен),
-    /// 5 = телефон (по најавата, може да се прескокне), 3 = почетна
+    /// 5 = телефон (по најавата, може да се прескокне), 6 = се враќа акаунтот (број, име), 3 = почетна
     private var stage: Int {
         if ScreenshotMode.isOn { return 3 }
         if !languageChosen { return 0 }
         if account.hasSession {
+            // Најавен, но профилот (бројот, името) уште се враќа — да не се прашува за број/име без потреба
+            if account.isRestoring { return 6 }
             if userName.isEmpty { return 1 }
             if !phoneAsked && storedPhone.isEmpty { return 5 }
             return 3
@@ -146,6 +148,12 @@ struct RootView: View {
             case 5:
                 PhoneStepView()
                     .transition(.opacity)
+            case 6:
+                ZStack {
+                    PaperBackground()
+                    ProgressView().tint(Theme.navy)
+                }
+                .transition(.opacity)
             default:
                 MainTabView()
                     .transition(.opacity)
