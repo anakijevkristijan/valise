@@ -20,6 +20,9 @@ struct AccountView: View {
     @State private var info: String?
     @State private var confirmDelete = false
     @State private var confirmDeleteTrips = false
+    @State private var showReset = false
+    @State private var showChangePassword = false
+    @State private var showDeletePassword = false
 
     /// Од Профил: „Избриши ги сите патувања“ стои тука, а одјавата е во Профил.
     private let onDeleteAllTrips: (() -> Void)?
@@ -59,14 +62,32 @@ struct AccountView: View {
         }
         .confirmationDialog(L("Да се избрише акаунтот?", "Delete your account?"), isPresented: $confirmDelete, titleVisibility: .visible) {
             Button(L("Избриши трајно", "Delete permanently"), role: .destructive) {
-                Task {
-                    error = await account.deleteAccount()
-                    if error == nil { dismiss() }
+                if account.usesPassword {
+                    // Firebase бара потврда со лозинката пред бришење
+                    showDeletePassword = true
+                } else {
+                    Task {
+                        info = nil
+                        error = await account.deleteAccount()
+                        if error == nil { dismiss() }
+                    }
                 }
             }
         } message: {
             Text(L("Твоите заеднички патувања ќе се избришат од облакот, а од туѓите ќе излезеш. Ова не може да се врати.",
                    "Your shared trips will be removed from the cloud and you'll leave other people's trips. This can't be undone."))
+        }
+        .sheet(isPresented: $showReset) {
+            ResetPasswordSheet(email: account.profile?.email ?? email)
+                .environmentObject(account)
+        }
+        .sheet(isPresented: $showChangePassword) {
+            ChangePasswordSheet(onSaved: { info = L("Лозинката е сменета.", "Your password has been changed.") })
+                .environmentObject(account)
+        }
+        .sheet(isPresented: $showDeletePassword) {
+            DeleteAccountPasswordSheet(onDeleted: { dismiss() })
+                .environmentObject(account)
         }
         .confirmationDialog(L("Да се избришат сите патувања?", "Delete all trips?"), isPresented: $confirmDeleteTrips, titleVisibility: .visible) {
             Button(L("Избриши ги сите", "Delete all"), role: .destructive) {
@@ -170,9 +191,19 @@ struct AccountView: View {
             }
             .luxCard(padding: 0)
 
+            if mode == .signIn {
+                HStack {
+                    Spacer()
+                    Button(L("Заборавена лозинка?", "Forgot password?")) { showReset = true }
+                        .font(.sans(13, .semibold))
+                        .foregroundStyle(Theme.navy)
+                }
+                .padding(.top, -10)
+            }
+
             if mode == .signUp {
-                note(L("Со бројот пријателите те наоѓаат од нивните контакти. Се чува само шифриран отпечаток, не самиот број.",
-                       "Your number lets friends find you from their contacts. Only an encrypted fingerprint is stored, never the number itself."))
+                note(L("Со бројот пријателите те наоѓаат од нивните контакти. Се чува во твојот акаунт и никој друг не го гледа.",
+                       "Your number lets friends find you from their contacts. It's kept in your account and no one else can see it."))
             }
 
             if let error { message(error, color: Theme.terracotta) }
@@ -191,23 +222,6 @@ struct AccountView: View {
 
             if mode == .signUp {
                 LegalConsentNote()
-            }
-
-            if mode == .signIn {
-                Button(L("Заборавена лозинка?", "Forgot password?")) {
-                    Task {
-                        if let failure = await account.resetPassword(email: email) {
-                            error = failure
-                        } else {
-                            error = nil
-                            info = L("Ти испративме линк за нова лозинка.", "We've sent you a link to reset your password.")
-                        }
-                    }
-                }
-                .font(.sans(13, .medium))
-                .foregroundStyle(Theme.navy)
-                .frame(maxWidth: .infinity)
-                .disabled(email.isEmpty)
             }
 
             if !AppConfig.appleSignInEnabled {
@@ -266,8 +280,13 @@ struct AccountView: View {
             }
             .luxCard(padding: 0)
 
-            note(L("Со бројот пријателите те наоѓаат од нивните контакти. Еден број може да биде само во еден акаунт.",
-                   "Your number lets friends find you from their contacts. A number can belong to only one account."))
+            if account.hasHiddenPhone && phone.isEmpty {
+                note(L("Твојот број е зачуван шифрирано и пријателите те наоѓаат. Внеси го уште еднаш ако сакаш да се гледа тука.",
+                       "Your number is saved encrypted and friends can find you. Enter it once more if you want to see it here."))
+            }
+
+            note(L("Со бројот пријателите те наоѓаат од нивните контакти. Се чува во твојот акаунт (никој друг не го гледа), а еден број може да биде само во еден акаунт.",
+                   "Your number lets friends find you from their contacts. It's kept in your account (no one else can see it), and a number can belong to only one account."))
 
             if let info { message(info, color: Theme.sage) }
             if let error { message(error, color: Theme.terracotta) }
@@ -286,6 +305,8 @@ struct AccountView: View {
                 Text(L("Зачувај", "Save"))
             }
             .buttonStyle(PrimaryButtonStyle())
+
+            passwordSection
 
             HStack(spacing: 10) {
                 if onDeleteAllTrips != nil {
@@ -324,6 +345,48 @@ struct AccountView: View {
         .onAppear {
             if let current = account.profile?.name, !current.isEmpty { name = current }
         }
+    }
+
+    /// Лозинка: промена (со старата) или линк на е-пошта; кај Google/Apple нема посебна лозинка.
+    @ViewBuilder
+    private var passwordSection: some View {
+        if account.usesPassword {
+            VStack(spacing: 0) {
+                Button { showChangePassword = true } label: {
+                    settingsRow(icon: "key", title: L("Смени лозинка", "Change password"))
+                }
+                .buttonStyle(.plain)
+                Hairline().padding(.leading, 52)
+                Button { showReset = true } label: {
+                    settingsRow(icon: "envelope", title: L("Ја заборави? Линк на е-пошта", "Forgot it? Email me a link"))
+                }
+                .buttonStyle(.plain)
+            }
+            .luxCard(padding: 0)
+        } else if !account.providers.isEmpty {
+            let provider = account.providers.contains("apple.com") ? "Apple" : "Google"
+            note(L("Се најавуваш со \(provider), па немаш посебна лозинка за Tripdrobe — ја менуваш кај \(provider).",
+                   "You sign in with \(provider), so there's no separate Tripdrobe password — change it with \(provider)."))
+        }
+    }
+
+    private func settingsRow(icon: String, title: String) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .light))
+                .foregroundStyle(Theme.navy)
+                .frame(width: 22)
+            Text(title)
+                .font(.sans(15, .medium))
+                .foregroundStyle(Theme.ink)
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Theme.muted)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 15)
+        .contentShape(Rectangle())
     }
 
     // MARK: Делови
@@ -386,6 +449,244 @@ struct AccountView: View {
             .font(.sans(13, .medium))
             .foregroundStyle(color)
             .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+// MARK: - Лозинка
+
+/// Мал формулар во лист: наслов, опис, полиња, копче и порака.
+private struct PasswordSheetFrame<Fields: View>: View {
+    let title: String
+    let detail: String
+    let actionTitle: String
+    var destructive = false
+    let canSubmit: Bool
+    let isWorking: Bool
+    let error: String?
+    let info: String?
+    let action: () -> Void
+    @ViewBuilder let fields: () -> Fields
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ZStack {
+            PaperBackground()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    HStack {
+                        Eyebrow(L("Лозинка", "Password"), color: Theme.gold)
+                        Spacer()
+                        CircleIconButton(systemName: "xmark") { dismiss() }
+                    }
+                    Text(title)
+                        .font(.serif(30))
+                        .foregroundStyle(Theme.ink)
+                    Text(detail)
+                        .font(.sans(14))
+                        .foregroundStyle(Theme.inkSoft)
+                        .fixedSize(horizontal: false, vertical: true)
+                    VStack(spacing: 0, content: fields)
+                        .luxCard(padding: 0)
+                    if let error {
+                        Text(error)
+                            .font(.sans(13, .medium))
+                            .foregroundStyle(Theme.terracotta)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if let info {
+                        Text(info)
+                            .font(.sans(13, .medium))
+                            .foregroundStyle(Theme.sage)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Button(action: action) {
+                        HStack(spacing: 10) {
+                            if isWorking { ProgressView().tint(Theme.goldLight) }
+                            Text(actionTitle)
+                        }
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .disabled(!canSubmit || isWorking)
+                }
+                .padding(24)
+                .containerRelativeFrame(.horizontal)
+            }
+            .scrollDismissesKeyboard(.interactively)
+        }
+        .presentationDetents([.large])
+        .presentationCornerRadius(28)
+    }
+}
+
+/// Поле во формуларот за лозинка.
+private struct SheetField: View {
+    let label: String
+    @Binding var text: String
+    var secure = false
+    var content: UITextContentType = .password
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label.uppercased())
+                .font(.sans(9, .semibold))
+                .tracking(1.6)
+                .foregroundStyle(Theme.muted)
+            Group {
+                if secure {
+                    SecureField("", text: $text)
+                } else {
+                    TextField("", text: $text)
+                        .keyboardType(.emailAddress)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                }
+            }
+            .font(.serif(19))
+            .foregroundStyle(Theme.ink)
+            .textContentType(content)
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 12)
+    }
+}
+
+/// Заборавена лозинка: линк на е-поштата, а линкот отвора страница за нова лозинка.
+struct ResetPasswordSheet: View {
+    @EnvironmentObject private var account: AccountService
+    @State private var email: String
+    @State private var error: String?
+    @State private var info: String?
+    @State private var sending = false
+
+    init(email: String) {
+        _email = State(initialValue: email)
+    }
+
+    var body: some View {
+        PasswordSheetFrame(
+            title: L("Нова лозинка", "New password"),
+            detail: L("Внеси ја е-поштата со која се најавуваш. Ќе ти пратиме линк — отвори го, смисли нова лозинка и потоа најави се со неа.",
+                      "Enter the email you sign in with. We'll send you a link — open it, choose a new password, then sign in with it."),
+            actionTitle: info == nil ? L("Испрати линк", "Send link") : L("Испрати пак", "Send again"),
+            canSubmit: email.contains("@"),
+            isWorking: sending,
+            error: error,
+            info: info,
+            action: send
+        ) {
+            SheetField(label: L("Е-пошта", "Email"), text: $email, content: .emailAddress)
+        }
+    }
+
+    private func send() {
+        error = nil
+        sending = true
+        Task {
+            if let failure = await account.resetPassword(email: email) {
+                error = failure
+            } else {
+                info = L("Готово. Ако има акаунт со \(email.trimmingCharacters(in: .whitespaces)), линкот стигнува за минута — провери и во Spam.",
+                         "Done. If there's an account for \(email.trimmingCharacters(in: .whitespaces)), the link arrives within a minute — check Spam too.")
+            }
+            sending = false
+        }
+    }
+}
+
+/// Смени лозинка: старата за потврда, па новата двапати.
+struct ChangePasswordSheet: View {
+    @EnvironmentObject private var account: AccountService
+    @Environment(\.dismiss) private var dismiss
+    let onSaved: () -> Void
+    @State private var current = ""
+    @State private var new = ""
+    @State private var repeated = ""
+    @State private var error: String?
+
+    var body: some View {
+        PasswordSheetFrame(
+            title: L("Смени лозинка", "Change password"),
+            detail: L("Прво старата лозинка, за да знаеме дека си ти. Новата треба да има барем 6 знаци.",
+                      "First your current password, so we know it's you. The new one needs at least 6 characters."),
+            actionTitle: L("Зачувај ја новата", "Save new password"),
+            canSubmit: !current.isEmpty && new.count >= 6 && new == repeated,
+            isWorking: account.isWorking,
+            error: error ?? mismatch,
+            info: nil,
+            action: save
+        ) {
+            SheetField(label: L("Стара лозинка", "Current password"), text: $current, secure: true, content: .password)
+            Hairline().padding(.leading, 18)
+            SheetField(label: L("Нова лозинка", "New password"), text: $new, secure: true, content: .newPassword)
+            Hairline().padding(.leading, 18)
+            SheetField(label: L("Повтори ја новата", "Repeat new password"), text: $repeated, secure: true, content: .newPassword)
+        }
+    }
+
+    private var mismatch: String? {
+        guard !repeated.isEmpty, repeated != new else { return nil }
+        return L("Новите лозинки не се исти.", "The new passwords don't match.")
+    }
+
+    private func save() {
+        error = nil
+        Task {
+            if let failure = await account.changePassword(current: current, new: new) {
+                error = failure
+            } else {
+                onSaved()
+                dismiss()
+            }
+        }
+    }
+}
+
+/// Бришење акаунт со е-пошта: потврда со лозинката (Firebase го бара ова пред бришење).
+struct DeleteAccountPasswordSheet: View {
+    @EnvironmentObject private var account: AccountService
+    @Environment(\.dismiss) private var dismiss
+    let onDeleted: () -> Void
+    @State private var password = ""
+    @State private var error: String?
+    @State private var showReset = false
+
+    var body: some View {
+        PasswordSheetFrame(
+            title: L("Потврди бришење", "Confirm deletion"),
+            detail: L("Внеси ја лозинката. Потоа акаунтот, гардеробата и твоите патувања се бришат засекогаш и се одјавуваш.",
+                      "Enter your password. Your account, wardrobe and trips are then deleted for good and you're signed out."),
+            actionTitle: L("Избриши го акаунтот", "Delete my account"),
+            destructive: true,
+            canSubmit: !password.isEmpty,
+            isWorking: account.isWorking,
+            error: error,
+            info: nil,
+            action: delete
+        ) {
+            SheetField(label: L("Лозинка", "Password"), text: $password, secure: true, content: .password)
+        }
+        .overlay(alignment: .bottom) {
+            Button(L("Ја заборави лозинката?", "Forgot your password?")) { showReset = true }
+                .font(.sans(13, .semibold))
+                .foregroundStyle(Theme.navy)
+                .padding(.bottom, 28)
+        }
+        .sheet(isPresented: $showReset) {
+            ResetPasswordSheet(email: account.profile?.email ?? "")
+                .environmentObject(account)
+        }
+    }
+
+    private func delete() {
+        error = nil
+        Task {
+            if let failure = await account.deleteAccount(password: password) {
+                error = failure
+            } else {
+                dismiss()
+                onDeleted()
+            }
+        }
     }
 }
 

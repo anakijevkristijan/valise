@@ -2,7 +2,8 @@ import SwiftUI
 import UserNotifications
 
 /// По најавата: телефонскиот број, за пријателите да те најдат од своите контакти.
-/// Се чува само шифриран отпечаток. Може да се прескокне и да се внесе подоцна во Профил.
+/// Се чува во акаунтот (го гледа само сопственикот), а пријателите го наоѓаат по шифриран отпечаток.
+/// Може да се прескокне и да се внесе подоцна во Профил.
 struct PhoneStepView: View {
     static let askedKey = "phoneAsked"
 
@@ -66,8 +67,8 @@ struct PhoneStepView: View {
                             .font(.system(size: 12))
                             .foregroundStyle(Theme.gold)
                             .padding(.top, 2)
-                        Text(L("Не го чуваме самиот број — само шифриран отпечаток. Никој не може да го види.",
-                               "We never store the number itself — only an encrypted fingerprint. No one can see it."))
+                        Text(L("Бројот се чува во твојот акаунт и го гледаш само ти. Пријателите те наоѓаат по шифриран отпечаток — бројот не им се покажува.",
+                               "Your number is kept in your account and only you can see it. Friends find you by an encrypted fingerprint — they're never shown the number."))
                             .font(.sans(12))
                             .foregroundStyle(Theme.muted)
                             .fixedSize(horizontal: false, vertical: true)
