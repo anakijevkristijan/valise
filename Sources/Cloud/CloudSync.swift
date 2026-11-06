@@ -382,7 +382,7 @@ final class CloudSync {
     /// Ги регистрира моите клучеви за пријателите да можат да ме најдат.
     /// Број што е веќе на друг акаунт не се презема (ниту поканите за него). Враќа кои клучеви се мои.
     @discardableResult
-    func registerProfile(name: String, phoneKey: String?, emailKey: String?) async -> Set<String> {
+    func registerProfile(name: String, phone: String? = nil, phoneKey: String?, emailKey: String?) async -> Set<String> {
         // Прво клучевите — правилата бараат бројот во профилот да е мој во /lookup
         var mine: Set<String> = []
         for key in [phoneKey, emailKey].compactMap({ $0 }) {
@@ -400,11 +400,14 @@ final class CloudSync {
             let previous = (try? await userRef.getDocument())?.data()?["phoneHash"] as? String
             if mine.contains(phoneKey) {
                 user["phoneHash"] = PhoneID.bareHash(phoneKey)
+                // Самиот број — во профилот што го гледа само сопственикот, за да се врати по повторна најава
+                if let phone { user["phone"] = phone }
                 // Сменет број: стариот се ослободува за друг акаунт
                 if let previous, "p_" + previous != phoneKey { await release("p_" + previous) }
             } else if previous == PhoneID.bareHash(phoneKey) {
                 // Стар запис со туѓ број — се трга
                 user["phoneHash"] = FieldValue.delete()
+                user["phone"] = FieldValue.delete()
             }
         }
         if let emailKey, mine.contains(emailKey) { user["emailHash"] = PhoneID.bareHash(emailKey) }
@@ -418,7 +421,7 @@ final class CloudSync {
         if let previous = (try? await userRef.getDocument())?.data()?["phoneHash"] as? String {
             await release("p_" + previous)
         }
-        try? await userRef.setData(["phoneHash": FieldValue.delete()], merge: true)
+        try? await userRef.setData(["phoneHash": FieldValue.delete(), "phone": FieldValue.delete()], merge: true)
     }
 
     /// Клучот за пребарување се брише само ако е мој.
