@@ -1086,7 +1086,7 @@ struct TripWizardView: View {
                     Eyebrow(L("Време на дестинацијата", "Weather at your destination"))
                     Spacer()
                     if !weather.isEmpty {
-                        Text(weatherSource.label)
+                        Text(WeatherSource.describe(weather))
                             .font(.sans(11, .medium))
                             .foregroundStyle(Theme.muted)
                     }
@@ -1107,7 +1107,7 @@ struct TripWizardView: View {
                         .luxCard(padding: 18)
                 } else {
                     WeatherStrip(days: weather)
-                    WeatherCreditView()
+                    if weather.contains(where: { !$0.isClimate }) { WeatherCreditView() }
                 }
             }
             }
@@ -1270,7 +1270,7 @@ struct TripWizardView: View {
 
         let finalTrip = updated
         store.mutate(original.id) { $0 = finalTrip }
-        if updated.weather.isEmpty {
+        if !updated.weather.contains(where: { !$0.isClimate }) {
             Task { await store.refreshWeather(original.id, force: true) }
         }
         sendInvites(to: original.id)
@@ -1279,7 +1279,7 @@ struct TripWizardView: View {
 
     private func create() {
         guard var trip = previewTrip else { return }
-        trip.weatherUpdatedAt = weather.isEmpty ? nil : Date()
+        trip.weatherUpdatedAt = weather.contains(where: { !$0.isClimate }) ? Date() : nil
         trip.items = PackingEngine.generate(for: trip)
         PackingEngine.ensureTogether(&trip)
         trip.exitChecklist = PackingEngine.defaultExitChecklist()
@@ -1766,6 +1766,9 @@ struct AirlinePickerSheet: View {
         NavigationStack {
             List {
                 if query.trimmingCharacters(in: .whitespaces).isEmpty {
+                    if selectedID.hasPrefix(Airlines.namedPrefix), let mine = Airlines.find(selectedID) {
+                        Section(L("Избрана", "Selected")) { row(mine) }
+                    }
                     Section(L("Популарни", "Popular")) {
                         ForEach(Airlines.popular) { row($0) }
                     }
@@ -1783,14 +1786,25 @@ struct AirlinePickerSheet: View {
                 } else {
                     let results = Airlines.search(query)
                     if results.isEmpty {
-                        Text(L("Нема таква авиокомпанија. Избери „Друга“ и внеси мерки.",
-                               "No such airline. Choose “Other” and enter the sizes."))
+                        Text(L("Ја немаме во листата. Додај ја по име — ќе ставам најчести мерки — или избери „Друга“.",
+                               "It isn't in our list. Add it by name — I'll use the most common sizes — or choose “Other”."))
                             .font(.sans(14))
                             .foregroundStyle(Theme.muted)
                             .listRowBackground(Theme.surface)
-                        if let other = Airlines.find("other") { row(other) }
                     } else {
                         ForEach(results) { row($0) }
+                    }
+                    if let typed = typedAirline(results) {
+                        Section {
+                            row(typed, label: L("Додај „\(typed.name)“", "Add “\(typed.name)”"))
+                        } footer: {
+                            Text(L("Ако твојата авиокомпанија ја нема, внеси го целото име. Мерките ќе бидат најчестите — провери ги на нејзиниот сајт.",
+                                   "If your airline isn't listed, type its full name. You'll get the most common sizes — check them on its website."))
+                                .font(.sans(12))
+                        }
+                    }
+                    if results.isEmpty, let other = Airlines.find("other") {
+                        Section { row(other) }
                     }
                 }
             }
@@ -1810,7 +1824,15 @@ struct AirlinePickerSheet: View {
         }
     }
 
-    private func row(_ airline: Airline) -> some View {
+    /// Внесеното име како авиокомпанија, ако не е веќе точно во резултатите.
+    private func typedAirline(_ results: [Airline]) -> Airline? {
+        guard let id = Airlines.namedID(query), let airline = Airlines.find(id) else { return nil }
+        let typed = Airlines.fold(airline.name)
+        if results.contains(where: { Airlines.fold($0.name) == typed || Airlines.fold($0.code) == typed }) { return nil }
+        return airline
+    }
+
+    private func row(_ airline: Airline, label: String? = nil) -> some View {
         Button {
             onSelect(airline)
             dismiss()
@@ -1822,7 +1844,7 @@ struct AirlinePickerSheet: View {
                     .frame(width: 38, height: 38)
                     .background(Circle().fill(Theme.navy))
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(airline.name)
+                    Text(label ?? airline.name)
                         .font(.sans(15, .medium))
                         .foregroundStyle(Theme.ink)
                     Text(subtitle(airline))
@@ -1850,6 +1872,7 @@ struct AirlinePickerSheet: View {
         if let cabin = airline.bags.first(where: { $0.kind == .cabin }) {
             parts.append(L("кабински \(cabin.dimensionText)", "cabin \(cabin.dimensionText)"))
         }
+        if airline.isTypical { parts.append(L("типично", "typical")) }
         return parts.joined(separator: " · ")
     }
 }
@@ -1872,20 +1895,28 @@ struct WeatherStrip: View {
             }
             .scrollIndicators(.hidden)
 
-            if days.contains(where: \.isEstimate) {
-                HStack(alignment: .top, spacing: 4) {
-                    Text("*")
-                        .font(.codes(14))
-                        .foregroundStyle(Theme.gold)
-                    Text(L("Истиот ден лани. Се заменува со вистинска прогноза 16 дена пред денот.",
-                           "Same day last year. Replaced by the real forecast 16 days ahead."))
-                        .font(.sans(12))
-                        .foregroundStyle(Theme.muted)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(.horizontal, 2)
+            if days.contains(where: \.isLastYear) {
+                footnote("*", L("Истиот ден претходната година. Се заменува со вистинска прогноза \(WeatherService.forecastHorizonDays + 1) дена пред денот.",
+                                "Same day in a previous year. Replaced by the real forecast \(WeatherService.forecastHorizonDays + 1) days ahead."))
+            }
+            if days.contains(where: \.isClimate) {
+                footnote("~", L("Климатска проценка за градот и месецот — засега немам податоци за овие денови. Ќе ја заменам штом ги добијам.",
+                                "Climate estimate for the city and month — no data for these days yet. I'll replace it as soon as I get it."))
             }
         }
+    }
+
+    private func footnote(_ mark: String, _ text: String) -> some View {
+        HStack(alignment: .top, spacing: 4) {
+            Text(mark)
+                .font(.codes(14))
+                .foregroundStyle(Theme.gold)
+            Text(text)
+                .font(.sans(12))
+                .foregroundStyle(Theme.muted)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 2)
     }
 }
 
@@ -1910,7 +1941,7 @@ struct WeatherDayCell: View {
                     .font(.codes(15))
                     .foregroundStyle(Theme.inkSoft)
                 if day.isEstimate {
-                    Text("*")
+                    Text(day.isClimate ? "~" : "*")
                         .font(.codes(15))
                         .foregroundStyle(Theme.gold)
                 }
@@ -1929,7 +1960,7 @@ struct WeatherDayCell: View {
             HStack(spacing: 2) {
                 Image(systemName: "drop.fill")
                     .font(.system(size: 7))
-                Text("\(day.rainChance ?? 0)%")
+                Text(day.isClimate ? "—" : "\(day.rainChance ?? 0)%")
                     .font(.sans(9, .medium))
             }
             .foregroundStyle((day.rainChance ?? 0) >= 40 ? Theme.rain : Theme.muted.opacity(0.7))

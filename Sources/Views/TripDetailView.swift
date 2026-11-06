@@ -503,13 +503,13 @@ struct TripDetailView: View {
                 .luxCard(padding: 18)
             } else {
                 WeatherStrip(days: trip.weather)
-                WeatherCreditView()
+                if trip.weather.contains(where: { !$0.isClimate }) { WeatherCreditView() }
             }
         }
     }
 
     private func updatedLabel(_ trip: Trip) -> String {
-        var label = trip.weatherSource.label
+        var label = WeatherSource.describe(trip.weather)
         if let updated = trip.weatherUpdatedAt {
             let f = DateFormatter()
             f.locale = AppLanguage.current.locale
