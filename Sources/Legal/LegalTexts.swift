@@ -26,7 +26,7 @@ enum LegalTexts {
     static let privacyMK = #"""
     # Политика за приватност
 
-    Важи од: 30 октомври 2026
+    Важи од: 6 ноември 2026
 
     Tripdrobe („апликацијата“) ја развива и одржува Кристијан Анакијев, ул. Христо Татарчев 47ј 1/22, 1000 Скопје, Северна Македонија („ние“). Ние сме одговорни за обработката на твоите лични податоци. За сè што е поврзано со приватноста пиши на tripdrobe@gmail.com.
 
@@ -36,7 +36,7 @@ enum LegalTexts {
 
     **Акаунт.** Име, е-пошта и идентификатор на акаунтот. Ако се најавиш со Google или Apple, од нив ги добиваме името и е-поштата (кај Apple може да биде скриена адреса). Лозинката ја чува Firebase Authentication и ние не ја гледаме.
 
-    **Телефонски број (по избор).** Ако го внесеш, останува на твојот телефон. Во базата праќаме само шифриран отпечаток (SHA-256) од бројот и од е-поштата, за да можат пријателите да те најдат кога те канат на патување.
+    **Телефонски број (по избор).** Ако го внесеш, го чуваме во твојот акаунт, за да остане и кога ќе се одјавиш и пак ќе се најавиш. Го гледаш само ти — правилата на базата не дозволуваат никој друг да го чита. За пријателите да можат да те најдат кога те канат на патување, во посебна листа за пребарување се чува само шифриран отпечаток (SHA-256) од бројот и од е-поштата; од него бројот не може да се прочита и не им се покажува на другите.
 
     **Патувања.** Дестинација, датуми, превоз, авиокомпанија и багаж, листи за пакување, листата „Пред излез“ и имињата на сопатниците што ги додаваш.
 
@@ -76,7 +76,7 @@ enum LegalTexts {
 
     ## Колку долго ги чуваме
 
-    Додека го имаш акаунтот. Од телефонот податоците се бришат при одјава. Кога ќе го избришеш акаунтот (Поставки → Избриши акаунт), веднаш се бришат профилот, гардеробата, аутфитите, патувањата чиј сопственик си, како и твојата листа и членство во туѓите патувања. Тоа што си го додал во делот „Заедно“ на туѓо патување останува кај другите членови.
+    Додека го имаш акаунтот. Од телефонот податоците се бришат при одјава. Кога ќе го избришеш акаунтот (Поставки → Избриши акаунт), веднаш се бришат профилот (со телефонскиот број), гардеробата, аутфитите, патувањата чиј сопственик си, како и твојата листа и членство во туѓите патувања. Тоа што си го додал во делот „Заедно“ на туѓо патување останува кај другите членови.
 
     ## Твоите права
 
@@ -100,7 +100,7 @@ enum LegalTexts {
     static let privacyEN = #"""
     # Privacy Policy
 
-    Effective: October 30, 2026
+    Effective: November 6, 2026
 
     Tripdrobe (“the app”) is developed and run by Kristijan Anakijev, Hristo Tatarchev 47j 1/22, 1000 Skopje, North Macedonia (“we”). We are responsible for processing your personal data. For anything about privacy, write to tripdrobe@gmail.com.
 
@@ -110,7 +110,7 @@ enum LegalTexts {
 
     **Account.** Name, email and an account identifier. If you sign in with Google or Apple, we receive your name and email from them (with Apple this may be a private relay address). Your password is handled by Firebase Authentication; we never see it.
 
-    **Phone number (optional).** If you enter it, it stays on your phone. We upload only a one-way fingerprint (SHA-256) of your number and email so friends can find you when they invite you to a trip.
+    **Phone number (optional).** If you enter it, we keep it in your account so it's still there when you sign out and back in. Only you can see it — the database rules don't let anyone else read it. So that friends can find you when they invite you to a trip, a separate lookup list stores only a one-way fingerprint (SHA-256) of your number and email; the number can't be read from it and is never shown to others.
 
     **Trips.** Destination, dates, transport, airline and bags, packing lists, the “Before you leave” checklist and the names of companions you add.
 
@@ -150,7 +150,7 @@ enum LegalTexts {
 
     ## How long we keep it
 
-    For as long as you have an account. Data on your phone is removed when you sign out. When you delete your account (Settings → Delete account), we immediately delete your profile, wardrobe, outfits, the trips you own, and your list and membership in other people's trips. Items you added to the “Together” section of someone else's trip stay with the other members.
+    For as long as you have an account. Data on your phone is removed when you sign out. When you delete your account (Settings → Delete account), we immediately delete your profile (including your phone number), wardrobe, outfits, the trips you own, and your list and membership in other people's trips. Items you added to the “Together” section of someone else's trip stay with the other members.
 
     ## Your rights
 
@@ -174,7 +174,7 @@ enum LegalTexts {
     static let termsMK = #"""
     # Услови за користење
 
-    Важи од: 30 октомври 2026
+    Важи од: 6 ноември 2026
 
     Овие услови важат за апликацијата Tripdrobe што ја нуди Кристијан Анакијев, ул. Христо Татарчев 47ј 1/22, 1000 Скопје, Северна Македонија („ние“). Кога создаваш акаунт или ја користиш апликацијата, се согласуваш со нив и со Политиката за приватност.
 
@@ -230,7 +230,7 @@ enum LegalTexts {
     static let termsEN = #"""
     # Terms of Use
 
-    Effective: October 30, 2026
+    Effective: November 6, 2026
 
     These terms apply to the Tripdrobe app offered by Kristijan Anakijev, Hristo Tatarchev 47j 1/22, 1000 Skopje, North Macedonia (“we”). By creating an account or using the app you agree to them and to the Privacy Policy.
 
