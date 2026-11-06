@@ -397,7 +397,7 @@ struct DayOutfitsSheet: View {
                                 .font(.codes(17))
                                 .foregroundStyle(Theme.inkSoft)
                             if weather.isEstimate {
-                                Text(L("* лани", "* last year"))
+                                Text(weather.isClimate ? L("~ проценка", "~ estimate") : L("* лани", "* last year"))
                                     .font(.sans(11))
                                     .foregroundStyle(Theme.muted)
                             }
