@@ -12,8 +12,12 @@ enum CloudCodec {
     /// Лични работи што воопшто не одат во облакот.
     static let personalKeys: Set<String> = [
         "exitChecklist", "dismissedSuggestions", "weather", "weatherSource", "weatherUpdatedAt",
-        "outfitPlan", "outfitDays", "outfitPacked"
+        "outfitPlan", "outfitDays", "outfitPacked", "ownBags"
     ]
+
+    /// Секој член има свои: багаж и стил (жена/маж). Во облакот: `personal.{uid}`.
+    /// Сопственикот ги пишува и горе (за постари верзии и како почеток за новите членови).
+    static let memberKeys: [String] = ["bag", "bags", "style"]
 
     static func encode(_ trip: Trip, myUID: String) -> [String: Any]? {
         guard let data = try? JSONEncoder().encode(trip),
@@ -23,6 +27,17 @@ enum CloudCodec {
         let mine = (dict["items"] as? [[String: Any]]) ?? []
         dict.removeValue(forKey: "items")
         dict["lists"] = [myUID: itemMap(mine)]
+
+        // Мојот багаж и стил — само ако се мои (сопственик, или член што ги избрал)
+        let isOwner = trip.ownerUID == nil || trip.ownerUID == myUID
+        if isOwner || trip.ownBags == true {
+            var personal: [String: Any] = [:]
+            for key in memberKeys { if let value = dict[key] { personal[key] = value } }
+            dict["personal"] = [myUID: personal]
+        }
+        if !isOwner {
+            for key in memberKeys { dict.removeValue(forKey: key) }
+        }
 
         if let together = dict["together"] as? [[String: Any]] {
             dict["together"] = itemMap(together)
@@ -63,6 +78,18 @@ enum CloudCodec {
         dict["items"] = itemList(lists?[myUID])
         dict.removeValue(forKey: "lists")
 
+        // Мојот багаж и стил; ако уште не сум ги избрал — багажот на сопственикот, стил неутрален
+        let personal = (dict["personal"] as? [String: Any])?[myUID] as? [String: Any]
+        dict.removeValue(forKey: "personal")
+        let isOwner = (dict["ownerUID"] as? String) == myUID
+        if let personal {
+            // Само моите (пр. ако имам еден багаж, не смее да остане листата багажи на сопственикот)
+            for key in memberKeys { dict.removeValue(forKey: key) }
+            for key in memberKeys { if let value = personal[key] { dict[key] = value } }
+        } else if !isOwner {
+            dict["style"] = TravelerStyle.neutral.rawValue
+        }
+
         if dict["together"] != nil {
             dict["together"] = itemList(dict["together"])
         }
@@ -89,6 +116,7 @@ enum CloudCodec {
         } else {
             trip.exitChecklist = PackingEngine.defaultExitChecklist()
         }
+        trip.ownBags = isOwner || personal != nil
         return (trip, hasMyList)
     }
 
@@ -104,9 +132,16 @@ enum CloudCodec {
         guard let o = encode(old, myUID: myUID), let n = encode(new, myUID: myUID) else { return [:] }
         var result: [AnyHashable: Any] = [:]
 
-        let topKeys = Set(o.keys).union(n.keys).subtracting(["lists", "together"])
+        let topKeys = Set(o.keys).union(n.keys).subtracting(["lists", "together", "personal"])
         for key in topKeys where !same(o[key], n[key]) {
             result[key] = n[key] ?? FieldValue.delete()
+        }
+
+        // Мојот багаж и стил (само мојот дел, не на другите)
+        let oldPersonal = (o["personal"] as? [String: Any])?[myUID]
+        let newPersonal = (n["personal"] as? [String: Any])?[myUID]
+        if let newPersonal, !same(oldPersonal, newPersonal) {
+            result["personal.\(myUID)"] = newPersonal
         }
 
         let oldMine = ((o["lists"] as? [String: Any])?[myUID] as? [String: Any]) ?? [:]

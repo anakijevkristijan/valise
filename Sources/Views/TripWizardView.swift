@@ -239,9 +239,11 @@ struct TripWizardView: View {
 
     private let stepCount = 5
 
-    init(editing: Trip? = nil, onCreate: @escaping (UUID) -> Void) {
+    /// `startStep` — пр. 2 = директно на превоз и багаж (член што си го бира својот куфер).
+    init(editing: Trip? = nil, startStep: Int = 0, onCreate: @escaping (UUID) -> Void) {
         self.editing = editing
         self.onCreate = onCreate
+        _step = State(initialValue: startStep)
         if let trip = editing {
             _draft = State(initialValue: TripDraft(trip: trip))
             _weather = State(initialValue: trip.weather)
@@ -1221,6 +1223,8 @@ struct TripWizardView: View {
         updated.outfitPlan = original.outfitPlan
         updated.outfitDays = original.outfitDays
         updated.outfitPacked = original.outfitPacked
+        // Багажот и стилот сега се мои (кај заедничко патување — само за мене)
+        updated.ownBags = true
 
         // Заедничко патување: мојот запис, сопственикот и членовите остануваат
         updated.ownerUID = original.ownerUID

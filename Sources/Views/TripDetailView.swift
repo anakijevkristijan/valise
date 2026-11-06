@@ -23,6 +23,8 @@ struct TripDetailView: View {
     @State private var isRefreshing = false
     @State private var showStory = false
     @State private var showEdit = false
+    /// Од кој чекор се отвора уредувањето (2 = превоз и багаж).
+    @State private var editStartStep = 0
     @State private var showAddCompanion = false
     @State private var newCompanionName = ""
     @State private var showAccount = false
@@ -78,6 +80,9 @@ struct TripDetailView: View {
                         topBar(trip)
                         titleBlock(trip)
                         BoardingPassCard(trip: trip)
+                        if trip.isCloud && !trip.isMine && trip.ownBags != true && !trip.isPast {
+                            ownBagsCard(trip)
+                        }
                         if !trip.isPast {
                             ReminderOfferCard()
                         }
@@ -144,7 +149,7 @@ struct TripDetailView: View {
             .presentationCornerRadius(28)
         }
         .fullScreenCover(isPresented: $showEdit) {
-            TripWizardView(editing: trip) { _ in }
+            TripWizardView(editing: trip, startStep: editStartStep) { _ in }
                 .environmentObject(store)
                 .environmentObject(premium)
         }
@@ -251,6 +256,7 @@ struct TripDetailView: View {
             }
             Menu {
                 Button(L("Уреди патување", "Edit trip"), systemImage: "pencil") {
+                    editStartStep = 0
                     showEdit = true
                 }
                 if premium.isPremium {
@@ -810,6 +816,40 @@ struct TripDetailView: View {
             // Рачно сменет ред од аутфитите станува обичен — гардеробата повеќе не ја менува бројката
             entry.fromOutfits = nil
         }
+    }
+
+    /// Додаден во туѓо патување: багажот и стилот се засега на сопственикот → избери ги своите.
+    private func ownBagsCard(_ trip: Trip) -> some View {
+        let owner = (trip.companions ?? []).first { $0.uid != nil && $0.uid == trip.ownerUID }?.firstName
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Image(systemName: "suitcase.rolling")
+                    .font(.system(size: 15, weight: .light))
+                    .foregroundStyle(Theme.navy)
+                    .frame(width: 36, height: 36)
+                    .background(Circle().fill(Theme.goldPale))
+                Text(L("Избери го твојот багаж", "Choose your own luggage"))
+                    .font(.sans(15, .semibold))
+                    .foregroundStyle(Theme.ink)
+            }
+            Text(owner.map {
+                L("\($0) те додаде во патувањето. Багажот засега е ист како кај \($0) — избери го твојот куфер и стил, за листата и „дали собира“ да се по тебе. Другите нема да го видат.",
+                  "\($0) added you to this trip. For now the luggage is theirs — pick your own bag and style so your list and “does it fit” are about you. Others won't see it.")
+            } ?? L("Багажот засега е на тој што те додаде — избери го твојот куфер и стил, за листата да е по тебе.",
+                   "For now the luggage belongs to whoever added you — pick your own bag and style so your list is about you."))
+                .font(.sans(13))
+                .foregroundStyle(Theme.inkSoft)
+                .fixedSize(horizontal: false, vertical: true)
+            Button {
+                editStartStep = 2
+                showEdit = true
+            } label: {
+                Text(L("Избери багаж", "Choose luggage"))
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(SecondaryButtonStyle())
+        }
+        .luxCard(padding: 16, radius: 18)
     }
 
     /// Аутфитите имаат парче што листата го нема (пр. сукња) → редот сам се додава.
