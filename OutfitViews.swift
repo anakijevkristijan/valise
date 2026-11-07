@@ -36,7 +36,7 @@ struct OutfitCollage: View {
 
     /// Колкав дел од ќелијата зафаќа парчето.
     private static func fill(for item: WardrobeItem) -> CGFloat {
-        // Слика со позадина е полна до рабовите — малку помала, за да не се допира со соседната
+        // Слика со позадина е полна до рабовите - малку помала, за да не се допира со соседната
         if item.isPhoto ?? false { return 0.84 }
         // Додатоците (накит, очила, капа) малку помали од облеката, како на вистински flat lay
         if item.category == .accessory { return 0.78 }
@@ -82,7 +82,7 @@ struct OutfitCollage: View {
         }
     }
 
-    /// Секое парче добива своја ќелија — ништо не се преклопува и сè се гледа цело.
+    /// Секое парче добива своја ќелија - ништо не се преклопува и сè се гледа цело.
     /// Облеката е во главниот дел (горе / долу), а обувките, торбата и додатоците во колона десно.
     static func layout(_ items: [WardrobeItem], in size: CGSize) -> [UUID: CGRect] {
         guard size.width > 0, size.height > 0, !items.isEmpty else { return [:] }
@@ -315,7 +315,7 @@ struct SeasonFilter: View {
 
 // MARK: - Листата наспроти аутфитите
 
-/// „Маици и топови 3/5 · Џемпер / дуксер 1/2 …“ — зелено кога е исполнето, црвено кога е над планираното.
+/// „Маици и топови 3/5 · Џемпер / дуксер 1/2 …“ - зелено кога е исполнето, црвено кога е над планираното.
 struct TargetChips: View {
     let targets: [ClothingTarget]
 
@@ -344,13 +344,13 @@ struct TargetChips: View {
 }
 
 enum TargetText {
-    /// „2 маици, 1 џемпер или дуксер“ — или nil ако сè е покриено.
+    /// „2 маици, 1 џемпер или дуксер“ - или nil ако сè е покриено.
     static func missing(_ targets: [ClothingTarget]) -> String? {
         let parts = targets.filter { $0.missing > 0 }.map { $0.countText($0.missing) }
         return parts.isEmpty ? nil : parts.joined(separator: ", ")
     }
 
-    /// „Горни дела 7/6“ — што е над планираното, или nil.
+    /// „Горни дела 7/6“ - што е над планираното, или nil.
     static func over(_ targets: [ClothingTarget]) -> String? {
         let parts = targets.filter { $0.over > 0 }.map(\.label)
         return parts.isEmpty ? nil : parts.joined(separator: ", ")
@@ -391,7 +391,7 @@ struct ToastBanner: View {
 struct OutfitBuilderView: View {
     let existing: Outfit?
     var startSeason: Season?
-    /// Ако се составува за патување — брои колку пати е облечено секое парче.
+    /// Ако се составува за патување - брои колку пати е облечено секое парче.
     var trip: Trip?
     var onSave: (Outfit) -> Void = { _ in }
 
@@ -405,7 +405,7 @@ struct OutfitBuilderView: View {
     @State private var toast: String?
     @State private var toastToken = 0
 
-    /// Над ова — предупредување за еден аутфит.
+    /// Над ова - предупредување за еден аутфит.
     private let manyPieces = 7
 
     init(existing: Outfit? = nil, startSeason: Season? = nil, trip: Trip? = nil,
@@ -528,8 +528,8 @@ struct OutfitBuilderView: View {
     private var bottomBar: some View {
         VStack(alignment: .leading, spacing: 10) {
             if selected.count > manyPieces {
-                warningLine(L("\(selected.count) парчиња е многу за еден аутфит — дали ти треба сè?",
-                              "\(selected.count) pieces is a lot for one outfit — do you need them all?"),
+                warningLine(L("\(selected.count) парчиња е многу за еден аутфит - дали ти треба сè?",
+                              "\(selected.count) pieces is a lot for one outfit - do you need them all?"),
                             color: Theme.terracotta)
             }
 
@@ -626,7 +626,7 @@ struct OutfitBuilderView: View {
         }
         guard adding else { return }
 
-        // Предупредување: аутфитите го надминуваат планираното во листата (пр. 7 маици, а планирани 6) —
+        // Предупредување: аутфитите го надминуваат планираното во листата (пр. 7 маици, а планирани 6) -
         // само за редот каде што се брои ова парче (џемперот не ги полни маиците)
         if let trip,
            let target = wardrobe.targets(for: trip, extra: selected, excludingOutfit: existing?.id)
@@ -639,8 +639,8 @@ struct OutfitBuilderView: View {
         let info = reuse(item)
         guard info.count > 0 else { return }
         if trip != nil {
-            show(L("„\(item.name)“ — ова ти е веќе искористено \(RepeatText.times(info.count)) на патувањето.",
-                   "“\(item.name)” — you already wear this \(RepeatText.times(info.count)) on this trip."))
+            show(L("„\(item.name)“ - ова ти е веќе искористено \(RepeatText.times(info.count)) на патувањето.",
+                   "“\(item.name)” - you already wear this \(RepeatText.times(info.count)) on this trip."))
         } else {
             show(L("„\(item.name)“ веќе го имаш \(PieceText.inOutfits(info.count)).",
                    "“\(item.name)” is already \(PieceText.inOutfits(info.count))."))

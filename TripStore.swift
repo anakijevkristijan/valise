@@ -32,7 +32,7 @@ final class TripStore: ObservableObject {
 
     private(set) var cloud: CloudSync?
 
-    /// Лични податоци на акаунтот (аутфити по денови) — поставено од PersonalCloud.
+    /// Лични податоци на акаунтот (аутфити по денови) - поставено од PersonalCloud.
     weak var personal: PersonalCloud?
 
     var isSignedIn: Bool { cloud != nil }
@@ -68,7 +68,7 @@ final class TripStore: ObservableObject {
     /// Промена што дошла од облакот (без повторно качување).
     func applyRemote(_ trip: Trip) {
         var incoming = trip
-        // Моите лични работи за патувањето (аутфити, спакувано, пред излез) — од акаунтот
+        // Моите лични работи за патувањето (аутфити, спакувано, пред излез) - од акаунтот
         if let plan = personal?.cachedPlan(trip.id) {
             Self.overlay(plan, on: &incoming)
         }
@@ -170,7 +170,7 @@ final class TripStore: ObservableObject {
         case failed
     }
 
-    /// Пријател од контакти: ако има акаунт — веднаш е во патувањето; ако нема — покана што го чека.
+    /// Пријател од контакти: ако има акаунт - веднаш е во патувањето; ако нема - покана што го чека.
     @MainActor
     func invite(name: String, phones: [String], emails: [String], to tripID: UUID) async -> InviteOutcome {
         guard let cloud, let current = trip(tripID) else { return .failed }
@@ -218,14 +218,14 @@ final class TripStore: ObservableObject {
     static func inviteMessage(friend name: String, trip: Trip, me: String) -> String {
         let first = name.split(separator: " ").first.map(String.init) ?? name
         let range = Fmt.range(trip.startDate, trip.endDate)
-        return L("Здраво \(first)! ✈︎ Патувам за \(trip.placeSummary) (\(range)) и те додадов во Tripdrobe. Симни ја апликацијата и регистрирај се со твојот број — патувањето и листата ќе те чекаат. — \(me)",
-                 "Hi \(first)! ✈︎ I'm going to \(trip.placeSummary) (\(range)) and added you on Tripdrobe. Get the app and sign up with your number — the trip and packing list will be waiting. — \(me)")
+        return L("Здраво \(first)! ✈︎ Патувам за \(trip.placeSummary) (\(range)) и те додадов во Tripdrobe. Симни ја апликацијата и регистрирај се со твојот број - патувањето и листата ќе те чекаат. - \(me)",
+                 "Hi \(first)! ✈︎ I'm going to \(trip.placeSummary) (\(range)) and added you on Tripdrobe. Get the app and sign up with your number - the trip and packing list will be waiting. - \(me)")
     }
 
-    // MARK: Прогноза — се освежува при секое отворање
+    // MARK: Прогноза - се освежува при секое отворање
 
     /// Освежи го времето за едно патување.
-    /// Автоматски најмногу на секои 2 часа (патување подалеку од прогнозата — еднаш дневно),
+    /// Автоматски најмногу на секои 2 часа (патување подалеку од прогнозата - еднаш дневно),
     /// за да остане во бесплатните 500.000 барања месечно на Apple Weather. „Повлечи надолу“ секогаш освежува.
     @MainActor
     func refreshWeather(_ id: UUID, force: Bool = false) async {
@@ -294,12 +294,12 @@ final class TripStore: ObservableObject {
             let data = try JSONEncoder().encode(trips)
             try data.write(to: fileURL, options: .atomic)
         } catch {
-            print("Valise: save failed — \(error)")
+            print("Valise: save failed - \(error)")
         }
     }
 }
 
-/// Последниот град од кој тргна — за побрзо следно патување.
+/// Последниот град од кој тргна - за побрзо следно патување.
 enum LastOrigin {
     private static let key = "lastOrigin"
 

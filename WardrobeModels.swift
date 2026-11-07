@@ -99,7 +99,7 @@ enum WardrobeCategory: String, Codable, CaseIterable, Identifiable {
         }
     }
 
-    /// Приближен волумен во куфер (литри, свиткано) — кога парчето нема вид.
+    /// Приближен волумен во куфер (литри, свиткано) - кога парчето нема вид.
     var volume: Double {
         switch self {
         case .outerwear: return 5.0
@@ -113,7 +113,7 @@ enum WardrobeCategory: String, Codable, CaseIterable, Identifiable {
         }
     }
 
-    /// Приближна тежина (kg) — кога парчето нема вид.
+    /// Приближна тежина (kg) - кога парчето нема вид.
     var weight: Double {
         switch self {
         case .outerwear: return 0.9
@@ -160,7 +160,7 @@ struct ClothingTarget: Identifiable {
 }
 
 extension WardrobeCategory {
-    /// Кратко, во множина — за ознаки „Горни дела 3/5“.
+    /// Кратко, во множина - за ознаки „Горни дела 3/5“.
     var shortPlural: String {
         switch self {
         case .outerwear: return L("Јакни", "Jackets")
@@ -185,7 +185,7 @@ struct WardrobeItem: Codable, Identifiable, Hashable {
     var createdAt: Date = Date()
     /// true = исечена слика (со позадина), не стикер.
     var isPhoto: Bool?
-    /// Видот (`WardrobeKind`) како текст — непознат вид од понова верзија не ја руши гардеробата.
+    /// Видот (`WardrobeKind`) како текст - непознат вид од понова верзија не ја руши гардеробата.
     var kindID: String?
 
     var imageName: String { id.uuidString + ".png" }

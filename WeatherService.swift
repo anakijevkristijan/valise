@@ -4,9 +4,9 @@ import MapKit
 import WeatherKit
 
 /// Прогноза и пребарување места.
-/// • App Store (AppConfig.weatherKitEnabled): Apple Weather (WeatherKit) и Apple Maps (MapKit) —
+/// • App Store (AppConfig.weatherKitEnabled): Apple Weather (WeatherKit) и Apple Maps (MapKit) -
 ///   бесплатно до 500.000 барања месечно со платената Apple Developer сметка, дозволено за комерцијална апликација.
-/// • Тест-верзии: Open-Meteo (open-meteo.com) — бесплатно само за некомерцијална употреба (CC BY 4.0).
+/// • Тест-верзии: Open-Meteo (open-meteo.com) - бесплатно само за некомерцијална употреба (CC BY 4.0).
 /// • Денови подалеку од прогнозата: истите датуми лани (историски податоци).
 enum WeatherService {
 
@@ -42,7 +42,7 @@ enum WeatherService {
         return try await searchOpenMeteo(query)
     }
 
-    /// Apple Maps (MapKit) — без клуч и без трошок.
+    /// Apple Maps (MapKit) - без клуч и без трошок.
     private static func searchApple(_ query: String) async -> [Place] {
         let request = MKLocalSearch.Request()
         request.naturalLanguageQuery = query
@@ -170,11 +170,11 @@ enum WeatherService {
         return (days, source)
     }
 
-    /// Секој ден од патувањето, на кое било растојание — никогаш празно за претстојно патување:
+    /// Секој ден од патувањето, на кое било растојание - никогаш празно за претстојно патување:
     /// 1) прогноза каде што ја има (`forecastHorizonDays`),
-    /// 2) истите датуми лани (ако патувањето е подалеку од година — претходната година),
-    ///    а за деновите што пак ги нема — уште една година наназад,
-    /// 3) за сè што останало (без интернет, Apple не вратил, денови по `maxTripDays`) —
+    /// 2) истите датуми лани (ако патувањето е подалеку од година - претходната година),
+    ///    а за деновите што пак ги нема - уште една година наназад,
+    /// 3) за сè што останало (без интернет, Apple не вратил, денови по `maxTripDays`) -
     ///    климатска проценка според градот и датумот, означена со ~. Се заменува штом стигнат податоци.
     static func fetchWeather(for place: Place, from start: Date, to end: Date) async -> (days: [WeatherDay], source: WeatherSource) {
         let cal = Calendar.current
@@ -245,7 +245,7 @@ enum WeatherService {
         return (all, source)
     }
 
-    /// Најмногу денови во лентата (подолго патување — првите 90 дена).
+    /// Најмногу денови во лентата (подолго патување - првите 90 дена).
     static let maxShownDays = 90
 
     private static func days(from: Date, to: Date) -> [Date] {
@@ -424,7 +424,7 @@ enum WeatherService {
 
 /// Груба климатска проценка кога нема никакви податоци за денот:
 /// просечна дневна максимална температура според географската ширина и денот во годината.
-/// Само за приказ (означено со ~) и за пакување без прогноза — не е прогноза.
+/// Само за приказ (означено со ~) и за пакување без прогноза - не е прогноза.
 enum ClimateEstimate {
     static func high(latitude: Double, on date: Date) -> Double {
         let distance = min(abs(latitude), 70)

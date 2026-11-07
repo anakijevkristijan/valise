@@ -5,7 +5,7 @@ import Foundation
 /// Формат: IATA код | име | земја (ISO) | регион (eu, me, as, am, af, oc) | L = нискобуџетна
 enum AirlineDirectory {
     static let data = """
-    # ——— Кина, Хонг Конг, Макао ———
+    # --- Кина, Хонг Конг, Макао ---
     9C|Spring Airlines|CN|as|L
     FM|Shanghai Airlines|CN|as|
     3U|Sichuan Airlines|CN|as|
@@ -41,7 +41,7 @@ enum AirlineDirectory {
     HX|Hong Kong Airlines|HK|as|
     HB|Greater Bay Airlines|HK|as|
     NX|Air Macau|MO|as|
-    # ——— Јапонија, Кореја, Тајван, Монголија ———
+    # --- Јапонија, Кореја, Тајван, Монголија ---
     BC|Skymark Airlines|JP|as|
     ZG|ZIPAIR|JP|as|L
     GK|Jetstar Japan|JP|as|L
@@ -65,7 +65,7 @@ enum AirlineDirectory {
     OM|MIAT Mongolian Airlines|MN|as|
     MR|Hunnu Air|MN|as|
     M0|Aero Mongolia|MN|as|
-    # ——— Југоисточна Азија ———
+    # --- Југоисточна Азија ---
     FD|Thai AirAsia|TH|as|L
     XJ|Thai AirAsia X|TH|as|L
     SL|Thai Lion Air|TH|as|L
@@ -93,7 +93,7 @@ enum AirlineDirectory {
     8M|Myanmar Airways International|MM|as|
     UB|Myanmar National Airlines|MM|as|
     BI|Royal Brunei Airlines|BN|as|
-    # ——— Јужна и Централна Азија ———
+    # --- Јужна и Централна Азија ---
     QP|Akasa Air|IN|as|L
     9I|Alliance Air|IN|as|
     S5|Star Air|IN|as|
@@ -129,7 +129,7 @@ enum AirlineDirectory {
     ZM|Air Manas|KG|as|L
     YK|Avia Traffic Company|KG|as|
     T5|Turkmenistan Airlines|TM|as|
-    # ——— Европа ———
+    # --- Европа ---
     2L|Helvetic Airways|CH|eu|
     GM|Chair Airlines|CH|eu|
     4Y|Discover Airlines|DE|eu|
@@ -180,7 +180,7 @@ enum AirlineDirectory {
     5N|Smartavia|RU|eu|
     R3|Yakutia Airlines|RU|eu|
     HZ|Aurora|RU|eu|
-    # ——— Блиски Исток ———
+    # --- Блиски Исток ---
     RX|Riyadh Air|SA|me|
     J9|Jazeera Airways|KW|me|L
     OV|SalamAir|OM|me|L
@@ -197,7 +197,7 @@ enum AirlineDirectory {
     IY|Yemenia|YE|me|
     6H|Israir|IL|me|
     IZ|Arkia|IL|me|
-    # ——— Африка ———
+    # --- Африка ---
     BJ|Nouvelair|TN|af|
     3O|Air Arabia Maroc|MA|af|L
     E5|Air Arabia Egypt|EG|af|L
@@ -240,7 +240,7 @@ enum AirlineDirectory {
     ZN|Zambia Airways|ZM|af|
     QM|Malawi Airlines|MW|af|
     VR|Cabo Verde Airlines|CV|af|
-    # ——— Америка ———
+    # --- Америка ---
     G4|Allegiant Air|US|am|L
     SY|Sun Country Airlines|US|am|L
     MX|Breeze Airways|US|am|L
@@ -278,7 +278,7 @@ enum AirlineDirectory {
     QL|LASER Airlines|VE|am|
     5R|Rutaca|VE|am|
     7M|MAP Linhas Aéreas|BR|am|
-    # ——— Австралија и Океанија ———
+    # --- Австралија и Океанија ---
     ZL|Rex Airlines|AU|oc|
     TL|Airnorth|AU|oc|
     S8|Sounds Air|NZ|oc|

@@ -96,8 +96,8 @@ struct SettingsView: View {
 
                     legalSection
 
-                    Text(L("Мерките за багаж се информативни. Авиокомпаниите ги менуваат често — пред лет секогаш провери на нивниот сајт.",
-                           "Baggage sizes are a guide. Airlines change them often — always check their website before you fly."))
+                    Text(L("Мерките за багаж се информативни. Авиокомпаниите ги менуваат често - пред лет секогаш провери на нивниот сајт.",
+                           "Baggage sizes are a guide. Airlines change them often - always check their website before you fly."))
                         .font(.sans(13))
                         .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
@@ -165,6 +165,16 @@ struct SettingsView: View {
                         legalLabel("envelope", L("Пиши ни", "Contact us"))
                     }
                     .buttonStyle(.plain)
+                }
+                // Tripdrobe на социјалните мрежи
+                ForEach(LegalTexts.socialLinks) { social in
+                    if let url = URL(string: social.url) {
+                        Hairline().padding(.leading, 48)
+                        Link(destination: url) {
+                            legalLabel(social.icon, social.title)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
             }
             .luxCard(padding: 0, radius: 16)
@@ -272,8 +282,8 @@ struct SettingsView: View {
                         UIApplication.shared.open(url)
                     }
                 } label: {
-                    Text(L("Известувањата за Tripdrobe се исклучени на iPhone — вклучи ги во Поставки",
-                           "Notifications for Tripdrobe are off on this iPhone — turn them on in Settings"))
+                    Text(L("Известувањата за Tripdrobe се исклучени на iPhone - вклучи ги во Поставки",
+                           "Notifications for Tripdrobe are off on this iPhone - turn them on in Settings"))
                         .font(.sans(12, .medium))
                         .foregroundStyle(Theme.terracotta)
                         .multilineTextAlignment(.leading)
@@ -533,7 +543,7 @@ struct PremiumSheet: View {
     @EnvironmentObject private var premium: PremiumStore
     @Environment(\.dismiss) private var dismiss
     @State private var selectedID = PremiumStore.yearlyID
-    /// Купено од овој прозорец — по отклучувањето сам се затвора.
+    /// Купено од овој прозорец - по отклучувањето сам се затвора.
     @State private var purchasedHere = false
     @State private var legalDoc: LegalDoc?
     @State private var manageSubscriptions = false
@@ -582,9 +592,9 @@ struct PremiumSheet: View {
                         benefit("airplane", L("Багаж за 140+ авиокомпании и дали сè ќе собере", "Baggage rules for 140+ airlines and whether it all fits"))
                         benefit("map", L("Повеќе градови во едно патување, со перална каде ја има", "Several cities in one trip, with laundry where you have it"))
                         benefit("hanger", L("Гардероба и аутфити по денови", "Your wardrobe and outfits for every day"))
-                        benefit("person.2", L("Патувања со пријатели — кој што носи", "Trips with friends — who brings what"))
+                        benefit("person.2", L("Патувања со пријатели - кој што носи", "Trips with friends - who brings what"))
                         benefit("camera.aperture", L("Story за Instagram", "Stories for Instagram"))
-                        benefit("house", L("„Пред излез“ — мирен излез од дома", "“Before you leave” checklist"))
+                        benefit("house", L("„Пред излез“ - мирен излез од дома", "“Before you leave” checklist"))
                         benefit("paintpalette", L("\(Palette.all.filter { $0.isPremium }.count) премиум теми", "\(Palette.all.filter { $0.isPremium }.count) premium themes"))
                     }
 
@@ -671,8 +681,8 @@ struct PremiumSheet: View {
 
             if premium.hasSubscription {
                 if premium.hasBillingIssue {
-                    Text(L("Плаќањето не помина. Apple ќе се обиде повторно — провери го начинот на плаќање во App Store за Premium да не прекине.",
-                           "The payment didn't go through. Apple will try again — check your payment method in the App Store so Premium isn't interrupted."))
+                    Text(L("Плаќањето не помина. Apple ќе се обиде повторно - провери го начинот на плаќање во App Store за Premium да не прекине.",
+                           "The payment didn't go through. Apple will try again - check your payment method in the App Store so Premium isn't interrupted."))
                         .font(.sans(13))
                         .foregroundStyle(Theme.terracotta)
                         .multilineTextAlignment(.center)

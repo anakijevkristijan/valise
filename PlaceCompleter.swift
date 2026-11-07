@@ -24,7 +24,7 @@ final class PlaceCompleter: NSObject, ObservableObject, MKLocalSearchCompleterDe
     }
 
     func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
-        // Само места (градови, региони, држави) — без улици со куќни броеви
+        // Само места (градови, региони, држави) - без улици со куќни броеви
         let places = completer.results.filter { !$0.title.contains(where: { $0.isNumber }) }
         results = Array(places.prefix(8))
     }

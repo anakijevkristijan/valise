@@ -106,7 +106,7 @@ struct TripDetailView: View {
                             BagFitCard(trip: trip)
                                 .id("shot-bags")
                         } else {
-                            // Бесплатно: само листата за пакување. Поканет во туѓо патување — ги гледа сопатниците.
+                            // Бесплатно: само листата за пакување. Поканет во туѓо патување - ги гледа сопатниците.
                             if !trip.travelers.isEmpty { companionsSection(trip) }
                             PremiumTeaserCard()
                         }
@@ -121,8 +121,8 @@ struct TripDetailView: View {
                             } else {
                                 PremiumLockRow(icon: "house",
                                                title: L("Последен круг низ домот", "One last walk through home"),
-                                               detail: L("Шпорет, прозорци, полнач, клучеви — листа за мирен излез од дома.",
-                                                         "Stove, windows, charger, keys — a checklist for leaving home calmly."))
+                                               detail: L("Шпорет, прозорци, полнач, клучеви - листа за мирен излез од дома.",
+                                                         "Stove, windows, charger, keys - a checklist for leaving home calmly."))
                             }
                         }
                         .transition(.opacity)
@@ -271,7 +271,7 @@ struct TripDetailView: View {
                     showEdit = true
                 }
                 if trip.isCloud && !trip.isMine {
-                    // Член: свои датуми (доаѓа подоцна, си оди порано…) — важат само за него
+                    // Член: свои датуми (доаѓа подоцна, си оди порано…) - важат само за него
                     Button(L("Смени датуми", "Change dates"), systemImage: "calendar") {
                         editStartStep = 1
                         showEdit = true
@@ -317,7 +317,7 @@ struct TripDetailView: View {
         }
     }
 
-    /// „🇫🇷  France“; повеќе градови — знамињата и државите.
+    /// „🇫🇷  France“; повеќе градови - знамињата и државите.
     private func headerEyebrow(_ trip: Trip) -> String {
         guard trip.isMultiStop else { return "\(trip.destination.flag)  \(trip.destination.country)" }
         var flags: [String] = []
@@ -411,7 +411,7 @@ struct TripDetailView: View {
                                 showAddCompanion = true
                             }
                         } else {
-                            Button(L("Пријатели — Premium", "Friends — Premium"), systemImage: "lock.fill") {
+                            Button(L("Пријатели - Premium", "Friends - Premium"), systemImage: "lock.fill") {
                                 showPaywall = true
                             }
                         }
@@ -439,8 +439,8 @@ struct TripDetailView: View {
             companionPlans(trip)
 
             if !trip.travelers.isEmpty {
-                Text(L("Секој ја гледа само својата листа. Заедничките работи се во „Заедно“ — таму избирате кој што носи.",
-                       "Everyone sees only their own list. Shared things live in “Together” — that's where you pick who brings what."))
+                Text(L("Секој ја гледа само својата листа. Заедничките работи се во „Заедно“ - таму избирате кој што носи.",
+                       "Everyone sees only their own list. Shared things live in “Together” - that's where you pick who brings what."))
                     .font(.sans(12))
                     .foregroundStyle(Theme.muted)
                     .fixedSize(horizontal: false, vertical: true)
@@ -469,8 +469,8 @@ struct TripDetailView: View {
         case .joined:
             inviteResult = InviteResult(
                 title: L("\(first) е на Tripdrobe ✓", "\(first) is on Tripdrobe ✓"),
-                detail: L("Додаден/а е во патувањето. Кај неа/него веќе се гледа истата листа — штиклирањето се синхронизира.",
-                          "They've been added to the trip and already see the same list — ticks sync both ways."),
+                detail: L("Додаден/а е во патувањето. Кај неа/него веќе се гледа истата листа - штиклирањето се синхронизира.",
+                          "They've been added to the trip and already see the same list - ticks sync both ways."),
                 shareMessage: nil)
         case .alreadyIn:
             inviteResult = InviteResult(
@@ -659,7 +659,7 @@ struct TripDetailView: View {
         }
     }
 
-    /// „Заедно“ — единствениот заеднички дел: кој што носи, синхронизирано кај сите.
+    /// „Заедно“ - единствениот заеднички дел: кој што носи, синхронизирано кај сите.
     private func togetherBlock(_ trip: Trip) -> some View {
         let items = trip.togetherItems
         return VStack(alignment: .leading, spacing: 12) {
@@ -678,8 +678,8 @@ struct TripDetailView: View {
                         .foregroundStyle(Theme.terracotta)
                 }
             }
-            Text(L("Работи што ги делите — изберете кој што носи. Се гледа и штиклира кај сите. Кој ќе штиклира дека зел нешто, тоа станува негово.",
-                   "Things you share — choose who brings what. Everyone sees and ticks the same list. Whoever ticks an item takes it over."))
+            Text(L("Работи што ги делите - изберете кој што носи. Се гледа и штиклира кај сите. Кој ќе штиклира дека зел нешто, тоа станува негово.",
+                   "Things you share - choose who brings what. Everyone sees and ticks the same list. Whoever ticks an item takes it over."))
                 .font(.sans(12))
                 .foregroundStyle(Theme.muted)
                 .fixedSize(horizontal: false, vertical: true)
@@ -787,7 +787,7 @@ struct TripDetailView: View {
         }
     }
 
-    /// Промена на предмет — било во мојата листа или во „Заедно“.
+    /// Промена на предмет - било во мојата листа или во „Заедно“.
     private func updateItem(_ id: UUID, _ change: @escaping (inout PackingItem) -> Void) {
         store.mutate(tripID) { trip in
             if let i = trip.items.firstIndex(where: { $0.id == id }) {
@@ -806,7 +806,7 @@ struct TripDetailView: View {
                     trip.items[i].isPacked.toggle()
                 } else if var together = trip.together, let i = together.firstIndex(where: { $0.id == item.id }) {
                     together[i].isPacked.toggle()
-                    // Заедничко: кој штиклира дека го зел — тој го носи (пр. било за Виктор, го зедов јас)
+                    // Заедничко: кој штиклира дека го зел - тој го носи (пр. било за Виктор, го зедов јас)
                     if together[i].isPacked, !trip.isMine(together[i]) {
                         if trip.isCloud {
                             if let me = trip.myCompanionID { together[i].assignee = me }
@@ -832,7 +832,7 @@ struct TripDetailView: View {
             entry.quantity = newValue
             entry.wornCount = min(entry.wornCount, newValue)
             entry.quantityEdited = true
-            // Рачно сменет ред од аутфитите станува обичен — гардеробата повеќе не ја менува бројката
+            // Рачно сменет ред од аутфитите станува обичен - гардеробата повеќе не ја менува бројката
             entry.fromOutfits = nil
         }
     }
@@ -863,10 +863,10 @@ struct TripDetailView: View {
                     .foregroundStyle(Theme.ink)
             }
             Text(owner.map {
-                L("\($0) те додаде во патувањето. Засега градовите, датумите и багажот се како кај \($0). Тргаш од друго место, доаѓаш подоцна или остануваш подолго? Смени ги — важат само за тебе, а кај \($0) ништо не се менува.",
-                  "\($0) added you to this trip. For now the cities, dates and luggage are \($0)'s. Leaving from somewhere else, arriving later or staying longer? Change them — they're only yours and nothing changes for \($0).")
-            } ?? L("Засега градовите, датумите и багажот се како кај тој што те додаде. Смени ги — важат само за тебе.",
-                   "For now the cities, dates and luggage are those of whoever added you. Change them — they're only yours."))
+                L("\($0) те додаде во патувањето. Засега градовите, датумите и багажот се како кај \($0). Тргаш од друго место, доаѓаш подоцна или остануваш подолго? Смени ги - важат само за тебе, а кај \($0) ништо не се менува.",
+                  "\($0) added you to this trip. For now the cities, dates and luggage are \($0)'s. Leaving from somewhere else, arriving later or staying longer? Change them - they're only yours and nothing changes for \($0).")
+            } ?? L("Засега градовите, датумите и багажот се како кај тој што те додаде. Смени ги - важат само за тебе.",
+                   "For now the cities, dates and luggage are those of whoever added you. Change them - they're only yours."))
                 .font(.sans(13))
                 .foregroundStyle(Theme.inkSoft)
                 .fixedSize(horizontal: false, vertical: true)
@@ -1010,7 +1010,7 @@ struct TripDetailView: View {
                     Text(L("Последен круг низ домот", "One last walk through home"))
                         .font(.serif(22))
                         .foregroundStyle(Theme.ink)
-                    Text(L("Помини ја листата на излез — за да не мислиш на шпоретот на аеродром.",
+                    Text(L("Помини ја листата на излез - за да не мислиш на шпоретот на аеродром.",
                            "Run through this on your way out, so you're not thinking about the stove at the airport."))
                         .font(.sans(14))
                         .foregroundStyle(Theme.inkSoft)
@@ -1062,7 +1062,7 @@ struct TripDetailView: View {
         .sensoryFeedback(.success, trigger: allDone)
     }
 
-    // MARK: Прогноза — при секое отворање
+    // MARK: Прогноза - при секое отворање
 
     @MainActor
     private func refreshWeather(force: Bool) async {

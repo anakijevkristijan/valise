@@ -64,8 +64,8 @@ struct TripOutfitsSection: View {
                 TripClosetSummary(trip: trip)
             } else {
                 Text(wardrobe.items.isEmpty
-                     ? L("Додај облека во „Гардероба“ и испланирај што ќе носиш секој ден — може и повеќе аутфити во ден.",
-                         "Add clothes in “Wardrobe” and plan what you'll wear each day — even several outfits a day.")
+                     ? L("Додај облека во „Гардероба“ и испланирај што ќе носиш секој ден - може и повеќе аутфити во ден.",
+                         "Add clothes in “Wardrobe” and plan what you'll wear each day - even several outfits a day.")
                      : L("Допри ден за да додадеш еден или повеќе аутфити.",
                          "Tap a day to add one or more outfits."))
                     .font(.sans(12))
@@ -400,8 +400,8 @@ struct DayOutfitsSheet: View {
 
                 // Веќе избрани за денот
                 if todays.isEmpty {
-                    Text(L("Сè уште ништо. Додај еден или повеќе — за ден, вечер, плажа…",
-                           "Nothing yet. Add one or more — for daytime, evening, the beach…"))
+                    Text(L("Сè уште ништо. Додај еден или повеќе - за ден, вечер, плажа…",
+                           "Nothing yet. Add one or more - for daytime, evening, the beach…"))
                         .font(.sans(14))
                         .foregroundStyle(Theme.inkSoft)
                         .fixedSize(horizontal: false, vertical: true)
@@ -567,11 +567,11 @@ struct DayOutfitsSheet: View {
         if !repeats.isEmpty {
             lines.append(L("Ова ти е веќе искористено на патувањето:", "You already wear these on the trip:"))
             for entry in repeats {
-                lines.append("• \(entry.item.name) — \(RepeatText.times(entry.times))")
+                lines.append("• \(entry.item.name) - \(RepeatText.times(entry.times))")
             }
             lines.append("")
         }
-        lines.append(L("Повторувањето е сосема во ред — помалку за пакување.", "Repeating is perfectly fine — less to pack."))
+        lines.append(L("Повторувањето е сосема во ред - помалку за пакување.", "Repeating is perfectly fine - less to pack."))
         return lines.joined(separator: "\n")
     }
 
@@ -706,7 +706,7 @@ struct OutfitPackingBlock: View {
     // MARK: Колку од секоја категорија
 
     private func summary(_ planned: [(item: WardrobeItem, times: Int)]) -> some View {
-        // По вид: „3 маици · 1 џемпер · 1 сукња · 2 пара патики“ (парчињата без вид — по групата)
+        // По вид: „3 маици · 1 џемпер · 1 сукња · 2 пара патики“ (парчињата без вид - по групата)
         var counts: [String] = []
         for kind in WardrobeKind.allCases {
             let n = planned.filter { $0.item.effectiveKind == kind }.count

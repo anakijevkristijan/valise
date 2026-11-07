@@ -1,7 +1,7 @@
 import SwiftUI
 import UserNotifications
 
-/// Во патувањето, еднаш: „Да те потсетам?“ — дури тогаш системското прашање за известувања.
+/// Во патувањето, еднаш: „Да те потсетам?“ - дури тогаш системското прашање за известувања.
 /// (Подобро отколку да се бара дозвола веднаш при отворање на апликацијата.)
 struct ReminderOfferCard: View {
     @EnvironmentObject private var store: TripStore
@@ -28,8 +28,8 @@ struct ReminderOfferCard: View {
                     .font(.sans(15, .semibold))
                     .foregroundStyle(Theme.ink)
             }
-            Text(L("3 дена и ден пред патувањето — колку работи уште не се спакувани. И кога пријател те додава во патување или те означува да понесеш нешто.",
-                   "3 days and 1 day before the trip — how much is still left to pack. And when a friend adds you to a trip or asks you to bring something."))
+            Text(L("3 дена и ден пред патувањето - колку работи уште не се спакувани. И кога пријател те додава во патување или те означува да понесеш нешто.",
+                   "3 days and 1 day before the trip - how much is still left to pack. And when a friend adds you to a trip or asks you to bring something."))
                 .font(.sans(13))
                 .foregroundStyle(Theme.inkSoft)
                 .fixedSize(horizontal: false, vertical: true)

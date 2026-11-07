@@ -77,7 +77,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     }
 }
 
-/// Краток превод: L("Македонски", "English"). Другите јазици — од табелите, по англискиот текст.
+/// Краток превод: L("Македонски", "English"). Другите јазици - од табелите, по англискиот текст.
 func L(_ mk: String, _ en: String) -> String {
     switch AppLanguage.current {
     case .mk: return mk
@@ -86,7 +86,7 @@ func L(_ mk: String, _ en: String) -> String {
     }
 }
 
-/// „3 маици“ / „3 T-shirts“ — број и именка. За другите јазици именката се бара посебно
+/// „3 маици“ / „3 T-shirts“ - број и именка. За другите јазици именката се бара посебно
 /// (клуч „#T-shirts“), за да не се меша со насловите („T-shirts“ → „Tişörtler“, а „3 tişört“).
 func countNoun(_ n: Int, _ oneMK: String, _ manyMK: String, _ oneEN: String, _ manyEN: String) -> String {
     let one = n == 1
@@ -204,7 +204,7 @@ enum Translations {
 
 #if DEBUG
 /// Само Debug: текстовите без превод. Во демо-режимот се запишуваат и во
-/// Documents/missing-translations-<јазик>.txt — ги собира workflow-от „Провери ја апликацијата“.
+/// Documents/missing-translations-<јазик>.txt - ги собира workflow-от „Провери ја апликацијата“.
 enum MissingTranslations {
     /// „de|Some English text“
     private(set) static var all: Set<String> = []

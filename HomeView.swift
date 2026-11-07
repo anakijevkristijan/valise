@@ -150,7 +150,7 @@ struct HomeView: View {
         return L("Твојата карта за \(trip.placeSummary) е спремна.", "Your ticket to \(trip.placeSummary) is ready.")
     }
 
-    // MARK: Патувања — пасови во мрежа
+    // MARK: Патувања - пасови во мрежа
 
     private let columns = [GridItem(.adaptive(minimum: 150, maximum: 230), spacing: 14)]
 

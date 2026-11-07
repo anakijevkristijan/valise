@@ -1,7 +1,7 @@
 import SwiftUI
 import StoreKit
 
-/// Целоекранска понуда за Premium — се појавува еднаш, веднаш по најавата (по името и телефонот).
+/// Целоекранска понуда за Premium - се појавува еднаш, веднаш по најавата (по името и телефонот).
 /// Со X или „Продолжи со бесплатната верзија“ се затвора и повеќе не се појавува сама;
 /// Premium после се отвора од заклучените функции и од Поставки.
 /// Одјавата го брише `shownKey`, па при најава со друг акаунт понудата се покажува уште еднаш.
@@ -62,7 +62,7 @@ struct PremiumOfferView: View {
         }
         .sensoryFeedback(.success, trigger: premium.isPremium)
         .onChange(of: premium.isPremium) { _, unlocked in
-            // Купено или вратено — прозорецот се затвора, сè е веднаш отклучено
+            // Купено или вратено - прозорецот се затвора, сè е веднаш отклучено
             if unlocked {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { dismiss() }
             }
@@ -169,7 +169,7 @@ struct PremiumOfferView: View {
             .frame(height: 1)
     }
 
-    // MARK: Проба — чекори
+    // MARK: Проба - чекори
 
     private func timeline(_ product: Product, trial: String) -> some View {
         let days = product.freeTrialDays ?? 7
@@ -231,7 +231,7 @@ struct PremiumOfferView: View {
         .accessibilityElement(children: .combine)
     }
 
-    // MARK: Без проба — придобивки
+    // MARK: Без проба - придобивки
 
     private var benefits: some View {
         VStack(alignment: .leading, spacing: 13) {
@@ -255,7 +255,7 @@ struct PremiumOfferView: View {
         }
     }
 
-    // MARK: Долу — планови и копче
+    // MARK: Долу - планови и копче
 
     private var bottomPanel: some View {
         VStack(spacing: 0) {

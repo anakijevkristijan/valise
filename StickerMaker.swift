@@ -3,7 +3,7 @@ import Vision
 import CoreImage
 
 /// Од фотографија → стикер (предметот исечен, со бел раб). Сè се прави на телефонот.
-/// Ако на сликата има лице, главата се отсекува; ако лицето и понатаму се гледа — не се прави стикер.
+/// Ако на сликата има лице, главата се отсекува; ако лицето и понатаму се гледа - не се прави стикер.
 enum StickerMaker {
 
     enum Outcome {
@@ -50,7 +50,7 @@ enum StickerMaker {
                 return .sticker(framedPhoto(image))
             }
 
-            // Без рачно означување: само главниот предмет (најголем и најблиску до средината; кај обувки — двете)
+            // Без рачно означување: само главниот предмет (најголем и најблиску до средината; кај обувки - двете)
             guard let lifted = liftSubject(image, mainOnly: crop == nil) else { return .noSubject }
             if largestFace(in: lifted) != nil { return .hasFace }
 
@@ -72,7 +72,7 @@ enum StickerMaker {
     }
 
     /// Apple „кревање предмет“ (iOS 17): го враќа предметот без позадина.
-    /// `mainOnly` — од повеќе предмети на сликата (перница, закачалка…) само главниот.
+    /// `mainOnly` - од повеќе предмети на сликата (перница, закачалка…) само главниот.
     private static func liftSubject(_ image: CGImage, mainOnly: Bool) -> CGImage? {
         let request = VNGenerateForegroundInstanceMaskRequest()
         let handler = VNImageRequestHandler(cgImage: image, options: [:])
@@ -104,7 +104,7 @@ enum StickerMaker {
         let rowBytes = CVPixelBufferGetBytesPerRow(mask)
         guard width > 0, height > 0 else { return all }
 
-        // Секој пиксел од предметот носи поени — повеќе ако е поблиску до средината
+        // Секој пиксел од предметот носи поени - повеќе ако е поблиску до средината
         var score = [Double](repeating: 0, count: 256)
         let pixels = base.assumingMemoryBound(to: UInt8.self)
         let cx = Double(width) / 2, cy = Double(height) / 2
@@ -145,7 +145,7 @@ enum StickerMaker {
         }
     }
 
-    /// Бел раб околу предметот — изглед на стикер.
+    /// Бел раб околу предметот - изглед на стикер.
     private static func addOutline(_ image: CGImage, radius: CGFloat) -> CGImage? {
         let pad = radius * 2
         let canvas = CGRect(x: 0, y: 0,

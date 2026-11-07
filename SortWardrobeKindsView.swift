@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Старата облека што не можеше да се препознае од името: со еден допир — маица, џемпер, дуксер…
+/// Старата облека што не можеше да се препознае од името: со еден допир - маица, џемпер, дуксер…
 /// Подреденото парче исчезнува од листата; кога ќе се подреди сè, прозорецот сам се затвора.
 struct SortWardrobeKindsView: View {
     @EnvironmentObject private var wardrobe: WardrobeStore
@@ -23,8 +23,8 @@ struct SortWardrobeKindsView: View {
                         Text(L("Што е секое парче?", "What is each piece?"))
                             .font(.serif(30))
                             .foregroundStyle(Theme.ink)
-                        Text(L("Еден допир по парче — за листата да знае дали е маица, џемпер или дуксер, и да го брои на вистинското место.",
-                               "One tap per piece — so the list knows if it's a T-shirt, a sweater or a hoodie, and counts it in the right place."))
+                        Text(L("Еден допир по парче - за листата да знае дали е маица, џемпер или дуксер, и да го брои на вистинското место.",
+                               "One tap per piece - so the list knows if it's a T-shirt, a sweater or a hoodie, and counts it in the right place."))
                             .font(.sans(14))
                             .foregroundStyle(Theme.inkSoft)
                             .lineSpacing(2)

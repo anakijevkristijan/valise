@@ -1,4 +1,4 @@
-// Генерирано од legal/*.md — Политика за приватност и Услови за користење (MK/EN).
+// Генерирано од legal/*.md - Политика за приватност и Услови за користење (MK/EN).
 // Истите текстови се објавени и на веб-страницата (за App Store Connect).
 import Foundation
 
@@ -13,6 +13,19 @@ enum LegalTexts {
         let value = "tripdrobe@gmail.com"
         return value.hasPrefix("[") ? "" : value
     }()
+
+    /// Tripdrobe на социјалните мрежи (Профил → Приватност и услови).
+    struct SocialLink: Identifiable {
+        let icon: String
+        let title: String
+        let url: String
+        var id: String { url }
+    }
+
+    static let socialLinks: [SocialLink] = [
+        SocialLink(icon: "camera", title: "Instagram · @tripdrobe", url: "https://www.instagram.com/tripdrobe/"),
+        SocialLink(icon: "music.note", title: "TikTok · @tripdrobe", url: "https://www.tiktok.com/@tripdrobe"),
+    ]
 
     static func markdown(_ doc: LegalDoc) -> String {
         switch (doc, AppLanguage.current) {
@@ -37,7 +50,7 @@ enum LegalTexts {
 
     **Акаунт.** Име, е-пошта и идентификатор на акаунтот. Ако се најавиш со Google или Apple, од нив ги добиваме името и е-поштата (кај Apple може да биде скриена адреса). Лозинката ја чува Firebase Authentication и ние не ја гледаме.
 
-    **Телефонски број (по избор).** Ако го внесеш, го чуваме во твојот акаунт, за да остане и кога ќе се одјавиш и пак ќе се најавиш. Го гледаш само ти — правилата на базата не дозволуваат никој друг да го чита. За пријателите да можат да те најдат кога те канат на патување, во посебна листа за пребарување се чува само шифриран отпечаток (SHA-256) од бројот и од е-поштата; од него бројот не може да се прочита и не им се покажува на другите.
+    **Телефонски број (по избор).** Ако го внесеш, го чуваме во твојот акаунт, за да остане и кога ќе се одјавиш и пак ќе се најавиш. Го гледаш само ти - правилата на базата не дозволуваат никој друг да го чита. За пријателите да можат да те најдат кога те канат на патување, во посебна листа за пребарување се чува само шифриран отпечаток (SHA-256) од бројот и од е-поштата; од него бројот не може да се прочита и не им се покажува на другите.
 
     **Патувања.** Дестинација, датуми, превоз, авиокомпанија и багаж, листи за пакување, листата „Пред излез“ и имињата на сопатниците што ги додаваш.
 
@@ -111,7 +124,7 @@ enum LegalTexts {
 
     **Account.** Name, email and an account identifier. If you sign in with Google or Apple, we receive your name and email from them (with Apple this may be a private relay address). Your password is handled by Firebase Authentication; we never see it.
 
-    **Phone number (optional).** If you enter it, we keep it in your account so it's still there when you sign out and back in. Only you can see it — the database rules don't let anyone else read it. So that friends can find you when they invite you to a trip, a separate lookup list stores only a one-way fingerprint (SHA-256) of your number and email; the number can't be read from it and is never shown to others.
+    **Phone number (optional).** If you enter it, we keep it in your account so it's still there when you sign out and back in. Only you can see it - the database rules don't let anyone else read it. So that friends can find you when they invite you to a trip, a separate lookup list stores only a one-way fingerprint (SHA-256) of your number and email; the number can't be read from it and is never shown to others.
 
     **Trips.** Destination, dates, transport, airline and bags, packing lists, the “Before you leave” checklist and the names of companions you add.
 

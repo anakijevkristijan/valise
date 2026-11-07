@@ -29,7 +29,7 @@ struct Airline: Identifiable, Hashable {
     let website: String?
     let bags: [BagSpec]
     let tip: String?
-    /// Нема проверени мерки — типични правила според регионот (или име што корисникот го внел).
+    /// Нема проверени мерки - типични правила според регионот (или име што корисникот го внел).
     var isTypical: Bool = false
 
     /// Авиокомпанија што ја нема во листата, внесена по име.
@@ -46,12 +46,12 @@ struct Airline: Identifiable, Hashable {
     }
 }
 
-/// Правила за багаж (економска класа) — информативно, октомври 2026.
+/// Правила за багаж (економска класа) - информативно, октомври 2026.
 /// Секогаш провери на сајтот на авиокомпанијата пред лет.
 enum Airlines {
     static var dataUpdated: String { L("октомври 2026", "October 2026") }
 
-    /// Најчести за патници од Македонија и регионот — прикажани први.
+    /// Најчести за патници од Македонија и регионот - прикажани први.
     static let popularIDs = ["wizz", "turkish", "austrian", "lufthansa", "pegasus", "ajet", "airserbia",
                              "swiss", "eurowings", "ryanair", "easyjet", "aegean", "croatia", "flydubai",
                              "emirates", "qatar"]
@@ -90,7 +90,7 @@ enum Airlines {
         var list: [Row] = []
         func add(_ row: Row) { list.append(row) }
 
-        // ——— Европа: нискобуџетни ———
+        // --- Европа: нискобуџетни ---
         add(Row(id: "wizz", code: "W6", name: "Wizz Air", country: "HU", region: .europe, lowCost: true,
                 personal: (40, 30, 20, 10), cabin: (55, 40, 23, 10), cabinRule: .paid,
                 cabinNote: ("Со WIZZ Priority · горна полица", "With WIZZ Priority · overhead bin"),
@@ -105,7 +105,7 @@ enum Airlines {
                       "Wheels, handles and outer pockets count towards the size.")))
         add(Row(id: "easyjet", code: "U2", name: "easyJet", country: "GB", region: .europe, lowCost: true,
                 personal: (45, 36, 20, 15), cabin: (56, 45, 25, 15), cabinRule: .paid,
-                cabinNote: ("Голем кабински — се доплаќа или со FLEXI", "Large cabin bag — extra fee or with FLEXI"),
+                cabinNote: ("Голем кабински - се доплаќа или со FLEXI", "Large cabin bag - extra fee or with FLEXI"),
                 checkedKg: 23, checkedRule: .paid, site: "easyjet.com",
                 tip: ("Up Front и Extra Legroom седиштата веќе не вклучуваат голем кабински куфер.",
                       "Up Front and Extra Legroom seats no longer include a large cabin bag.")))
@@ -143,7 +143,7 @@ enum Airlines {
         add(Row(id: "sunexpress", code: "XQ", name: "SunExpress", country: "TR", region: .europe, lowCost: true,
                 cabin: (55, 40, 23, 8), checkedKg: 20, site: "sunexpress.com"))
 
-        // ——— Европа: класични ———
+        // --- Европа: класични ---
         add(Row(id: "turkish", code: "TK", name: "Turkish Airlines", country: "TR", region: .europe,
                 personal: (40, 30, 15, 4), site: "turkishairlines.com"))
         add(Row(id: "lufthansa", code: "LH", name: "Lufthansa", country: "DE", region: .europe,
@@ -212,7 +212,7 @@ enum Airlines {
         add(Row(id: "georgian", code: "A9", name: "Georgian Airways", country: "GE", region: .europe,
                 cabin: (55, 40, 20, 8), site: "georgian-airways.com"))
 
-        // ——— Блиски Исток ———
+        // --- Блиски Исток ---
         add(Row(id: "emirates", code: "EK", name: "Emirates", country: "AE", region: .middleEast,
                 personal: nil, cabin: (55, 38, 20, 7), checkedKg: 25, site: "emirates.com"))
         add(Row(id: "qatar", code: "QR", name: "Qatar Airways", country: "QA", region: .middleEast,
@@ -243,7 +243,7 @@ enum Airlines {
         add(Row(id: "elal", code: "LY", name: "El Al", country: "IL", region: .middleEast,
                 cabin: (56, 45, 25, 8), site: "elal.com"))
 
-        // ——— Азија ———
+        // --- Азија ---
         add(Row(id: "singapore", code: "SQ", name: "Singapore Airlines", country: "SG", region: .asia,
                 personal: nil, cabin: (56, 36, 23, 7), checkedKg: 25, site: "singaporeair.com"))
         add(Row(id: "scoot", code: "TR", name: "Scoot", country: "SG", region: .asia, lowCost: true,
@@ -319,7 +319,7 @@ enum Airlines {
         add(Row(id: "uzbekistan", code: "HY", name: "Uzbekistan Airways", country: "UZ", region: .asia,
                 cabin: (55, 40, 20, 8), site: "uzairways.com"))
 
-        // ——— Австралија и Океанија ———
+        // --- Австралија и Океанија ---
         add(Row(id: "qantas", code: "QF", name: "Qantas", country: "AU", region: .oceania,
                 personal: nil, cabin: (56, 36, 23, 7), site: "qantas.com"))
         add(Row(id: "virginaustralia", code: "VA", name: "Virgin Australia", country: "AU", region: .oceania,
@@ -332,7 +332,7 @@ enum Airlines {
         add(Row(id: "fiji", code: "FJ", name: "Fiji Airways", country: "FJ", region: .oceania,
                 personal: nil, cabin: (56, 36, 23, 7), checkedRule: .included, site: "fijiairways.com"))
 
-        // ——— Америка ———
+        // --- Америка ---
         add(Row(id: "american", code: "AA", name: "American Airlines", country: "US", region: .americas,
                 personal: (45, 35, 20, nil), cabin: (56, 36, 23, nil), checkedRule: .paid, site: "aa.com"))
         add(Row(id: "delta", code: "DL", name: "Delta", country: "US", region: .americas,
@@ -388,7 +388,7 @@ enum Airlines {
         add(Row(id: "caribbean", code: "BW", name: "Caribbean Airlines", country: "TT", region: .americas,
                 personal: nil, cabin: (56, 36, 23, nil), site: "caribbean-airlines.com"))
 
-        // ——— Африка ———
+        // --- Африка ---
         add(Row(id: "ethiopian", code: "ET", name: "Ethiopian Airlines", country: "ET", region: .africa,
                 cabin: (55, 40, 23, 7), checkedRule: .included, site: "ethiopianairlines.com"))
         add(Row(id: "egyptair", code: "MS", name: "EgyptAir", country: "EG", region: .africa, site: "egyptair.com"))
@@ -407,7 +407,7 @@ enum Airlines {
         add(Row(id: "rwandair", code: "WB", name: "RwandAir", country: "RW", region: .africa,
                 personal: nil, cabin: (55, 40, 23, 7), site: "rwandair.com"))
 
-        // ——— Уште авиокомпании (AirlineDirectory): типични правила ———
+        // --- Уште авиокомпании (AirlineDirectory): типични правила ---
         var codes = Set(list.map(\.code))
         var ids = Set(list.map(\.id))
         for line in AirlineDirectory.data.split(separator: "\n") {
@@ -448,7 +448,7 @@ enum Airlines {
         return result.trimmingCharacters(in: CharacterSet(charactersIn: "-"))
     }
 
-    /// Мало, без дијакритици — за пребарување („Widerøe“ = „wideroe“).
+    /// Мало, без дијакритици - за пребарување („Widerøe“ = „wideroe“).
     static func fold(_ text: String) -> String {
         text.folding(options: [.diacriticInsensitive, .caseInsensitive, .widthInsensitive], locale: Locale(identifier: "en"))
             .replacingOccurrences(of: "ø", with: "o")
@@ -463,8 +463,8 @@ enum Airlines {
                                 region: AirlineRegion, lowCost: Bool) -> Row {
         var row = Row(id: id, code: code, name: name, country: country, region: region, lowCost: lowCost)
         row.typical = true
-        row.tip = ("Типични мерки за овој вид авиокомпанија — точните правила ги немаме проверено. Провери ги на нејзиниот сајт пред лет.",
-                   "Typical sizes for this kind of airline — we haven't checked its exact rules. Check its website before you fly.")
+        row.tip = ("Типични мерки за овој вид авиокомпанија - точните правила ги немаме проверено. Провери ги на нејзиниот сајт пред лет.",
+                   "Typical sizes for this kind of airline - we haven't checked its exact rules. Check its website before you fly.")
         let northAmerica = ["US", "CA"].contains(country)
         if lowCost {
             switch region {
@@ -560,7 +560,7 @@ enum Airlines {
     }
 
     private static func other() -> Airline {
-        Airline(id: "other", code: "—", name: L("Друга авиокомпанија", "Other airline"), country: "", region: .europe,
+        Airline(id: "other", code: "-", name: L("Друга авиокомпанија", "Other airline"), country: "", region: .europe,
                 isLowCost: false, website: nil, bags: [
                     BagSpec(title: L("Мала торба / ранец", "Small bag / backpack"),
                             detail: L("Стандард во ЕУ · под седиштето", "EU standard · under the seat"),
@@ -572,7 +572,7 @@ enum Airlines {
                 ], tip: nil)
     }
 
-    // MARK: Кеш (по јазик) — листата се гради еднаш, не при секое цртање
+    // MARK: Кеш (по јазик) - листата се гради еднаш, не при секое цртање
 
     private static var cache: (language: String, list: [Airline], index: [String: Airline], searchTexts: [String])?
 

@@ -1,12 +1,12 @@
 import Foundation
 
 /// Трибуквен код на град за авионската карта (SKP, ROM, PAR…).
-/// Познатите градови го добиваат вистинскиот IATA код; останатите — изведен од името.
+/// Познатите градови го добиваат вистинскиот IATA код; останатите - изведен од името.
 enum CityCode {
 
     static func code(for name: String) -> String {
         let latin = latinLetters(name)
-        if latin.isEmpty { return "———" }
+        if latin.isEmpty { return "---" }
         if let known = knownCodes[latin] { return known }
         return derived(from: latin)
     }
@@ -14,7 +14,7 @@ enum CityCode {
     /// Прва буква + следните согласки, како аеродромските кодови (Маврово → MVR).
     private static func derived(from latin: String) -> String {
         let letters = Array(latin)
-        guard let first = letters.first else { return "———" }
+        guard let first = letters.first else { return "---" }
         var result = [first]
         let vowels: Set<Character> = ["A", "E", "I", "O", "U", "Y"]
         for ch in letters.dropFirst() where result.count < 3 {

@@ -199,7 +199,7 @@ extension Palette {
     static let vanilla = Palette(
         id: "vanilla", isPremium: true,
         nameMK: "Ванила латте", nameEN: "Vanilla Latte",
-        moodMK: "Clean girl — беж, крем, мока", moodEN: "Clean girl — beige, cream, mocha",
+        moodMK: "Clean girl - беж, крем, мока", moodEN: "Clean girl - beige, cream, mocha",
         paper: Color(hex: 0xFAF6EF), stone: Color(hex: 0xF1E9DD), hairline: Color(hex: 0xE7DCCB),
         ink: Color(hex: 0x2F241C), inkSoft: Color(hex: 0x66574A), muted: Color(hex: 0xA6978A),
         primary: Color(hex: 0x8B6B52), ticketText: Color(hex: 0xFBF5EC),
@@ -299,12 +299,12 @@ enum Theme {
 }
 
 extension Font {
-    /// Наслови и зборови — New York (поддржува кирилица).
+    /// Наслови и зборови - New York (поддржува кирилица).
     static func serif(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
         .system(size: size, weight: weight, design: .serif)
     }
 
-    /// Кодови и бројки на картата — Didot (само латиница и бројки).
+    /// Кодови и бројки на картата - Didot (само латиница и бројки).
     static func codes(_ size: CGFloat) -> Font {
         .custom("Didot", size: size)
     }
@@ -573,7 +573,7 @@ enum Fmt {
     }
     static func weekdayLong(_ d: Date) -> String { formatter("EEEE, d MMMM").string(from: d) }
 
-    /// 29.10 — за картата (само бројки, без кирилица во Didot).
+    /// 29.10 - за картата (само бројки, без кирилица во Didot).
     static func ticketDate(_ d: Date) -> String { formatter("dd.MM").string(from: d) }
 
     static func range(_ a: Date, _ b: Date) -> String {

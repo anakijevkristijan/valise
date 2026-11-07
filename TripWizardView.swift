@@ -4,7 +4,7 @@ import UIKit
 
 // MARK: - Нацрт на патувањето
 
-/// Уште еден град во патувањето (Premium) — свои датуми и перална.
+/// Уште еден град во патувањето (Premium) - свои датуми и перална.
 struct DraftStop: Identifiable {
     let id = UUID()
     var place: Place?
@@ -121,7 +121,7 @@ struct TripDraft {
         return list
     }
 
-    /// Најголемиот — „главниот“ багаж.
+    /// Најголемиот - „главниот“ багаж.
     var primaryBag: BagSpec {
         resolvedBags.max { $0.volume < $1.volume } ?? bagOptions.first ?? customBag
     }
@@ -231,7 +231,7 @@ struct TripWizardView: View {
     @State private var weatherKey: String
     @State private var companionName = ""
     @FocusState private var companionFocused: Bool
-    /// Пријатели од контакти: по креирањето — ако имаат Valise, влегуваат во патувањето; ако немаат — покана.
+    /// Пријатели од контакти: по креирањето - ако имаат Valise, влегуваат во патувањето; ако немаат - покана.
     @State private var pendingInvites: [PendingInvite] = []
     @State private var contactNote: String?
     @State private var showAirlinePicker = false
@@ -239,7 +239,7 @@ struct TripWizardView: View {
 
     private let stepCount = 5
 
-    /// `startStep` — пр. 2 = директно на превоз и багаж (член што си го бира својот куфер).
+    /// `startStep` - пр. 2 = директно на превоз и багаж (член што си го бира својот куфер).
     init(editing: Trip? = nil, startStep: Int = 0, onCreate: @escaping (UUID) -> Void) {
         self.editing = editing
         self.onCreate = onCreate
@@ -311,7 +311,7 @@ struct TripWizardView: View {
         }
         .sensoryFeedback(.selection, trigger: step)
         .onAppear {
-            // Без Premium нема правила на авиокомпании — општи багажи
+            // Без Premium нема правила на авиокомпании - општи багажи
             if !premium.isPremium && draft.airlineID != "other" && !isEditing {
                 draft.airlineID = "other"
                 draft.resetBags()
@@ -410,11 +410,11 @@ struct TripWizardView: View {
     private var subtitle: String {
         switch step {
         case 0 where editsSharedAsMember:
-            return L("Градовите и датумите што ќе ги смениш важат само за тебе — другите си ги задржуваат своите. Тргаш од друго место, доаѓаш подоцна или остануваш подолго? Само смени.",
-                     "Cities and dates you change are only yours — everyone else keeps theirs. Leaving from somewhere else, arriving later or staying longer? Just change them.")
+            return L("Градовите и датумите што ќе ги смениш важат само за тебе - другите си ги задржуваат своите. Тргаш од друго место, доаѓаш подоцна или остануваш подолго? Само смени.",
+                     "Cities and dates you change are only yours - everyone else keeps theirs. Leaving from somewhere else, arriving later or staying longer? Just change them.")
         case 1 where editsSharedAsMember:
-            return L("Твоите датуми — не мора да се исти како кај другите.",
-                     "Your dates — they don't have to match anyone else's.")
+            return L("Твоите датуми - не мора да се исти како кај другите.",
+                     "Your dates - they don't have to match anyone else's.")
         case 0: return isEditing
                     ? L("Допри ја цртата горе за да скокнеш на кој било чекор, или „Зачувај“ кога ќе завршиш.",
                         "Tap the bar above to jump to any step, or “Save” when you're done.")
@@ -425,7 +425,7 @@ struct TripWizardView: View {
                      "For each city: the day you arrive and the day you leave.")
         case 1: return L("Допри го денот на поаѓање, па денот на враќање.",
                          "Tap your departure day, then your return day.")
-        case 2: return L("Ги знам мерките за рачен багаж — за да не платиш казна на излезот.",
+        case 2: return L("Ги знам мерките за рачен багаж - за да не платиш казна на излезот.",
                          "I know the hand-luggage sizes, so you won't pay a fee at the gate.")
         case 3: return L("Избери сè што важи. Листата се прилагодува на твојот план.",
                          "Pick everything that applies. The list adapts to your plans.")
@@ -595,7 +595,7 @@ struct TripWizardView: View {
                 .foregroundStyle(Theme.goldLight)
                 .frame(width: 28, height: 28)
                 .background(Circle().fill(Theme.navy))
-            Text(place.map { "\($0.flag)  \($0.name)" } ?? "—")
+            Text(place.map { "\($0.flag)  \($0.name)" } ?? "-")
                 .font(.serif(24))
                 .foregroundStyle(Theme.ink)
                 .lineLimit(1)
@@ -612,7 +612,7 @@ struct TripWizardView: View {
                     .foregroundStyle(Theme.ink)
                 Text(city == nil
                      ? L("Пакуваш облека за најмногу 4 дена и переш.", "Pack for at most 4 days and wash.")
-                     : L("Таму переш — понатаму ти треба помалку облека.", "You wash there, so you need fewer clothes after."))
+                     : L("Таму переш - понатаму ти треба помалку облека.", "You wash there, so you need fewer clothes after."))
                     .font(.sans(13))
                     .foregroundStyle(Theme.inkSoft)
             }
@@ -642,8 +642,8 @@ struct TripWizardView: View {
             if draft.transport == .plane && !premium.isPremium {
                 PremiumLockRow(icon: "airplane",
                                title: L("Авиокомпанија и правила за багаж", "Airline and baggage rules"),
-                               detail: L("Мерки и килограми за 140+ авиокомпании — без казни на аеродром.",
-                                         "Sizes and weights for 140+ airlines — no fees at the gate."))
+                               detail: L("Мерки и килограми за 140+ авиокомпании - без казни на аеродром.",
+                                         "Sizes and weights for 140+ airlines - no fees at the gate."))
             }
 
             if draft.transport == .plane && premium.isPremium {
@@ -654,7 +654,7 @@ struct TripWizardView: View {
                     } label: {
                         let airline = Airlines.find(draft.airlineID)
                         HStack(spacing: 14) {
-                            Text(airline?.code ?? "—")
+                            Text(airline?.code ?? "-")
                                 .font(.codes(16))
                                 .foregroundStyle(Theme.goldLight)
                                 .frame(width: 44, height: 44)
@@ -681,7 +681,7 @@ struct TripWizardView: View {
             }
 
             VStack(alignment: .leading, spacing: 12) {
-                Eyebrow(L("Со што пакуваш — може повеќе", "What you're packing in — pick several"))
+                Eyebrow(L("Со што пакуваш - може повеќе", "What you're packing in - pick several"))
                 VStack(spacing: 0) {
                     let options = draft.bagOptions
                     ForEach(Array(options.enumerated()), id: \.offset) { _, bag in
@@ -827,8 +827,8 @@ struct TripWizardView: View {
             } else {
                 PremiumLockRow(icon: "person.2",
                                title: L("Патувај со пријатели", "Travel with friends"),
-                               detail: L("Заедничка листа и кој што носи — синхронизирано кај сите.",
-                                         "A shared list and who brings what — synced for everyone."))
+                               detail: L("Заедничка листа и кој што носи - синхронизирано кај сите.",
+                                         "A shared list and who brings what - synced for everyone."))
             }
 
             VStack(alignment: .leading, spacing: 12) {
@@ -942,10 +942,10 @@ struct TripWizardView: View {
 
             if !pendingInvites.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
-                    Label(L("има Tripdrobe — ќе ја гледа истата листа", "on Tripdrobe — will see the same list"),
+                    Label(L("има Tripdrobe - ќе ја гледа истата листа", "on Tripdrobe - will see the same list"),
                           systemImage: "checkmark.icloud")
-                    Label(L("уште нема — по креирањето допри го името во патувањето и испрати покана",
-                            "not yet — after creating, tap their name in the trip to send an invite"),
+                    Label(L("уште нема - по креирањето допри го името во патувањето и испрати покана",
+                            "not yet - after creating, tap their name in the trip to send an invite"),
                           systemImage: "envelope")
                 }
                 .font(.sans(12))
@@ -953,8 +953,8 @@ struct TripWizardView: View {
                 .fixedSize(horizontal: false, vertical: true)
             }
 
-            Text(L("Заедничките работи (шампон, крема за сонце, адаптер…) можете да ги поделите — тоа што го носи пријател не зафаќа место во твојот багаж.",
-                   "Share common items (shampoo, sunscreen, adapter…) — whatever a friend carries doesn't take space in your bag."))
+            Text(L("Заедничките работи (шампон, крема за сонце, адаптер…) можете да ги поделите - тоа што го носи пријател не зафаќа место во твојот багаж.",
+                   "Share common items (shampoo, sunscreen, adapter…) - whatever a friend carries doesn't take space in your bag."))
                 .font(.sans(12))
                 .foregroundStyle(Theme.muted)
                 .fixedSize(horizontal: false, vertical: true)
@@ -1234,10 +1234,10 @@ struct TripWizardView: View {
         updated.outfitPlan = original.outfitPlan
         updated.outfitDays = original.outfitDays
         updated.outfitPacked = original.outfitPacked
-        // Багажот и стилот сега се мои (кај заедничко патување — само за мене)
+        // Багажот и стилот сега се мои (кај заедничко патување - само за мене)
         updated.ownBags = true
         // Член на заедничко патување: сменетите градови и датуми се само мои,
-        // а ако не ги менувал — продолжува да ги следи тие на сопственикот
+        // а ако не ги менувал - продолжува да ги следи тие на сопственикот
         updated.memberPlans = original.memberPlans
         if original.isCloud && !original.isMine {
             let planChanged = !original.myPlan.sameRoute(as: updated.myPlan)
@@ -1332,9 +1332,9 @@ struct PlaceSearchField: View {
     let placeholder: String
     @Binding var selection: Place?
     var suggestions: [String] = []
-    /// Ново празно поле (следен град) — тастатурата веднаш се отвора.
+    /// Ново празно поле (следен град) - тастатурата веднаш се отвора.
     var autoFocus = false
-    /// Полето доби фокус — екранот лизга за да е над тастатурата.
+    /// Полето доби фокус - екранот лизга за да е над тастатурата.
     var onFocus: (() -> Void)? = nil
 
     @StateObject private var completer = PlaceCompleter()
@@ -1807,8 +1807,8 @@ struct AirlinePickerSheet: View {
                 } else {
                     let results = Airlines.search(query)
                     if results.isEmpty {
-                        Text(L("Ја немаме во листата. Додај ја по име — ќе ставам најчести мерки — или избери „Друга“.",
-                               "It isn't in our list. Add it by name — I'll use the most common sizes — or choose “Other”."))
+                        Text(L("Ја немаме во листата. Додај ја по име - ќе ставам најчести мерки - или избери „Друга“.",
+                               "It isn't in our list. Add it by name - I'll use the most common sizes - or choose “Other”."))
                             .font(.sans(14))
                             .foregroundStyle(Theme.muted)
                             .listRowBackground(Theme.surface)
@@ -1819,8 +1819,8 @@ struct AirlinePickerSheet: View {
                         Section {
                             row(typed, label: L("Додај „\(typed.name)“", "Add “\(typed.name)”"))
                         } footer: {
-                            Text(L("Ако твојата авиокомпанија ја нема, внеси го целото име. Мерките ќе бидат најчестите — провери ги на нејзиниот сајт.",
-                                   "If your airline isn't listed, type its full name. You'll get the most common sizes — check them on its website."))
+                            Text(L("Ако твојата авиокомпанија ја нема, внеси го целото име. Мерките ќе бидат најчестите - провери ги на нејзиниот сајт.",
+                                   "If your airline isn't listed, type its full name. You'll get the most common sizes - check them on its website."))
                                 .font(.sans(12))
                         }
                     }
@@ -1921,8 +1921,8 @@ struct WeatherStrip: View {
                                 "Same day in a previous year. Replaced by the real forecast \(WeatherService.forecastHorizonDays + 1) days ahead."))
             }
             if days.contains(where: \.isClimate) {
-                footnote("~", L("Климатска проценка за градот и месецот — засега немам податоци за овие денови. Ќе ја заменам штом ги добијам.",
-                                "Climate estimate for the city and month — no data for these days yet. I'll replace it as soon as I get it."))
+                footnote("~", L("Климатска проценка за градот и месецот - засега немам податоци за овие денови. Ќе ја заменам штом ги добијам.",
+                                "Climate estimate for the city and month - no data for these days yet. I'll replace it as soon as I get it."))
             }
         }
     }
@@ -1981,7 +1981,7 @@ struct WeatherDayCell: View {
             HStack(spacing: 2) {
                 Image(systemName: "drop.fill")
                     .font(.system(size: 7))
-                Text(day.isClimate ? "—" : "\(day.rainChance ?? 0)%")
+                Text(day.isClimate ? "-" : "\(day.rainChance ?? 0)%")
                     .font(.sans(9, .medium))
             }
             .foregroundStyle((day.rainChance ?? 0) >= 40 ? Theme.rain : Theme.muted.opacity(0.7))

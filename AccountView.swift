@@ -365,8 +365,8 @@ struct AccountView: View {
             .luxCard(padding: 0)
         } else if !account.providers.isEmpty {
             let provider = account.providers.contains("apple.com") ? "Apple" : "Google"
-            note(L("Се најавуваш со \(provider), па немаш посебна лозинка за Tripdrobe — ја менуваш кај \(provider).",
-                   "You sign in with \(provider), so there's no separate Tripdrobe password — change it with \(provider)."))
+            note(L("Се најавуваш со \(provider), па немаш посебна лозинка за Tripdrobe - ја менуваш кај \(provider).",
+                   "You sign in with \(provider), so there's no separate Tripdrobe password - change it with \(provider)."))
         }
     }
 
@@ -565,8 +565,8 @@ struct ResetPasswordSheet: View {
     var body: some View {
         PasswordSheetFrame(
             title: L("Нова лозинка", "New password"),
-            detail: L("Внеси ја е-поштата со која се најавуваш. Ќе ти пратиме линк — отвори го, смисли нова лозинка и потоа најави се со неа.",
-                      "Enter the email you sign in with. We'll send you a link — open it, choose a new password, then sign in with it."),
+            detail: L("Внеси ја е-поштата со која се најавуваш. Ќе ти пратиме линк - отвори го, смисли нова лозинка и потоа најави се со неа.",
+                      "Enter the email you sign in with. We'll send you a link - open it, choose a new password, then sign in with it."),
             actionTitle: info == nil ? L("Испрати линк", "Send link") : L("Испрати пак", "Send again"),
             canSubmit: email.contains("@"),
             isWorking: sending,
@@ -585,8 +585,8 @@ struct ResetPasswordSheet: View {
             if let failure = await account.resetPassword(email: email) {
                 error = failure
             } else {
-                info = L("Готово. Ако има акаунт со \(email.trimmingCharacters(in: .whitespaces)), линкот стигнува за минута — провери и во Spam.",
-                         "Done. If there's an account for \(email.trimmingCharacters(in: .whitespaces)), the link arrives within a minute — check Spam too.")
+                info = L("Готово. Ако има акаунт со \(email.trimmingCharacters(in: .whitespaces)), линкот стигнува за минута - провери и во Spam.",
+                         "Done. If there's an account for \(email.trimmingCharacters(in: .whitespaces)), the link arrives within a minute - check Spam too.")
             }
             sending = false
         }
@@ -690,7 +690,7 @@ struct DeleteAccountPasswordSheet: View {
     }
 }
 
-/// „Продолжи со Apple“ — црно копче со логото, според упатствата на Apple.
+/// „Продолжи со Apple“ - црно копче со логото, според упатствата на Apple.
 struct ContinueWithAppleButton: View {
     var isWorking: Bool = false
     let action: () -> Void

@@ -10,7 +10,7 @@ struct WardrobeView: View {
 
     @State private var section: Pane = ScreenshotMode.screen == "looks" ? .outfits : .pieces
     @State private var season: Season?
-    /// Филтер по група во „Парчиња“ — nil = сите.
+    /// Филтер по група во „Парчиња“ - nil = сите.
     @State private var categoryFilter: WardrobeCategory?
     @State private var showAddItem = false
     @State private var editingItem: WardrobeItem?
@@ -147,8 +147,8 @@ struct WardrobeView: View {
             HStack(alignment: .top, spacing: 6) {
                 Image(systemName: "exclamationmark.icloud")
                     .font(.system(size: 11))
-                Text(L("Не се зачувува на акаунтот — објави ги новите правила во Firebase (firestore.rules).",
-                       "Not saving to your account — publish the new Firebase rules (firestore.rules)."))
+                Text(L("Не се зачувува на акаунтот - објави ги новите правила во Firebase (firestore.rules).",
+                       "Not saving to your account - publish the new Firebase rules (firestore.rules)."))
                     .font(.sans(11, .medium))
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -190,8 +190,8 @@ struct WardrobeView: View {
         if wardrobe.items.isEmpty {
             emptyState(icon: "hanger",
                        title: L("Твојата гардероба", "Your wardrobe"),
-                       text: L("Сликај ја јакната, фармерките, омилените чевли — секое парче станува стикер со кој составуваш аутфити.",
-                               "Photograph your jacket, jeans, favourite shoes — each piece becomes a sticker you can style into outfits."),
+                       text: L("Сликај ја јакната, фармерките, омилените чевли - секое парче станува стикер со кој составуваш аутфити.",
+                               "Photograph your jacket, jeans, favourite shoes - each piece becomes a sticker you can style into outfits."),
                        action: L("Додај прво парче", "Add your first piece")) { showAddItem = true }
         } else {
             let pending = wardrobe.itemsNeedingKind.count
@@ -279,7 +279,7 @@ struct WardrobeView: View {
             .onTapGesture { editingItem = item }
     }
 
-    /// Стара облека без вид — со еден допир по парче, за листата да брои точно.
+    /// Стара облека без вид - со еден допир по парче, за листата да брои точно.
     private func sortKindsCard(_ count: Int) -> some View {
         Button { showSortKinds = true } label: {
             HStack(spacing: 14) {
@@ -293,8 +293,8 @@ struct WardrobeView: View {
                                     : L("\(count) парчиња без вид", "\(count) pieces without a type"))
                         .font(.sans(15, .semibold))
                         .foregroundStyle(Theme.ink)
-                    Text(L("Подреди ги — маица, џемпер, дуксер… за точна листа",
-                           "Sort them — T-shirt, sweater, hoodie… for an accurate list"))
+                    Text(L("Подреди ги - маица, џемпер, дуксер… за точна листа",
+                           "Sort them - T-shirt, sweater, hoodie… for an accurate list"))
                         .font(.sans(12))
                         .foregroundStyle(Theme.inkSoft)
                         .fixedSize(horizontal: false, vertical: true)
@@ -317,8 +317,8 @@ struct WardrobeView: View {
         if wardrobe.outfits.isEmpty {
             emptyState(icon: "sparkles",
                        title: L("Состави аутфит", "Style an outfit"),
-                       text: L("Избери парчиња од гардеробата и зачувај ги како аутфит — потоа планирај што носиш секој ден од патувањето.",
-                               "Pick pieces from your wardrobe and save them as an outfit — then plan what you'll wear each day of your trip."),
+                       text: L("Избери парчиња од гардеробата и зачувај ги како аутфит - потоа планирај што носиш секој ден од патувањето.",
+                               "Pick pieces from your wardrobe and save them as an outfit - then plan what you'll wear each day of your trip."),
                        action: L("Нов аутфит", "New outfit")) { showNewOutfit = true }
         } else {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 14)], spacing: 18) {
@@ -394,7 +394,7 @@ struct MainTabView: View {
     }
 }
 
-/// На iOS 26+ таб-лентата е Liquid Glass (системска); на постарите — во бојата на хартијата.
+/// На iOS 26+ таб-лентата е Liquid Glass (системска); на постарите - во бојата на хартијата.
 struct TabBarLook: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 26, *) {

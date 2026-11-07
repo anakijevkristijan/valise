@@ -368,7 +368,7 @@ struct PearlStrand: View {
 // MARK: - Шара за позадина
 
 /// Ситни мотиви, распоредени рачно-изгледно. Сè е еден слој, па деловите не се преклопуваат потемно.
-/// Equatable — се црта повторно само кога навистина се менува.
+/// Equatable - се црта повторно само кога навистина се менува.
 struct MotifPattern: View, Equatable {
     var motif: Motif
     var color: Color

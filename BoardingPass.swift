@@ -144,7 +144,7 @@ struct BoardingPassCard: View {
             .foregroundStyle(Theme.goldLight)
 
             HStack(alignment: .bottom, spacing: 8) {
-                cityBlock(code: trip.originCode, name: trip.origin?.name ?? "—", alignment: .leading)
+                cityBlock(code: trip.originCode, name: trip.origin?.name ?? "-", alignment: .leading)
                 Spacer(minLength: 4)
                 VStack(spacing: 6) {
                     Image(systemName: trip.transport.icon)
@@ -205,7 +205,7 @@ struct BoardingPassCard: View {
                 HStack(alignment: .top, spacing: 8) {
                     field(L("Багаж", "Bag"), "\(Int((trip.fillRatio * 100).rounded()))%")
                     field(L("Спакувано", "Packed"), "\(Int((trip.progress * 100).rounded()))%")
-                    field(L("Време", "Weather"), trip.weatherSummary.shortText ?? "—")
+                    field(L("Време", "Weather"), trip.weatherSummary.shortText ?? "-")
                 }
             }
             HStack(alignment: .center, spacing: 14) {
@@ -262,7 +262,7 @@ struct TicketRow: View {
                         .font(.codes(22))
                 }
                 .foregroundStyle(Theme.ink)
-                Text("\(trip.title) · \(Fmt.ticketDate(trip.startDate)) — \(Fmt.ticketDate(trip.endDate))")
+                Text("\(trip.title) · \(Fmt.ticketDate(trip.startDate)) - \(Fmt.ticketDate(trip.endDate))")
                     .font(.sans(12))
                     .foregroundStyle(Theme.inkSoft)
                     .lineLimit(1)
@@ -376,7 +376,7 @@ struct PassTile: View {
     private var bottom: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
-                Text("\(Fmt.ticketDate(trip.startDate)) — \(Fmt.ticketDate(trip.endDate))")
+                Text("\(Fmt.ticketDate(trip.startDate)) - \(Fmt.ticketDate(trip.endDate))")
                     .font(.codes(13))
                     .foregroundStyle(Theme.ticketText)
                     .lineLimit(1)

@@ -5,8 +5,8 @@ import FirebaseFirestore
 
 /// Едно патување = еден документ `trips/{id}`:
 /// • заеднички податоци (дестинација, датуми, сопатници…)
-/// • `together` — заедничките работи, синхронизирани кај сите (кој носи + спакувано)
-/// • `lists.{uid}` — личната листа на секој патник; секој ја гледа само својата
+/// • `together` - заедничките работи, синхронизирани кај сите (кој носи + спакувано)
+/// • `lists.{uid}` - личната листа на секој патник; секој ја гледа само својата
 enum CloudCodec {
 
     /// Лични работи што воопшто не одат во облакот.
@@ -20,7 +20,7 @@ enum CloudCodec {
     static let memberKeys: [String] = ["bag", "bags", "style"]
 
     /// Градовите и датумите. Горе се на тој што го направил патувањето; член што ги сменил
-    /// ги има свои во `personal.{uid}` — тие не ги менуваат другите, а другите не ги менуваат нив.
+    /// ги има свои во `personal.{uid}` - тие не ги менуваат другите, а другите не ги менуваат нив.
     static let planKeys: [String] = ["origin", "destination", "startDate", "endDate", "stops",
                                      "transport", "airlineID", "hasLaundry"]
 
@@ -33,8 +33,8 @@ enum CloudCodec {
         dict.removeValue(forKey: "items")
         dict["lists"] = [myUID: itemMap(mine)]
 
-        // Мојот багаж и стил — само ако се мои (сопственик, или член што ги избрал);
-        // моите градови и датуми — кај член само ако ги сменил (инаку ги следи сопственикот)
+        // Мојот багаж и стил - само ако се мои (сопственик, или член што ги избрал);
+        // моите градови и датуми - кај член само ако ги сменил (инаку ги следи сопственикот)
         let isOwner = trip.ownerUID == nil || trip.ownerUID == myUID
         var personal: [String: Any] = [:]
         if isOwner || trip.ownBags == true {
@@ -90,7 +90,7 @@ enum CloudCodec {
         dict["items"] = itemList(lists?[myUID])
         dict.removeValue(forKey: "lists")
 
-        // Мојот багаж и стил; ако уште не сум ги избрал — багажот на сопственикот, стил неутрален
+        // Мојот багаж и стил; ако уште не сум ги избрал - багажот на сопственикот, стил неутрален
         let allPersonal = (dict["personal"] as? [String: Any]) ?? [:]
         let personal = allPersonal[myUID] as? [String: Any]
         dict.removeValue(forKey: "personal")
@@ -291,7 +291,7 @@ final class CloudSync {
             .whereField("memberUIDs", arrayContains: uid)
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self, let snapshot else {
-                    if let error { print("Valise: listener — \(error)") }
+                    if let error { print("Valise: listener - \(error)") }
                     return
                 }
                 for change in snapshot.documentChanges {
@@ -347,7 +347,7 @@ final class CloudSync {
         }
     }
 
-    /// Качување на целото патување (спојување — туѓите листи остануваат).
+    /// Качување на целото патување (спојување - туѓите листи остануваат).
     func upload(_ trip: Trip) async {
         guard var data = CloudCodec.encode(trip, myUID: uid) else { return }
         data["updatedAt"] = Date().timeIntervalSince1970
@@ -355,7 +355,7 @@ final class CloudSync {
         do {
             try await ref(trip.id).setData(data, merge: true)
         } catch {
-            print("Valise: upload failed — \(error)")
+            print("Valise: upload failed - \(error)")
         }
     }
 
@@ -439,7 +439,7 @@ final class CloudSync {
     /// Број што е веќе на друг акаунт не се презема (ниту поканите за него). Враќа кои клучеви се мои.
     @discardableResult
     func registerProfile(name: String, phone: String? = nil, phoneKey: String?, emailKey: String?) async -> Set<String> {
-        // Прво клучевите — правилата бараат бројот во профилот да е мој во /lookup
+        // Прво клучевите - правилата бараат бројот во профилот да е мој во /lookup
         var mine: Set<String> = []
         for key in [phoneKey, emailKey].compactMap({ $0 }) {
             let doc = db.collection("lookup").document(key)
@@ -456,12 +456,12 @@ final class CloudSync {
             let previous = (try? await userRef.getDocument())?.data()?["phoneHash"] as? String
             if mine.contains(phoneKey) {
                 user["phoneHash"] = PhoneID.bareHash(phoneKey)
-                // Самиот број — во профилот што го гледа само сопственикот, за да се врати по повторна најава
+                // Самиот број - во профилот што го гледа само сопственикот, за да се врати по повторна најава
                 if let phone { user["phone"] = phone }
                 // Сменет број: стариот се ослободува за друг акаунт
                 if let previous, "p_" + previous != phoneKey { await release("p_" + previous) }
             } else if previous == PhoneID.bareHash(phoneKey) {
-                // Стар запис со туѓ број — се трга
+                // Стар запис со туѓ број - се трга
                 user["phoneHash"] = FieldValue.delete()
                 user["phone"] = FieldValue.delete()
             }
@@ -488,7 +488,7 @@ final class CloudSync {
         }
     }
 
-    /// Покана за некој што уште нема акаунт — чека додека не се регистрира.
+    /// Покана за некој што уште нема акаунт - чека додека не се регистрира.
     func createInvites(trip: Trip, keys: [String], fromName: String) async {
         for key in keys {
             try? await db.collection("invites").document(key)
@@ -531,7 +531,7 @@ final class CloudSync {
                         try await tripRef.updateData(["companions": list, "editedBy": uid])
                     }
                 } catch {
-                    print("Valise: join failed — \(error)")
+                    print("Valise: join failed - \(error)")
                 }
                 try? await invite.reference.delete()
             }

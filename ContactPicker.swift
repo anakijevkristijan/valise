@@ -10,7 +10,7 @@ struct PickedContact {
     let emails: [String]
 }
 
-/// Системскиот избирач на контакти. Не бара дозвола за целиот именик —
+/// Системскиот избирач на контакти. Не бара дозвола за целиот именик -
 /// апликацијата го гледа само контактот што ќе го избереш.
 final class ContactPickerPresenter: NSObject, CNContactPickerDelegate {
     static let shared = ContactPickerPresenter()

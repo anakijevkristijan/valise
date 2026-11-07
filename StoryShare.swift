@@ -94,7 +94,7 @@ struct StoryCardView: View {
     }
 }
 
-/// Дизајнирани позадини — секогаш има убав избор, и без фотографии.
+/// Дизајнирани позадини - секогаш има убав избор, и без фотографии.
 struct StoryBackdrop: View {
     let kind: Int
     let trip: Trip
@@ -239,8 +239,8 @@ struct StorySheet: View {
                      "Finding photos of \(name)… \(remotes.count)/\(PhotoService.storyTarget)")
         }
         if remotes.isEmpty {
-            return L("Нема фотографии без луѓе за \(name) — избери позадина или „+“ за своја слика.",
-                     "No people-free photos of \(name) — pick a backdrop or “+” for your own.")
+            return L("Нема фотографии без луѓе за \(name) - избери позадина или „+“ за своја слика.",
+                     "No people-free photos of \(name) - pick a backdrop or “+” for your own.")
         }
         return L("\(remotes.count) фотографии · допри ја сликата за следна", "\(remotes.count) photos · tap the image for the next one")
     }
@@ -273,7 +273,7 @@ struct StorySheet: View {
                         .id(option)
                     }
 
-                    // Места за фотографиите што уште се проверуваат — бројот не скока
+                    // Места за фотографиите што уште се проверуваат - бројот не скока
                     ForEach(0..<placeholders, id: \.self) { _ in
                         thumbFrame(isSelected: false) {
                             ZStack {
@@ -394,7 +394,7 @@ struct StorySheet: View {
 }
 
 extension UIImage {
-    /// Намалена копија — за брзо рендерирање на Story.
+    /// Намалена копија - за брзо рендерирање на Story.
     func downscaled(maxSide: CGFloat) -> UIImage {
         let longest = max(size.width, size.height)
         guard longest > maxSide else { return self }

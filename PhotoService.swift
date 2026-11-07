@@ -14,7 +14,7 @@ struct PhotoCredit: Codable, Hashable {
 /// Фотографии од дестинацијата, бесплатно и без клуч:
 /// Wikidata (според GeoNames ID) → главна слика (P18) + категорија на Wikimedia Commons (P373).
 /// Сè се чува во меморија и на диск.
-/// Секоја слика се проверува на самиот телефон (Vision) — ако има лице или човек, не се прикажува.
+/// Секоја слика се проверува на самиот телефон (Vision) - ако има лице или човек, не се прикажува.
 enum PhotoService {
 
     private static let userAgent = "Tripdrobe/2.6 (iOS travel packing app)"
@@ -92,7 +92,7 @@ enum PhotoService {
         }
 
         async let geo = geoImages(latitude: place.latitude, longitude: place.longitude)
-        // GeoNames бројка постои само за места од Open-Meteo (позитивен id); кај Apple Maps — пребарување по име
+        // GeoNames бројка постои само за места од Open-Meteo (позитивен id); кај Apple Maps - пребарување по име
         var entity: String? = nil
         if place.id > 0 { entity = await entityID(geonamesID: place.id) }
 
@@ -114,7 +114,7 @@ enum PhotoService {
         }
         let nearby = await geo
 
-        // Наизменично од секој извор — разновидно, а не 20 слики од иста зграда.
+        // Наизменично од секој извор - разновидно, а не 20 слики од иста зграда.
         var urls: [URL] = []
         var seen = Set<String>()
         func add(_ url: URL) {
@@ -139,14 +139,14 @@ enum PhotoService {
         return urls
     }
 
-    /// Проверени фотографии (без луѓе) — до `target`, паралелно, и секогаш истите следниот пат.
+    /// Проверени фотографии (без луѓе) - до `target`, паралелно, и секогаш истите следниот пат.
     /// `onFound` се вика за секоја проверена слика веднаш штом е готова.
     static func verifiedPhotos(for place: Place,
                                target: Int = storyTarget,
                                onFound: @escaping @MainActor (URL, UIImage) -> Void) async -> [URL] {
         var verified: [URL] = []
 
-        // 1. Веќе проверени (од диск) — веднаш
+        // 1. Веќе проверени (од диск) - веднаш
         for url in loadVerified(place.id) {
             guard verified.count < target, let loaded = await PhotoService.image(at: url) else { continue }
             verified.append(url)
@@ -181,7 +181,7 @@ enum PhotoService {
         return verified
     }
 
-    /// Однапред (кога се отвора патувањето) — Story потоа се отвора веднаш.
+    /// Однапред (кога се отвора патувањето) - Story потоа се отвора веднаш.
     static func prefetchStory(for place: Place) async {
         _ = await verifiedPhotos(for: place) { _, _ in }
     }
@@ -397,7 +397,7 @@ enum PhotoService {
         return found
     }
 
-    /// Една датотека по име (главната слика од Wikidata) — со автор и лиценца.
+    /// Една датотека по име (главната слика од Wikidata) - со автор и лиценца.
     private static func fileImage(_ fileName: String) async -> URL? {
         let url = api("https://commons.wikimedia.org/w/api.php", [
             "action": "query", "titles": "File:\(fileName)",

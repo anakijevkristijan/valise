@@ -106,7 +106,7 @@ enum ScreenshotMode {
                             codes: [1, 0, 61, 3, 2, 0], rain: [10, 5, 70, 35, 15, 5], lastYear: false)
         hero.companions = [Companion(name: "Mia Laurent", uid: "demo-mia"),
                            Companion(name: "Leo Brooks", inviteKey: "p_demo")]
-        // Мија доаѓа два дена подоцна, од Лондон — свои градови и датуми
+        // Мија доаѓа два дена подоцна, од Лондон - свои градови и датуми
         let london = Place(id: 2643743, name: "London", region: "England", country: "United Kingdom",
                            countryCode: "GB", latitude: 51.5085, longitude: -0.1257, timezone: "Europe/London")
         let miaStart = hero.startDate.adding(days: 2)
@@ -209,7 +209,7 @@ enum ScreenshotMode {
                 let name: String
                 let category: WardrobeCategory
                 let seasons: [Season]?
-                /// Вид (маица, џемпер…), по избор — инаку се погодува од името.
+                /// Вид (маица, џемпер…), по избор - инаку се погодува од името.
                 let kind: WardrobeKind?
             }
             struct Look: Decodable {
