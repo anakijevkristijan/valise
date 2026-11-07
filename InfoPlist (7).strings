@@ -1,0 +1,5 @@
+/* Tripdrobe — pl */
+"CFBundleDisplayName" = "Tripdrobe";
+"NSCameraUsageDescription" = "Tripdrobe używa aparatu, aby fotografować ubrania do twojej garderoby.";
+"NSContactsUsageDescription" = "Tripdrobe używa wybranego kontaktu, aby zaprosić współtowarzysza podróży.";
+"NSPhotoLibraryAddUsageDescription" = "Tripdrobe zapisuje obraz relacji z podróży w Zdjęciach.";

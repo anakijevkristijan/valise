@@ -129,7 +129,7 @@ GitHub → **Actions → „Провери ја апликацијата“ → 
 GitHub → **Actions → „Слики за App Store“ → Run workflow** (околу 30–40 минути). Ја пушта вистинската апликација (Debug) во симулатор — iPhone 17 Pro (6.3"), iPhone 17 Pro Max (6.9") и iPad Pro 13" — со демо-патувања (Париз, Лисабон, Токио, Рим), на англиски, со Premium, и ги слика екраните. Готовите слики: на крајот од изградбата → **Artifacts → Tripdrobe-screenshots**.
 
 - Демо-гардероба: `Screenshots/wardrobe/` (17 PNG стикери + `manifest.json` со 6 аутфити за Париз) — или `demo-wardrobe.zip` во коренот на репото (полесно за качување од телефон; workflow-от сам го отпакува). Ако ја нема, гардеробата е празна. Стикерите се без лица и без видливи брендови (етикетите се избришани).
-- Демо-режимот (`Sources/ScreenshotMode.swift`) постои само во Debug изградбата и се вклучува само со аргументот `-TripdrobeScreenshots` (`-screen home|trip|…|language|settings|new|offer`, `-lang de`). Во TestFlight и App Store (Release) е секогаш исклучен.
+- Демо-режимот (`Sources/ScreenshotMode.swift`) постои само во Debug изградбата и се вклучува само со аргументот `-TripdrobeScreenshots` (`-screen home|trip|friends|weather|outfits|day|bags|packing|exit|story|wardrobe|looks|new|dates|edit-bags|settings|offer|language`, `-lang de`). Во демо-режимот Premium е секогаш отклучен (App Store во симулаторот не може да го заклучи). Во TestFlight и App Store (Release) демо-режимот е секогаш исклучен.
 
 ## Пред App Store
 1. Претплатите (види „Претплата во App Store Connect“) и **Agreements, Tax, and Banking → Paid Apps**.
