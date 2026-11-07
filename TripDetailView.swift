@@ -23,6 +23,8 @@ struct TripDetailView: View {
     @State private var isRefreshing = false
     @State private var showStory = false
     @State private var showEdit = false
+    /// Од кој чекор се отвора уредувањето (2 = превоз и багаж).
+    @State private var editStartStep = 0
     @State private var showAddCompanion = false
     @State private var newCompanionName = ""
     @State private var showAccount = false
@@ -63,7 +65,17 @@ struct TripDetailView: View {
         if let anchor = ScreenshotMode.anchor {
             proxy.scrollTo(anchor, anchor: .top)
         }
-        if ScreenshotMode.screen == "story" { showStory = true }
+        switch ScreenshotMode.screen {
+        case "story": showStory = true
+        case "exit": tab = .exit
+        case "dates":
+            editStartStep = 1
+            showEdit = true
+        case "edit-bags":
+            editStartStep = 2
+            showEdit = true
+        default: break
+        }
     }
 
     // MARK: Распоред
@@ -78,8 +90,15 @@ struct TripDetailView: View {
                         topBar(trip)
                         titleBlock(trip)
                         BoardingPassCard(trip: trip)
+                        if trip.isCloud && !trip.isMine && !trip.isPast && needsMemberSetup(trip) {
+                            memberSetupCard(trip)
+                        }
+                        if !trip.isPast {
+                            ReminderOfferCard()
+                        }
                         if premium.isPremium {
                             companionsSection(trip)
+                                .id("shot-friends")
                             weatherSection(trip)
                                 .id("shot-weather")
                             TripOutfitsSection(trip: trip)
@@ -141,7 +160,7 @@ struct TripDetailView: View {
             .presentationCornerRadius(28)
         }
         .fullScreenCover(isPresented: $showEdit) {
-            TripWizardView(editing: trip) { _ in }
+            TripWizardView(editing: trip, startStep: editStartStep) { _ in }
                 .environmentObject(store)
                 .environmentObject(premium)
         }
@@ -154,6 +173,9 @@ struct TripDetailView: View {
         }
         .onChange(of: premium.isPremium) { _, unlocked in
             if unlocked { Task { await refreshWeather(force: true) } }
+        }
+        .onChange(of: wardrobe.outfitRowSignature(for: trip), initial: true) { _, _ in
+            syncOutfitRows()
         }
         .sheet(isPresented: $showAccount) {
             AccountView(startWith: .signUp)
@@ -245,7 +267,15 @@ struct TripDetailView: View {
             }
             Menu {
                 Button(L("Уреди патување", "Edit trip"), systemImage: "pencil") {
+                    editStartStep = 0
                     showEdit = true
+                }
+                if trip.isCloud && !trip.isMine {
+                    // Член: свои датуми (доаѓа подоцна, си оди порано…) — важат само за него
+                    Button(L("Смени датуми", "Change dates"), systemImage: "calendar") {
+                        editStartStep = 1
+                        showEdit = true
+                    }
                 }
                 if premium.isPremium {
                     Button(L("Освежи прогноза", "Refresh forecast"), systemImage: "arrow.clockwise") {
@@ -272,11 +302,11 @@ struct TripDetailView: View {
     private func titleBlock(_ trip: Trip) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Eyebrow("\(trip.destination.flag)  \(trip.destination.country)", color: Theme.gold)
+                Eyebrow(headerEyebrow(trip), color: Theme.gold)
                 Spacer()
                 Pill(text: trip.countdownText, icon: "calendar")
             }
-            Text(trip.destination.name)
+            Text(trip.title)
                 .font(.serif(44))
                 .foregroundStyle(Theme.ink)
                 .lineLimit(2)
@@ -287,8 +317,17 @@ struct TripDetailView: View {
         }
     }
 
+    /// „🇫🇷  France“; повеќе градови — знамињата и државите.
+    private func headerEyebrow(_ trip: Trip) -> String {
+        guard trip.isMultiStop else { return "\(trip.destination.flag)  \(trip.destination.country)" }
+        var flags: [String] = []
+        for stop in trip.allStops where !flags.contains(stop.place.flag) { flags.append(stop.place.flag) }
+        return flags.joined(separator: " ") + "  " + Trip.joined(trip.countryNames)
+    }
+
     private func heroDetail(_ trip: Trip) -> String {
         var parts = [Fmt.range(trip.startDate, trip.endDate), Fmt.nights(trip.nightCount), trip.transport.title]
+        if trip.isMultiStop { parts.insert(trip.stopsText, at: 0) }
         if let airline = trip.airline, airline.id != "other" { parts.append(airline.name) }
         return parts.joined(separator: " · ")
     }
@@ -397,6 +436,7 @@ struct TripDetailView: View {
                 .padding(.vertical, 1)
             }
             .scrollIndicators(.hidden)
+            companionPlans(trip)
 
             if !trip.travelers.isEmpty {
                 Text(L("Секој ја гледа само својата листа. Заедничките работи се во „Заедно“ — таму избирате кој што носи.",
@@ -482,13 +522,13 @@ struct TripDetailView: View {
                 .luxCard(padding: 18)
             } else {
                 WeatherStrip(days: trip.weather)
-                WeatherCreditView()
+                if trip.weather.contains(where: { !$0.isClimate }) { WeatherCreditView() }
             }
         }
     }
 
     private func updatedLabel(_ trip: Trip) -> String {
-        var label = trip.weatherSource.label
+        var label = WeatherSource.describe(trip.weather)
         if let updated = trip.weatherUpdatedAt {
             let f = DateFormatter()
             f.locale = AppLanguage.current.locale
@@ -692,9 +732,9 @@ struct TripDetailView: View {
     }
 
     private func categoryBlock(_ category: ItemCategory, items: [PackingItem], trip: Trip) -> some View {
-        // Облека и обувки: колку од секој предмет веќе е во аутфитите (синхронизирано постојано)
+        // Облека, обувки, костими, очила…: колку од секој предмет веќе е во аутфитите (синхронизирано постојано)
         let shares: [UUID: ClothingTarget.Share] =
-            (category == .clothing || category == .shoes) && !wardrobe.wearCounts(for: trip).isEmpty
+            category != .documents && !wardrobe.wearCounts(for: trip).isEmpty
             ? wardrobe.shares(for: trip) : [:]
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
@@ -791,6 +831,142 @@ struct TripDetailView: View {
             let newValue = max(1, entry.quantity + delta)
             entry.quantity = newValue
             entry.wornCount = min(entry.wornCount, newValue)
+            entry.quantityEdited = true
+            // Рачно сменет ред од аутфитите станува обичен — гардеробата повеќе не ја менува бројката
+            entry.fromOutfits = nil
+        }
+    }
+
+    /// Додаден во туѓо патување: багажот и стилот се засега на сопственикот → избери ги своите.
+    private static let samePlanKey = "member-same-plan"
+
+    /// Член што уште ги има градовите/датумите или багажот на сопственикот.
+    private func needsMemberSetup(_ trip: Trip) -> Bool {
+        let planOpen = trip.ownPlan != true && !trip.dismissedSuggestions.contains(Self.samePlanKey)
+        return trip.ownBags != true || planOpen
+    }
+
+    /// Поканет во туѓо патување: свои градови и датуми (тргам од друго место, доаѓам подоцна…) и свој багаж.
+    private func memberSetupCard(_ trip: Trip) -> some View {
+        let owner = (trip.companions ?? []).first { $0.uid != nil && $0.uid == trip.ownerUID }?.firstName
+        let planOpen = trip.ownPlan != true && !trip.dismissedSuggestions.contains(Self.samePlanKey)
+        let bagsOpen = trip.ownBags != true
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Image(systemName: "person.crop.circle.badge.checkmark")
+                    .font(.system(size: 15, weight: .light))
+                    .foregroundStyle(Theme.navy)
+                    .frame(width: 36, height: 36)
+                    .background(Circle().fill(Theme.goldPale))
+                Text(L("Направи го твое", "Make it yours"))
+                    .font(.sans(15, .semibold))
+                    .foregroundStyle(Theme.ink)
+            }
+            Text(owner.map {
+                L("\($0) те додаде во патувањето. Засега градовите, датумите и багажот се како кај \($0). Тргаш од друго место, доаѓаш подоцна или остануваш подолго? Смени ги — важат само за тебе, а кај \($0) ништо не се менува.",
+                  "\($0) added you to this trip. For now the cities, dates and luggage are \($0)'s. Leaving from somewhere else, arriving later or staying longer? Change them — they're only yours and nothing changes for \($0).")
+            } ?? L("Засега градовите, датумите и багажот се како кај тој што те додаде. Смени ги — важат само за тебе.",
+                   "For now the cities, dates and luggage are those of whoever added you. Change them — they're only yours."))
+                .font(.sans(13))
+                .foregroundStyle(Theme.inkSoft)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 10) {
+                if planOpen {
+                    Button {
+                        editStartStep = 0
+                        showEdit = true
+                    } label: {
+                        Text(L("Мои градови и датуми", "My cities & dates"))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(SecondaryButtonStyle())
+                }
+                if bagsOpen {
+                    Button {
+                        editStartStep = 2
+                        showEdit = true
+                    } label: {
+                        Text(L("Мој багаж", "My luggage"))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(SecondaryButtonStyle())
+                }
+            }
+            if planOpen {
+                Button {
+                    store.mutate(tripID) { $0.dismissedSuggestions.append(Self.samePlanKey) }
+                } label: {
+                    Text(owner.map { L("Патувам исто како \($0)", "I'm travelling the same as \($0)") }
+                         ?? L("Патувам истите датуми", "I'm travelling the same dates"))
+                        .font(.sans(12, .medium))
+                        .foregroundStyle(Theme.muted)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .luxCard(padding: 16, radius: 18)
+    }
+
+    /// Кој е со мене кога и каде (заедничко патување со различни градови и датуми).
+    @ViewBuilder
+    private func companionPlans(_ trip: Trip) -> some View {
+        let mine = trip.myPlan
+        let differing = trip.travelerPlans.filter { !$0.plan.sameRoute(as: mine) }
+        if !differing.isEmpty {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(differing) { entry in
+                    if entry.id != differing.first?.id { Hairline().padding(.leading, 46) }
+                    HStack(alignment: .top, spacing: 12) {
+                        Text(String(entry.companion.firstName.prefix(1)).uppercased())
+                            .font(.serif(13))
+                            .foregroundStyle(Theme.goldLight)
+                            .frame(width: 24, height: 24)
+                            .background(Circle().fill(Theme.navy))
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(entry.companion.firstName)
+                                .font(.sans(14, .semibold))
+                                .foregroundStyle(Theme.ink)
+                            Text("\(entry.plan.routeText) · \(entry.plan.dateText)")
+                                .font(.sans(12))
+                                .foregroundStyle(Theme.inkSoft)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Text(togetherText(mine: mine, theirs: entry.plan))
+                                .font(.sans(12, .medium))
+                                .foregroundStyle(Theme.gold)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.vertical, 10)
+                    .padding(.horizontal, 12)
+                }
+            }
+            .luxCard(padding: 0, radius: 18)
+        }
+    }
+
+    private func togetherText(mine: MemberPlan, theirs: MemberPlan) -> String {
+        guard let overlap = mine.overlap(with: theirs) else {
+            return L("Не се преклопувате", "You don't overlap")
+        }
+        let dates = MemberPlan.range(overlap.start, overlap.end)
+        if overlap.cities.isEmpty {
+            return L("Во исто време, на различни места · \(dates)", "Same time, different places · \(dates)")
+        }
+        let cities = overlap.cities.joined(separator: ", ")
+        return L("Заедно · \(dates) · \(cities)", "Together · \(dates) · \(cities)")
+    }
+
+    /// Аутфитите имаат парче што листата го нема (пр. сукња) → редот сам се додава.
+    private func syncOutfitRows() {
+        guard var copy = store.trip(tripID), wardrobe.syncOutfitRows(&copy) else { return }
+        store.mutate(tripID) { trip in
+            _ = wardrobe.syncOutfitRows(&trip)
         }
     }
 
@@ -1031,7 +1207,7 @@ struct PackingRow: View {
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(L("Во аутфитите \(share.have) од планирани \(item.quantity)",
                                       "\(share.have) in outfits of \(item.quantity) planned"))
-            } else if item.quantity > 1 {
+            } else if item.category != .documents {
                 Text("×\(item.quantity)")
                     .font(.codes(17))
                     .foregroundStyle(item.isPacked ? Theme.muted : Theme.navy)

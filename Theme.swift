@@ -591,13 +591,11 @@ enum Fmt {
     }
 
     static func days(_ n: Int) -> String {
-        if AppLanguage.current == .mk { return n == 1 ? "1 ден" : "\(n) дена" }
-        return n == 1 ? "1 day" : "\(n) days"
+        n == 1 ? L("1 ден", "1 day") : L("\(n) дена", "\(n) days")
     }
 
     static func nights(_ n: Int) -> String {
-        if AppLanguage.current == .mk { return n == 1 ? "1 ноќ" : "\(n) ноќи" }
-        return n == 1 ? "1 night" : "\(n) nights"
+        n == 1 ? L("1 ноќ", "1 night") : L("\(n) ноќи", "\(n) nights")
     }
 }
 

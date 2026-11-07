@@ -20,9 +20,12 @@ struct AddWardrobeItemView: View {
     @State private var showCamera = false
     @State private var problem: String?
     @State private var style: StickerMaker.Style = .sticker
+    /// Стикерот е исечен сам (без означување) — во деталите се нуди „Означи рачно“.
+    @State private var autoCut = false
 
     @State private var name = ""
     @State private var category: WardrobeCategory = .top
+    @State private var kind: WardrobeKind?
     @State private var seasons: Set<Season> = [Season.current]
 
     var body: some View {
@@ -68,11 +71,13 @@ struct AddWardrobeItemView: View {
             Text(L("Сликај го парчето", "Photograph the piece"))
                 .font(.serif(30))
                 .foregroundStyle(Theme.ink)
-            Text(L("Најдобро е парчето само — на кревет, на под или на закачалка, на светла подлога. Потоа избираш: стикер без позадина или само исечена слика.",
-                   "Best with the piece on its own — on a bed, the floor or a hanger, on a light background. Then choose: a sticker without background, or just a cropped photo."))
+            Text(L("Најдобро е парчето само — на кревет, на под или на закачалка, на светла подлога. Стикерот сам се сече: не мораш да означуваш каде е облеката.",
+                   "Best with the piece on its own — on a bed, the floor or a hanger, on a light background. The sticker cuts itself out: no need to mark where the clothing is."))
                 .font(.sans(15))
                 .foregroundStyle(Theme.inkSoft)
                 .lineSpacing(3)
+
+            stylePicker
 
             if let problem { problemText(problem) }
 
@@ -98,8 +103,8 @@ struct AddWardrobeItemView: View {
             }
             .buttonStyle(SecondaryButtonStyle())
 
-            Text(L("Цел лоок со човек? Во следниот чекор означи само парчето што го сакаш. Лицата никогаш не се зачувуваат.",
-                   "A full look with a person? In the next step, mark just the piece you want. Faces are never saved."))
+            Text(L("Цел лоок со човек? Избери „Исечена слика“ и означи го само парчето што го сакаш. Лицата никогаш не се зачувуваат.",
+                   "A full look with a person? Choose “Cropped photo” and mark just the piece you want. Faces are never saved."))
                 .font(.sans(12))
                 .foregroundStyle(Theme.muted)
                 .fixedSize(horizontal: false, vertical: true)
@@ -111,7 +116,29 @@ struct AddWardrobeItemView: View {
         original = prepared
         selection = nil
         problem = nil
-        step = .crop(prepared)
+        autoCut = false
+        if style == .sticker {
+            // Стикер: сам го наоѓа парчето и го сече; ако не успее — рачно означување
+            Task { await cutAutomatically(prepared) }
+        } else {
+            step = .crop(prepared)
+        }
+    }
+
+    @MainActor
+    private func cutAutomatically(_ image: UIImage) async {
+        step = .processing
+        switch await StickerMaker.make(from: image, crop: nil, style: .sticker) {
+        case .sticker(let sticker):
+            autoCut = true
+            step = .details(sticker)
+        case .hasFace:
+            problem = L("На сликата има лице. Означи ја само облеката, без глава.", "There's a face in the photo. Mark only the clothing, without the head.")
+            step = .crop(image)
+        case .noSubject:
+            problem = L("Не успеав сам да го најдам парчето. Означи го со прст.", "I couldn't find the piece on my own. Mark it with your finger.")
+            step = .crop(image)
+        }
     }
 
     // MARK: 2. Означи
@@ -193,6 +220,7 @@ struct AddWardrobeItemView: View {
 
     @MainActor
     private func cut(_ image: UIImage, crop: CGRect?) async {
+        autoCut = false
         step = .processing
         switch await StickerMaker.make(from: image, crop: crop, style: style) {
         case .sticker(let sticker):
@@ -237,23 +265,30 @@ struct AddWardrobeItemView: View {
                 }
                 .frame(height: 260)
 
-                WardrobeItemForm(name: $name, category: $category, seasons: $seasons)
+                WardrobeItemForm(name: $name, category: $category, kind: $kind, seasons: $seasons)
 
                 Button {
                     let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-                    let item = WardrobeItem(name: trimmed.isEmpty ? category.shortTitle : trimmed,
-                                            category: category,
+                    let item = WardrobeItem(name: trimmed.isEmpty ? (kind?.title ?? category.shortTitle) : trimmed,
+                                            category: kind?.category ?? category,
                                             seasons: Season.allCases.filter { seasons.contains($0) },
-                                            isPhoto: style == .photo ? true : nil)
+                                            isPhoto: style == .photo ? true : nil,
+                                            kindID: kind?.rawValue)
                     wardrobe.add(item, image: sticker)
                     dismiss()
                 } label: {
                     Text(L("Зачувај во гардероба", "Save to wardrobe"))
                 }
                 .buttonStyle(PrimaryButtonStyle())
+                // Без вид листата не знае каде да го брои (маица или џемпер)
+                .disabled(kind == nil)
 
-                Button(L("Пробај повторно", "Try again")) {
-                    if let original { step = .crop(original) }
+                Button(autoCut ? L("Не е добро исечено? Означи рачно", "Not cut out right? Mark it yourself")
+                               : L("Пробај повторно", "Try again")) {
+                    if let original {
+                        problem = nil
+                        step = .crop(original)
+                    }
                 }
                 .font(.sans(13, .medium))
                 .foregroundStyle(Theme.navy)
@@ -275,11 +310,27 @@ struct AddWardrobeItemView: View {
     }
 }
 
-/// Име, категорија и сезони (се користи и при уредување).
+/// Име, група, вид и сезони (се користи и при уредување).
+/// Додека не се избере рачно, видот (и групата) се погодуваат од името: „Сив дуксер“ → Горни делови · Дуксер.
 struct WardrobeItemForm: View {
     @Binding var name: String
     @Binding var category: WardrobeCategory
+    @Binding var kind: WardrobeKind?
     @Binding var seasons: Set<Season>
+
+    @State private var kindPicked: Bool
+    @State private var categoryPicked: Bool
+
+    /// `editing` = постоечко парче: групата не се менува сама од името.
+    init(name: Binding<String>, category: Binding<WardrobeCategory>, kind: Binding<WardrobeKind?>,
+         seasons: Binding<Set<Season>>, editing: Bool = false) {
+        _name = name
+        _category = category
+        _kind = kind
+        _seasons = seasons
+        _kindPicked = State(initialValue: kind.wrappedValue != nil)
+        _categoryPicked = State(initialValue: editing)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -291,17 +342,38 @@ struct WardrobeItemForm: View {
                     .textInputAutocapitalization(.sentences)
                 Hairline()
             }
+            .onChange(of: name) { _, typed in guessFromName(typed) }
 
             VStack(alignment: .leading, spacing: 10) {
-                Eyebrow(L("Категорија", "Category"))
+                Eyebrow(L("Група", "Group"))
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 8)], spacing: 8) {
                     ForEach(WardrobeCategory.allCases) { option in
                         ChipButton(title: option.title, isSelected: category == option, expand: true) {
-                            category = option
+                            pick(option)
                         }
                     }
                 }
             }
+
+            VStack(alignment: .leading, spacing: 10) {
+                Eyebrow(L("Вид", "Type"))
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 8)], spacing: 8) {
+                    ForEach(WardrobeKind.kinds(in: category)) { option in
+                        KindChip(title: option.title, isSelected: kind == option) {
+                            kindPicked = true
+                            kind = option
+                        }
+                    }
+                }
+                if kind == nil {
+                    Text(L("Избери вид — така листата знае дали е маица, џемпер или дуксер.",
+                           "Pick a type — so the list knows if it's a T-shirt, a sweater or a hoodie."))
+                        .font(.sans(12))
+                        .foregroundStyle(Theme.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .animation(.easeInOut(duration: 0.2), value: category)
 
             VStack(alignment: .leading, spacing: 10) {
                 Eyebrow(L("Сезони", "Seasons"))
@@ -332,6 +404,51 @@ struct WardrobeItemForm: View {
             }
         }
     }
+
+    /// Рачно избрана група: видот се погодува од името во таа група (или сигурниот, пр. фустан).
+    private func pick(_ option: WardrobeCategory) {
+        categoryPicked = true
+        guard category != option else { return }
+        category = option
+        if kind?.category != option {
+            kind = WardrobeKind.guess(name, in: option) ?? WardrobeKind.safeDefault(for: option)
+            kindPicked = false
+        }
+    }
+
+    private func guessFromName(_ typed: String) {
+        guard !kindPicked else { return }
+        if let found = WardrobeKind.guess(typed, in: category) {
+            kind = found
+        } else if !categoryPicked, let found = WardrobeKind.guess(typed, in: nil) {
+            category = found.category
+            kind = found
+        }
+    }
+}
+
+/// Копче за вид — во еден ред и кога името е подолго („Елегантни панталони“).
+struct KindChip: View {
+    let title: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.sans(13, isSelected ? .semibold : .medium))
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .foregroundStyle(isSelected ? Theme.goldLight : Theme.ink)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity)
+                .background(Capsule().fill(isSelected ? Theme.navy : Theme.surface))
+                .overlay(Capsule().strokeBorder(isSelected ? Theme.navy : Theme.hairline, lineWidth: 0.75))
+        }
+        .buttonStyle(PressableStyle())
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
 }
 
 /// Уредување постоечко парче.
@@ -342,12 +459,14 @@ struct EditWardrobeItemView: View {
 
     @State private var name: String
     @State private var category: WardrobeCategory
+    @State private var kind: WardrobeKind?
     @State private var seasons: Set<Season>
 
     init(item: WardrobeItem) {
         self.item = item
         _name = State(initialValue: item.name)
         _category = State(initialValue: item.category)
+        _kind = State(initialValue: item.effectiveKind)
         _seasons = State(initialValue: Set(item.seasons))
     }
 
@@ -369,12 +488,13 @@ struct EditWardrobeItemView: View {
                             .frame(maxWidth: .infinity)
                             .shadow(color: Theme.navy.opacity(0.18), radius: 10, x: 0, y: 6)
                     }
-                    WardrobeItemForm(name: $name, category: $category, seasons: $seasons)
+                    WardrobeItemForm(name: $name, category: $category, kind: $kind, seasons: $seasons, editing: true)
                     Button {
                         var updated = item
                         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-                        updated.name = trimmed.isEmpty ? category.shortTitle : trimmed
-                        updated.category = category
+                        updated.name = trimmed.isEmpty ? (kind?.title ?? category.shortTitle) : trimmed
+                        updated.category = kind?.category ?? category
+                        updated.kind = kind
                         updated.seasons = Season.allCases.filter { seasons.contains($0) }
                         wardrobe.update(updated)
                         dismiss()
@@ -382,6 +502,7 @@ struct EditWardrobeItemView: View {
                         Text(L("Зачувај", "Save"))
                     }
                     .buttonStyle(PrimaryButtonStyle())
+                    .disabled(kind == nil)
                 }
                 .padding(24)
                 .containerRelativeFrame(.horizontal)

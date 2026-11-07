@@ -148,62 +148,115 @@ enum WeatherService {
         return f
     }()
 
-    /// Секој ден од патувањето: прогноза каде што ја има, инаку истиот ден лани (означен).
+    /// Повеќе градови: прогноза за секој град во неговите датуми, споена по денови.
+    /// На ден на преселба важи новиот град (таму спиеш).
+    static func fetchWeather(for stops: [TripStop]) async -> (days: [WeatherDay], source: WeatherSource) {
+        if stops.count <= 1, let only = stops.first {
+            return await fetchWeather(for: only.place, from: only.startDate, to: only.endDate)
+        }
+        var byDay: [Date: WeatherDay] = [:]
+        var sources: [WeatherSource] = []
+        for stop in stops {
+            let result = await fetchWeather(for: stop.place, from: stop.startDate, to: stop.endDate)
+            if result.source != .none && !sources.contains(result.source) { sources.append(result.source) }
+            for day in result.days {
+                var labelled = day
+                labelled.place = stop.place.name
+                byDay[day.date.startOfDay] = labelled
+            }
+        }
+        let days = byDay.values.sorted { $0.date < $1.date }
+        let source: WeatherSource = sources.isEmpty ? .none : (sources.count == 1 ? sources[0] : .mixed)
+        return (days, source)
+    }
+
+    /// Секој ден од патувањето, на кое било растојание — никогаш празно за претстојно патување:
+    /// 1) прогноза каде што ја има (`forecastHorizonDays`),
+    /// 2) истите датуми лани (ако патувањето е подалеку од година — претходната година),
+    ///    а за деновите што пак ги нема — уште една година наназад,
+    /// 3) за сè што останало (без интернет, Apple не вратил, денови по `maxTripDays`) —
+    ///    климатска проценка според градот и датумот, означена со ~. Се заменува штом стигнат податоци.
     static func fetchWeather(for place: Place, from start: Date, to end: Date) async -> (days: [WeatherDay], source: WeatherSource) {
+        let cal = Calendar.current
         let today = Date().startOfDay
         let horizon = today.adding(days: forecastHorizonDays)
         let tripStart = start.startOfDay
-        let tripEnd = min(end.startOfDay, tripStart.adding(days: maxTripDays - 1))
+        let tripEnd = min(end.startOfDay, tripStart.adding(days: maxShownDays - 1))
+        let dataEnd = min(tripEnd, tripStart.adding(days: maxTripDays - 1))
 
         if tripEnd < today { return ([], .none) }
         let from = max(tripStart, today)
 
         // 1) Прогноза за деновите во дометот
         var forecast: [WeatherDay] = []
-        if from <= horizon {
-            let to = min(tripEnd, horizon)
+        if from <= horizon && from <= dataEnd {
+            let to = min(dataEnd, horizon)
             forecast = (try? await daily(place: place, from: from, to: to, isForecast: true, shiftYears: 0)) ?? []
         }
+        var covered = Set(forecast.map(\.date))
 
-        // 2) Денови без прогноза
-        let covered = Set(forecast.map(\.date))
-        var missing: [Date] = []
-        var cursor = from
-        while cursor <= tripEnd {
-            if !covered.contains(cursor) { missing.append(cursor) }
-            cursor = cursor.adding(days: 1)
-        }
-
-        // 3) Истите датуми лани
+        // 2) Истите датуми во минатото: лани, па уште една година наназад за деновите што ги нема.
+        // Архивата е полна до пред неколку дена, па периодот мора целиот да е поминат.
+        let archiveLimit = today.adding(days: -3)
         var estimates: [WeatherDay] = []
-        if let first = missing.first, let last = missing.last {
-            let cal = Calendar.current
-            if let lyStart = cal.date(byAdding: .year, value: -1, to: first),
-               let lyEnd = cal.date(byAdding: .year, value: -1, to: last) {
-                let archive = (try? await daily(place: place, from: lyStart, to: lyEnd, isForecast: false, shiftYears: 1)) ?? []
-                let wanted = Set(missing)
-                estimates = archive
-                    .filter { wanted.contains($0.date) }
-                    .map { day in
-                        var copy = day
-                        copy.fromLastYear = true
-                        return copy
-                    }
+        var years = 1
+        var attempts = 0
+        while attempts < 2 && years <= 6 {
+            let missing = Self.days(from: from, to: dataEnd).filter { !covered.contains($0) }
+            guard let first = missing.first, let last = missing.last,
+                  let pastStart = cal.date(byAdding: .year, value: -years, to: first),
+                  let pastEnd = cal.date(byAdding: .year, value: -years, to: last) else { break }
+            if pastEnd > archiveLimit {
+                years += 1
+                continue
             }
+            attempts += 1
+            let archive = (try? await daily(place: place, from: pastStart, to: pastEnd,
+                                            isForecast: false, shiftYears: years)) ?? []
+            let wanted = Set(missing)
+            for day in archive where wanted.contains(day.date) && !covered.contains(day.date) {
+                var copy = day
+                copy.fromLastYear = true
+                estimates.append(copy)
+                covered.insert(day.date)
+            }
+            years += 1
         }
 
-        let all = (forecast + estimates).sorted { $0.date < $1.date }
+        // 3) Климатска проценка за сè што останало
+        var climate: [WeatherDay] = []
+        for date in Self.days(from: from, to: tripEnd) where !covered.contains(date) {
+            climate.append(ClimateEstimate.day(latitude: place.latitude, on: date))
+        }
+
+        let all = (forecast + estimates + climate).sorted { $0.date < $1.date }
         let source: WeatherSource
         if all.isEmpty {
             source = .none
-        } else if estimates.isEmpty {
+        } else if estimates.isEmpty && climate.isEmpty {
             source = .forecast
+        } else if forecast.isEmpty && estimates.isEmpty {
+            source = .climate
         } else if forecast.isEmpty {
             source = .lastYear
         } else {
             source = .mixed
         }
         return (all, source)
+    }
+
+    /// Најмногу денови во лентата (подолго патување — првите 90 дена).
+    static let maxShownDays = 90
+
+    private static func days(from: Date, to: Date) -> [Date] {
+        var result: [Date] = []
+        var cursor = from.startOfDay
+        let last = to.startOfDay
+        while cursor <= last {
+            result.append(cursor)
+            cursor = cursor.adding(days: 1)
+        }
+        return result
     }
 
     /// Дневни податоци од избраниот извор.
@@ -218,8 +271,63 @@ enum WeatherService {
     }
 
     /// Apple Weather (WeatherKit): прогноза до 10 дена и историја за изминатите години.
+    /// Apple враќа најмногу 10 дена по барање (а за подолг период понекогаш ништо),
+    /// па периодот се дели на парчиња од 7 дена; парче што нема да успее се пробува уште еднаш,
+    /// а ако пак не успее, другите денови сепак се прикажуваат.
+    private static let weatherKitChunkDays = 7
+
     private static func fetchWeatherKit(place: Place, from: Date, to: Date, shiftYears: Int) async throws -> [WeatherDay] {
-        let location = CLLocation(latitude: place.latitude, longitude: place.longitude)
+        let latitude = place.latitude
+        let longitude = place.longitude
+        let first = from.startOfDay
+        let last = to.startOfDay
+
+        var chunks: [(start: Date, end: Date)] = []
+        var cursor = first
+        while cursor <= last {
+            let chunkEnd = min(cursor.adding(days: weatherKitChunkDays - 1), last)
+            chunks.append((cursor, chunkEnd))
+            cursor = chunkEnd.adding(days: 1)
+        }
+
+        var byDay: [Date: WeatherDay] = [:]
+        var failures = 0
+        var lastError: Error?
+        await withTaskGroup(of: Result<[WeatherDay], Error>.self) { group in
+            for chunk in chunks {
+                group.addTask {
+                    do {
+                        return .success(try await weatherKitChunk(latitude: latitude, longitude: longitude, from: chunk.start,
+                                                                  to: chunk.end, shiftYears: shiftYears))
+                    } catch {
+                        // Уште еден обид по кратка пауза (мрежа, ограничување на брзина)
+                        try? await Task.sleep(nanoseconds: 600_000_000)
+                        do {
+                            return .success(try await weatherKitChunk(latitude: latitude, longitude: longitude, from: chunk.start,
+                                                                      to: chunk.end, shiftYears: shiftYears))
+                        } catch {
+                            return .failure(error)
+                        }
+                    }
+                }
+            }
+            for await result in group {
+                switch result {
+                case .success(let days):
+                    for day in days { byDay[day.date] = day }
+                case .failure(let error):
+                    failures += 1
+                    lastError = error
+                }
+            }
+        }
+        if byDay.isEmpty, failures > 0, let lastError { throw lastError }
+        return byDay.values.sorted { $0.date < $1.date }
+    }
+
+    private static func weatherKitChunk(latitude: Double, longitude: Double,
+                                        from: Date, to: Date, shiftYears: Int) async throws -> [WeatherDay] {
+        let location = CLLocation(latitude: latitude, longitude: longitude)
         let end = to.adding(days: 1)
         let forecast = try await WeatherKit.WeatherService.shared.weather(for: location,
                                                                          including: .daily(startDate: from, endDate: end))
@@ -311,5 +419,27 @@ enum WeatherService {
     private static func value(_ array: [Double?]?, _ index: Int) -> Double? {
         guard let array, index < array.count else { return nil }
         return array[index]
+    }
+}
+
+/// Груба климатска проценка кога нема никакви податоци за денот:
+/// просечна дневна максимална температура според географската ширина и денот во годината.
+/// Само за приказ (означено со ~) и за пакување без прогноза — не е прогноза.
+enum ClimateEstimate {
+    static func high(latitude: Double, on date: Date) -> Double {
+        let distance = min(abs(latitude), 70)
+        let yearly = 30 - 0.28 * distance                // просечна дневна температура во годината
+        let swing = min(0.24 * distance, 11)             // разлика лето–зима
+        let warmestDay = latitude >= 0 ? 200.0 : 17.0    // крај на јули / средина на јануари
+        let day = Double(Calendar.current.ordinality(of: .day, in: .year, for: date) ?? 180)
+        return yearly + swing * cos((day - warmestDay) / 365 * 2 * .pi)
+    }
+
+    static func day(latitude: Double, on date: Date) -> WeatherDay {
+        let typicalHigh = Self.high(latitude: latitude, on: date)
+        var estimate = WeatherDay(date: date.startOfDay, maxTemp: typicalHigh, minTemp: typicalHigh - 8,
+                                  rainChance: nil, precipitation: nil, code: 2)
+        estimate.fromClimate = true
+        return estimate
     }
 }

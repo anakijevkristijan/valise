@@ -55,7 +55,7 @@ struct StoryCardView: View {
                         .font(.sans(9, .semibold))
                         .tracking(3)
                         .foregroundStyle(foreground.opacity(0.9))
-                    Text(trip.destination.name)
+                    Text(trip.placeSummary)
                         .font(.serif(46))
                         .foregroundStyle(foreground)
                         .multilineTextAlignment(.center)
@@ -203,7 +203,7 @@ struct StorySheet: View {
                 if let rendered {
                     let image = Image(uiImage: rendered)
                     ShareLink(item: image,
-                              preview: SharePreview(trip.destination.name, image: image)) {
+                              preview: SharePreview(trip.title, image: image)) {
                         HStack(spacing: 10) {
                             Image(systemName: "square.and.arrow.up")
                                 .font(.system(size: 12, weight: .semibold))

@@ -1,5 +1,6 @@
 import SwiftUI
 import StoreKit
+import UserNotifications
 
 struct SettingsView: View {
     @EnvironmentObject private var store: TripStore
@@ -10,11 +11,15 @@ struct SettingsView: View {
     @AppStorage(Theme.storageKey) private var themeID: String = Palette.classic.id
     @State private var showPremium = false
     @AppStorage("userName") private var userName: String = ""
-    @AppStorage(AppLanguage.storageKey) private var language: String = AppLanguage.mk.rawValue
+    @AppStorage(AppLanguage.storageKey) private var language: String = AppLanguage.en.rawValue
+    @State private var showLanguages = false
 
     @State private var draftName = ""
     @State private var confirmSignOut = false
     @State private var legalDoc: LegalDoc?
+    @AppStorage(TripReminders.enabledKey) private var remindersOn = true
+    @AppStorage(PushService.friendAlertsKey) private var friendAlertsOn = true
+    @ObservedObject private var router = NotificationRouter.shared
 
     var body: some View {
         ZStack {
@@ -29,6 +34,7 @@ struct SettingsView: View {
                     }
 
                     accountCard
+                    premiumCard
 
                     VStack(alignment: .leading, spacing: 10) {
                         Eyebrow(L("Твоето име", "Your name"))
@@ -44,17 +50,42 @@ struct SettingsView: View {
 
                     VStack(alignment: .leading, spacing: 12) {
                         Eyebrow(L("Јазик", "Language"))
-                        HStack(spacing: 8) {
-                            ForEach(AppLanguage.allCases) { lang in
-                                ChipButton(title: lang.nativeName, isSelected: language == lang.rawValue, expand: true) {
-                                    save()
-                                    language = lang.rawValue
-                                }
+                        Button {
+                            save()
+                            showLanguages = true
+                        } label: {
+                            HStack(spacing: 14) {
+                                Image(systemName: "globe")
+                                    .font(.system(size: 16, weight: .light))
+                                    .foregroundStyle(Theme.navy)
+                                    .frame(width: 24)
+                                Text((AppLanguage(rawValue: language) ?? .en).nativeName)
+                                    .font(.serif(20))
+                                    .foregroundStyle(Theme.ink)
+                                Spacer()
+                                Text(L("Смени", "Change"))
+                                    .font(.sans(13, .medium))
+                                    .foregroundStyle(Theme.gold)
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(Theme.muted)
                             }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 14)
+                            .luxCard(padding: 0, radius: 18)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .sheet(isPresented: $showLanguages) {
+                        LanguageSheet(language: $language) { _ in
+                            // Известувањата од пријателите на новиот јазик
+                            Task { await PushService.shared.upload() }
                         }
                     }
 
                     themesSection
+
+                    remindersSection
 
                     VStack(alignment: .leading, spacing: 14) {
                         infoRow("suitcase", L("Патувања", "Trips"), "\(store.trips.count)")
@@ -113,8 +144,8 @@ struct SettingsView: View {
                 dismiss()
             }
         } message: {
-            Text(L("Патувањата и гардеробата остануваат на твојот акаунт и се враќаат кога ќе се најавиш повторно.",
-                   "Your trips and wardrobe stay in your account and come back when you sign in again."))
+            Text(L("Патувањата и гардеробата остануваат на твојот акаунт и се враќаат кога ќе се најавиш повторно. На овој телефон апликацијата почнува од почеток.",
+                   "Your trips and wardrobe stay in your account and come back when you sign in again. On this phone the app starts fresh."))
         }
         .presentationCornerRadius(28)
     }
@@ -197,6 +228,125 @@ struct SettingsView: View {
         .buttonStyle(PressableStyle())
     }
 
+    // MARK: Premium
+
+    // MARK: Потсетници
+
+    /// Потсетници за пакување (локални известувања): вклучи/исклучи.
+    private var remindersSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Toggle(isOn: $remindersOn) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(L("Потсетници за патувања", "Trip reminders"))
+                        .font(.sans(15, .semibold))
+                        .foregroundStyle(Theme.ink)
+                    Text(L("3 дена и ден пред тргнување, и ден пред враќање",
+                           "3 days and 1 day before you leave, and the day before you head home"))
+                        .font(.sans(12))
+                        .foregroundStyle(Theme.inkSoft)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .tint(Theme.navy)
+
+            if account.isSignedIn {
+                Hairline()
+                Toggle(isOn: $friendAlertsOn) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(L("Известувања од пријателите", "Notifications from friends"))
+                            .font(.sans(15, .semibold))
+                            .foregroundStyle(Theme.ink)
+                        Text(L("Кога некој те додава во патување или те означува да понесеш нешто",
+                               "When someone adds you to a trip or asks you to bring something"))
+                            .font(.sans(12))
+                            .foregroundStyle(Theme.inkSoft)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .tint(Theme.navy)
+            }
+
+            if (remindersOn || friendAlertsOn) && router.authorization == .denied {
+                Button {
+                    if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
+                        UIApplication.shared.open(url)
+                    }
+                } label: {
+                    Text(L("Известувањата за Tripdrobe се исклучени на iPhone — вклучи ги во Поставки",
+                           "Notifications for Tripdrobe are off on this iPhone — turn them on in Settings"))
+                        .font(.sans(12, .medium))
+                        .foregroundStyle(Theme.terracotta)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .luxCard(padding: 18, radius: 18)
+        .task { await router.refreshAuthorization() }
+        .onChange(of: remindersOn) { _, on in
+            Task {
+                if on, router.authorization == .notDetermined {
+                    await TripReminders.requestPermission()
+                }
+                await router.refreshAuthorization()
+                await TripReminders.reschedule(trips: store.trips, premium: premium.isPremium)
+            }
+        }
+        .onChange(of: friendAlertsOn) { _, on in
+            Task {
+                if on, router.authorization == .notDetermined {
+                    await TripReminders.requestPermission()
+                    await router.refreshAuthorization()
+                }
+                await PushService.shared.setFriendAlerts(on)
+            }
+        }
+    }
+
+    /// Втор ред во картичката: активно, откажано (до кога) или проблем со плаќањето.
+    private var premiumCardDetail: String {
+        guard premium.isPremium else {
+            return L("Прогноза, авиокомпании, гардероба, пријатели", "Forecast, airlines, wardrobe, friends")
+        }
+        if premium.hasBillingIssue {
+            return L("Плаќањето не помина · провери", "Payment issue · check it")
+        }
+        if !premium.willAutoRenew, let date = premium.expirationDate {
+            return L("Откажано · трае до \(Fmt.dayMonth(date))", "Cancelled · until \(Fmt.dayMonth(date))")
+        }
+        return L("Активно · управувај со претплатата", "Active · manage your subscription")
+    }
+
+    /// Premium: купи, или (ако е купено) управувај со претплатата.
+    private var premiumCard: some View {
+        Button { showPremium = true } label: {
+            HStack(spacing: 14) {
+                Image(systemName: premium.isPremium ? "checkmark.seal" : "sparkles")
+                    .font(.system(size: 18, weight: .light))
+                    .foregroundStyle(Theme.navy)
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(Theme.goldPale))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(premium.isPremium ? "Tripdrobe Premium" : L("Пробај Premium", "Try Premium"))
+                        .font(.sans(15, .semibold))
+                        .foregroundStyle(Theme.ink)
+                    Text(premiumCardDetail)
+                        .font(.sans(12))
+                        .foregroundStyle(premium.isPremium && premium.hasBillingIssue ? Theme.terracotta : Theme.inkSoft)
+                        .lineLimit(1)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.muted)
+            }
+            .luxCard(padding: 14, radius: 18)
+        }
+        .buttonStyle(PressableStyle())
+    }
+
+    /// Само во TestFlight (тест-купување): да се види апликацијата без Premium.
     // MARK: Теми
 
     private var themesSection: some View {
@@ -383,6 +533,8 @@ struct PremiumSheet: View {
     @EnvironmentObject private var premium: PremiumStore
     @Environment(\.dismiss) private var dismiss
     @State private var selectedID = PremiumStore.yearlyID
+    /// Купено од овој прозорец — по отклучувањето сам се затвора.
+    @State private var purchasedHere = false
     @State private var legalDoc: LegalDoc?
     @State private var manageSubscriptions = false
 
@@ -426,8 +578,9 @@ struct PremiumSheet: View {
                     }
 
                     VStack(alignment: .leading, spacing: 14) {
-                        benefit("cloud.sun", L("Прогноза за секој ден и листа според времето", "Day-by-day forecast and a list that fits the weather"))
+                        benefit("cloud.sun", L("Прогноза за секој ден и колку од секое парче да спакуваш", "Day-by-day forecast and how many of each item to pack"))
                         benefit("airplane", L("Багаж за 140+ авиокомпании и дали сè ќе собере", "Baggage rules for 140+ airlines and whether it all fits"))
+                        benefit("map", L("Повеќе градови во едно патување, со перална каде ја има", "Several cities in one trip, with laundry where you have it"))
                         benefit("hanger", L("Гардероба и аутфити по денови", "Your wardrobe and outfits for every day"))
                         benefit("person.2", L("Патувања со пријатели — кој што носи", "Trips with friends — who brings what"))
                         benefit("camera.aperture", L("Story за Instagram", "Stories for Instagram"))
@@ -442,7 +595,19 @@ struct PremiumSheet: View {
                     } else if !premium.allowsTestUnlock {
                         // App Store / TestFlight, но производите уште не се вчитале
                         VStack(spacing: 12) {
-                            ProgressView().tint(Theme.navy)
+                            if premium.isLoadingProducts || !premium.didLoad {
+                                ProgressView().tint(Theme.navy)
+                            } else {
+                                Text(premium.canMakePayments
+                                     ? L("Не можам да се поврзам со App Store. Провери дали имаш интернет и дали си најавен во App Store (Поставки → твоето име → Media & Purchases), па обиди се повторно.",
+                                         "Couldn't reach the App Store. Check that you're online and signed in to the App Store (Settings → your name → Media & Purchases), then try again.")
+                                     : L("Купувањата во апликации се исклучени на овој iPhone (Поставки → Screen Time → Content & Privacy Restrictions).",
+                                         "In-app purchases are turned off on this iPhone (Settings → Screen Time → Content & Privacy Restrictions)."))
+                                    .font(.sans(12))
+                                    .foregroundStyle(Theme.muted)
+                                    .multilineTextAlignment(.center)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
                             Button(L("Обиди се повторно", "Try again")) {
                                 Task { await premium.load() }
                             }
@@ -479,6 +644,13 @@ struct PremiumSheet: View {
             LegalView(doc: doc)
         }
         .manageSubscriptionsSheet(isPresented: $manageSubscriptions)
+        .sensoryFeedback(.success, trigger: premium.isPremium)
+        .onChange(of: premium.isPremium) { _, unlocked in
+            // Штом е купено, прозорецот се затвора и сè е веднаш отклучено
+            if unlocked && purchasedHere {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { dismiss() }
+            }
+        }
         .presentationCornerRadius(28)
     }
 
@@ -498,10 +670,27 @@ struct PremiumSheet: View {
             .overlay(Capsule().strokeBorder(Theme.navy.opacity(0.25), lineWidth: 0.75))
 
             if premium.hasSubscription {
-                if let date = premium.expirationDate {
-                    Text(L("Следно обновување: \(Fmt.longDate(date))", "Renews on \(Fmt.longDate(date))"))
+                if premium.hasBillingIssue {
+                    Text(L("Плаќањето не помина. Apple ќе се обиде повторно — провери го начинот на плаќање во App Store за Premium да не прекине.",
+                           "The payment didn't go through. Apple will try again — check your payment method in the App Store so Premium isn't interrupted."))
+                        .font(.sans(13))
+                        .foregroundStyle(Theme.terracotta)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if let date = premium.expirationDate {
+                    Text(premium.willAutoRenew
+                         ? L("Следно обновување: \(Fmt.longDate(date))", "Renews on \(Fmt.longDate(date))")
+                         : L("Откажано · Premium трае до \(Fmt.longDate(date))", "Cancelled · Premium until \(Fmt.longDate(date))"))
                         .font(.sans(13))
                         .foregroundStyle(Theme.inkSoft)
+                }
+                if premium.isSandbox {
+                    Text(L("Тест-верзија (TestFlight): претплатата се обновува забрзано, приближно еднаш дневно, и ништо не се наплаќа. Во App Store трае цел месец или година.",
+                           "Test version (TestFlight): the subscription renews faster, about once a day, and nothing is charged. In the App Store it lasts a full month or year."))
+                        .font(.sans(11))
+                        .foregroundStyle(Theme.muted)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Button(L("Управувај со претплатата", "Manage subscription")) {
                     manageSubscriptions = true
@@ -539,6 +728,7 @@ struct PremiumSheet: View {
 
             if let product = selected {
                 Button {
+                    purchasedHere = true
                     Task { await premium.purchase(product) }
                 } label: {
                     HStack(spacing: 10) {

@@ -9,12 +9,12 @@ enum Catalog {
             return L("Адаптер за штекер (тип \(type))", "Plug adapter (type \(type))")
         }
         guard let pair = names[key] else { return nil }
-        return AppLanguage.current == .mk ? pair.0 : pair.1
+        return L(pair.0, pair.1)
     }
 
     static func note(_ key: String) -> String? {
         guard let pair = notes[key] else { return nil }
-        return AppLanguage.current == .mk ? pair.0 : pair.1
+        return L(pair.0, pair.1)
     }
 
     /// Работи што може да ги носи само еден од друштвото.
@@ -29,7 +29,7 @@ enum Catalog {
 
     static func exitTitle(_ key: String) -> String? {
         guard let pair = exit[key] else { return nil }
-        return AppLanguage.current == .mk ? pair.0 : pair.1
+        return L(pair.0, pair.1)
     }
 
     private static let names: [String: (String, String)] = [
@@ -37,14 +37,14 @@ enum Catalog {
         "passport": ("Пасош / лична карта", "Passport / ID card"),
         "insurance": ("Патничко здравствено осигурување", "Travel health insurance"),
         "idCard": ("Лична карта", "ID card"),
-        "boardingPass": ("Boarding pass", "Boarding pass"),
+        "boardingPass": ("Карта за качување", "Boarding pass"),
         "tickets": ("Билети", "Tickets"),
         "carDocs": ("Возачка и сообраќајна дозвола", "Driving licence and car papers"),
         "greenCard": ("Зелен картон", "Green card (car insurance)"),
         "booking": ("Потврда за сместување", "Accommodation confirmation"),
         "cards": ("Платежни картички", "Payment cards"),
         // Облека
-        "tshirts": ("Маици", "T-shirts"),
+        "tshirts": ("Маици и топови", "T-shirts and tops"),
         "underwear": ("Долна облека", "Underwear"),
         "socks": ("Чорапи", "Socks"),
         "shorts": ("Шорцеви / лесни панталони", "Shorts / light trousers"),
@@ -71,6 +71,7 @@ enum Catalog {
         "dressShoes": ("Елегантни чевли", "Dress shoes"),
         "trainingShoes": ("Патики за тренинг", "Training shoes"),
         "hikingBoots": ("Планинарски чевли", "Hiking boots"),
+        "boots": ("Чизми / боти", "Boots"),
         // Хигиена
         "toothbrush": ("Четка за заби", "Toothbrush"),
         "toothpaste": ("Паста за заби", "Toothpaste"),
@@ -199,8 +200,9 @@ enum PackingEngine {
         var b = Builder()
 
         let days = trip.dayCount
-        let clothDays = trip.hasLaundry ? min(days, 4) : days
-        let w = trip.weatherSummary
+        let clothDays = clothingDays(for: trip)
+        // Климатската проценка (~) е само за приказ — листата се гради од вистинските податоци
+        let w = WeatherSummary(days: trip.weather.filter { !$0.isClimate })
         let acts = Set(trip.activities)
         let isPlane = trip.transport == .plane
         let carryOnOnly = isPlane && !trip.hasCheckedBag
@@ -209,13 +211,13 @@ enum PackingEngine {
         let international = trip.isInternational
         let liquids: String? = carryOnOnly ? "liquids100" : nil
 
-        let minT = w.minTemp ?? 12
-        let maxT = w.maxTemp ?? 22
-        let chilly = minT < 15
-        let cold = minT < 8
-        let freezing = minT < 2 || w.hasSnow
-        let warm = maxT >= 24
-        let hot = maxT >= 28
+        // Типичен ден и ноќ на патувањето: просек од прогнозата, или климатска проценка ако ја нема.
+        let c = climate(for: trip)
+        let warm = c.high >= 23 || c.warmestHigh >= 27
+        let hot = c.warmestHigh >= 29 && c.high >= 25
+        let mild = !warm && c.high >= 16
+        let cool = !warm && !mild && c.high >= 9
+        let freezing = c.coldestLow < 0 || w.hasSnow
         let rainy = (w.maxRainChance ?? 0) > 40 || w.rainyDays > 0 || !w.hasData
 
         // Документи
@@ -237,27 +239,36 @@ enum PackingEngine {
         b.add("booking", .documents, vol: 0.01, kg: 0.01)
         b.add("cards", .documents, vol: 0.05, kg: 0.05, note: international ? "localCash" : nil)
 
-        // Облека — горните делови според температурата преку ден:
-        // топло → маици; свежо → дел маици, дел долги ракави; студено → малку маици (под џемпер) и повеќе џемпери.
-        let tops = min(clothDays + 1 + (hot ? 1 : 0), 12)
-        if maxT >= 20 {
-            b.add("tshirts", .clothing, qty: tops, vol: 0.6, kg: 0.18, worn: 1)
-        } else if maxT >= 13 {
-            let tees = max(2, Int((Double(tops) * 0.55).rounded()))
+        // Облека — горните делови според типичната температура преку ден.
+        // Топло → маици. Благо → пола маици, пола долги ракави. Свежо и студено → помалку горни делови
+        // (се носат под џемпер и може да се облечат повеќе пати) и повеќе слоеви.
+        let n = clothDays
+        if warm {
+            b.add("tshirts", .clothing, qty: min(n + (hot ? 1 : 0), 12), vol: 0.6, kg: 0.18, worn: 1)
+            if c.low < 15 { b.add("longSleeves", .clothing, vol: 0.8, kg: 0.22) }
+        } else if mild {
+            let base = min(n, 10)
+            let tees = max(1, Int((Double(base) / 2).rounded(.up)))
             b.add("tshirts", .clothing, qty: tees, vol: 0.6, kg: 0.18, worn: 1)
-            b.add("longSleeves", .clothing, qty: max(1, tops - tees), vol: 0.8, kg: 0.22)
+            b.add("longSleeves", .clothing, qty: max(1, base - tees), vol: 0.8, kg: 0.22)
+        } else if cool {
+            let base = n <= 3 ? n : min(n - 1, 9)
+            let tees = max(1, Int((Double(base) * 0.4).rounded()))
+            b.add("tshirts", .clothing, qty: tees, vol: 0.6, kg: 0.18, worn: 1)
+            b.add("longSleeves", .clothing, qty: max(1, base - tees), vol: 0.8, kg: 0.22)
         } else {
-            let tees = min(max(2, Int((Double(clothDays) / 2).rounded(.up))), 5)
-            b.add("tshirts", .clothing, qty: tees, vol: 0.6, kg: 0.18, worn: 1)
-            b.add("longSleeves", .clothing, qty: max(1, Int((Double(clothDays) / 3).rounded(.up))), vol: 0.8, kg: 0.22)
+            let base = n <= 3 ? n : min(n - 1, 8)
+            let tees = min(2, max(1, base - 1))
+            b.add("tshirts", .clothing, qty: tees, vol: 0.6, kg: 0.18)
+            b.add("longSleeves", .clothing, qty: max(1, base - tees), vol: 0.8, kg: 0.22, worn: 1)
         }
-        b.add("underwear", .clothing, qty: min(clothDays + 1, 12), vol: 0.1, kg: 0.05, worn: 1)
-        b.add("socks", .clothing, qty: min(clothDays + 1, 12), vol: 0.12, kg: 0.05, worn: 1)
+        b.add("underwear", .clothing, qty: min(n + 1, 12), vol: 0.1, kg: 0.05, worn: 1)
+        b.add("socks", .clothing, qty: min(n + 1, 12), vol: 0.12, kg: 0.05, worn: 1)
 
-        let bottoms = max(1, Int((Double(clothDays) / 2.5).rounded(.up)))
+        let bottoms = max(1, Int((Double(n) / 2.5).rounded(.up)))
         if warm {
             b.add("shorts", .clothing, qty: bottoms, vol: 0.7, kg: 0.25)
-            if minT < 18 { b.add("longTrousers", .clothing, vol: 1.2, kg: 0.5, worn: 1) }
+            if c.low < 18 { b.add("longTrousers", .clothing, vol: 1.2, kg: 0.5, worn: 1) }
         } else {
             b.add("trousers", .clothing, qty: bottoms, vol: 1.3, kg: 0.55, worn: 1)
         }
@@ -265,15 +276,24 @@ enum PackingEngine {
             b.add("dress", .clothing, qty: max(1, days / 3), vol: 0.8, kg: 0.25)
         }
         b.add("pyjamas", .clothing, vol: 0.8, kg: 0.25)
-        if maxT < 13 || cold {
-            b.add("sweater", .clothing, qty: min(max(2, Int((Double(clothDays) / 2.5).rounded(.up))), 4), vol: 1.6, kg: 0.45, worn: 1)
-        } else if chilly {
-            b.add("sweater", .clothing, qty: days > 5 ? 2 : 1, vol: 1.6, kg: 0.45)
-        }
-        if cold {
-            b.add("warmJacket", .clothing, vol: 5, kg: 1.2, worn: 1)
-        } else if minT < 17 {
+
+        // Џемпери и јакни
+        if warm {
+            if c.low < 12 { b.add("sweater", .clothing, vol: 1.6, kg: 0.45) }
+            if c.low < 17 { b.add("lightJacket", .clothing, vol: 2, kg: 0.5, worn: 1) }
+        } else if mild {
+            b.add("sweater", .clothing, qty: n >= 8 ? 2 : 1, vol: 1.6, kg: 0.45)
             b.add("lightJacket", .clothing, vol: 2, kg: 0.5, worn: 1)
+        } else if cool {
+            b.add("sweater", .clothing, qty: n >= 5 ? 2 : 1, vol: 1.6, kg: 0.45, worn: 1)
+            if c.high < 12 {
+                b.add("warmJacket", .clothing, vol: 5, kg: 1.2, worn: 1)
+            } else {
+                b.add("lightJacket", .clothing, vol: 2, kg: 0.5, worn: 1)
+            }
+        } else {
+            b.add("sweater", .clothing, qty: n >= 8 ? 3 : (n >= 3 ? 2 : 1), vol: 1.6, kg: 0.45, worn: 1)
+            b.add("warmJacket", .clothing, vol: 5, kg: 1.2, worn: 1)
         }
         if freezing {
             b.add("winterSet", .clothing, vol: 1, kg: 0.3)
@@ -310,8 +330,14 @@ enum PackingEngine {
         b.add("phoneCharger", .electronics, vol: 0.15, kg: 0.1)
         b.add("powerbank", .electronics, vol: 0.25, kg: 0.25, note: isPlane ? "handOnly" : nil)
         b.add("headphones", .electronics, vol: 0.2, kg: 0.06)
-        if let plug = adapterType(from: trip.origin?.countryCode ?? "MK", to: trip.destination.countryCode) {
-            b.add("adapter.\(plug)", .electronics, vol: 0.1, kg: 0.08, note: "plugNote")
+        // Адаптер за секоја држава со друг штекер (кај повеќе градови може и повеќе)
+        var plugs: [String] = []
+        for stop in trip.allStops {
+            if let plug = adapterType(from: trip.origin?.countryCode ?? "MK", to: stop.place.countryCode),
+               !plugs.contains(plug) {
+                plugs.append(plug)
+                b.add("adapter.\(plug)", .electronics, vol: 0.1, kg: 0.08, note: "plugNote")
+            }
         }
 
         // Додатоци
@@ -393,7 +419,163 @@ enum PackingEngine {
             if trip.dayCount > 1 { b.add("neckPillow", .journey, vol: 1.5, kg: 0.2) }
         }
 
+        // Бесплатно: секој предмет по 1 — бројките ги поставуваш сам со + и −.
+        // Со Premium бројките се пресметуваат според деновите и времето.
+        guard PremiumStore.cachedIsPremium else {
+            return b.items.map { item in
+                var plain = item
+                plain.quantity = 1
+                plain.wornCount = 0
+                return plain
+            }
+        }
         return b.items
+    }
+
+    // MARK: Типично време
+
+    /// Типичното време на патувањето, за колку облека да се спакува.
+    struct Climate {
+        /// Просечна дневна максимална и ноќна минимална температура.
+        let high: Double
+        let low: Double
+        let warmestHigh: Double
+        let coldestLow: Double
+        /// true = проценка од климата (нема прогноза), не вистинска прогноза.
+        let isEstimate: Bool
+    }
+
+    /// Од прогнозата (просек по денови), а без прогноза (бесплатно или далечно патување) —
+    /// груба климатска проценка според географската ширина на дестинацијата и датумите.
+    static func climate(for trip: Trip) -> Climate {
+        let forecast = trip.weather.filter { !$0.isClimate }
+        if !forecast.isEmpty {
+            let highs = forecast.map(\.maxTemp)
+            let lows = forecast.map(\.minTemp)
+            return Climate(high: highs.reduce(0, +) / Double(highs.count),
+                           low: lows.reduce(0, +) / Double(lows.count),
+                           warmestHigh: highs.max() ?? 22,
+                           coldestLow: lows.min() ?? 12,
+                           isEstimate: false)
+        }
+        let highs = trip.days.map { date -> Double in
+            // Географската ширина на градот каде си тој ден
+            ClimateEstimate.high(latitude: trip.stop(on: date).place.latitude, on: date)
+        }
+        let high = highs.isEmpty ? 22 : highs.reduce(0, +) / Double(highs.count)
+        return Climate(high: high, low: high - 8,
+                       warmestHigh: (highs.max() ?? high) + 3,
+                       coldestLow: high - 11,
+                       isEstimate: true)
+    }
+
+    // MARK: Перење
+
+    /// Колку дена облека треба: најдолгиот период без перење.
+    /// Во сместување со перална се пере на секои 4 дена и пред да се замине во следниот град.
+    static func clothingDays(for trip: Trip) -> Int {
+        let stops = trip.allStops
+        guard stops.contains(where: \.hasLaundry) else { return trip.dayCount }
+        let days = trip.days
+        var sinceWash = 0
+        var longest = 0
+        for (index, date) in days.enumerated() {
+            sinceWash += 1
+            longest = max(longest, sinceWash)
+            let here = trip.stopIndex(on: date)
+            guard stops[here].hasLaundry else { continue }
+            let leavingTomorrow = index + 1 < days.count && trip.stopIndex(on: days[index + 1]) != here
+            if sinceWash >= 4 || (leavingTomorrow && sinceWash >= 2) { sinceWash = 0 }
+        }
+        return max(1, min(longest, trip.dayCount))
+    }
+
+    // MARK: Облека според новата прогноза
+
+    /// Предмети што зависат од времето (маици, долги ракави, џемпери, јакни, чадор…).
+    static let weatherKeys: Set<String> = [
+        "tshirts", "longSleeves", "sweater", "lightJacket", "warmJacket", "winterSet", "thermals",
+        "shorts", "longTrousers", "trousers", "sandals", "sunglasses", "sunHat", "umbrella", "raincoat"
+    ]
+
+    /// Кога ќе стигне нова прогноза: облеката што зависи од времето се усогласува
+    /// (на пример, на студено помалку маици и повеќе долги ракави).
+    /// Не се допира: спакуваното, рачно сменетата бројка, рачно додаденото и тргнатото од корисникот.
+    @discardableResult
+    static func syncWithWeather(_ trip: inout Trip) -> Bool {
+        // Заедничките работи (пр. чадор кога има сопатници) не се додаваат во личната листа
+        let fresh = generate(for: trip).filter { item in
+            guard let key = item.key, weatherKeys.contains(key) else { return false }
+            return trip.together == nil || !item.isShareable
+        }
+        var freshByKey: [String: PackingItem] = [:]
+        for item in fresh {
+            if let key = item.key, freshByKey[key] == nil { freshByKey[key] = item }
+        }
+        let dismissed = Set(trip.dismissedSuggestions.map { $0.lowercased() })
+        let shared = Set(trip.togetherItems.compactMap(\.key))
+
+        func followsWeather(_ item: PackingItem) -> Bool {
+            guard let key = item.key, weatherKeys.contains(key) else { return false }
+            return !item.isCustom && !item.isPacked && item.quantityEdited != true
+        }
+
+        var items = trip.items
+        var changed = false
+
+        let before = items.count
+        items.removeAll { followsWeather($0) && freshByKey[$0.key ?? ""] == nil }
+        if items.count != before { changed = true }
+
+        for index in items.indices where followsWeather(items[index]) {
+            guard let key = items[index].key, let new = freshByKey[key] else { continue }
+            if items[index].quantity != new.quantity || items[index].wornCount != new.wornCount
+                || items[index].noteKey != new.noteKey {
+                items[index].quantity = new.quantity
+                items[index].wornCount = new.wornCount
+                items[index].noteKey = new.noteKey
+                items[index].note = new.note
+                changed = true
+            }
+        }
+
+        let present = Set(items.compactMap(\.key)).union(shared)
+        for item in fresh {
+            guard let key = item.key, !present.contains(key), !dismissed.contains(item.identity) else { continue }
+            if let last = items.lastIndex(where: { $0.category == item.category }) {
+                items.insert(item, at: last + 1)
+            } else {
+                items.append(item)
+            }
+            changed = true
+        }
+
+        if changed { trip.items = items }
+        return changed
+    }
+
+    // MARK: По купување Premium
+
+    /// Бројките „по 1“ од бесплатната верзија стануваат паметни (според деновите и времето).
+    /// Не се допира: рачно сменетата бројка, рачно додаденото и спакуваното.
+    static func applySmartQuantities(_ trip: inout Trip) {
+        var smart: [String: PackingItem] = [:]
+        for item in generate(for: trip) {
+            if let key = item.key, smart[key] == nil { smart[key] = item }
+        }
+        func upgrade(_ list: inout [PackingItem]) {
+            for index in list.indices {
+                guard let key = list[index].key, let suggested = smart[key],
+                      !list[index].isCustom, !list[index].isPacked, list[index].quantityEdited != true else { continue }
+                list[index].quantity = suggested.quantity
+                list[index].wornCount = suggested.wornCount
+            }
+        }
+        upgrade(&trip.items)
+        if var together = trip.together {
+            upgrade(&together)
+            trip.together = together
+        }
     }
 
     // MARK: Предлози и регенерирање
@@ -422,6 +604,12 @@ enum PackingEngine {
                 copy.id = old.id
                 copy.isPacked = old.isPacked
                 copy.assignee = old.assignee
+                if old.quantityEdited == true {
+                    // Рачно сменетата бројка останува
+                    copy.quantity = old.quantity
+                    copy.wornCount = old.wornCount
+                    copy.quantityEdited = true
+                }
             }
             return copy
         }

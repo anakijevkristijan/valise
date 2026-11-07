@@ -147,6 +147,7 @@ final class PersonalCloud {
             "createdAt": item.createdAt.timeIntervalSince1970
         ]
         fields["isPhoto"] = item.isPhoto ?? false
+        if let kindID = item.kindID { fields["kind"] = kindID }
         return fields
     }
 
@@ -157,7 +158,8 @@ final class PersonalCloud {
         let seasons = (data["seasons"] as? [String] ?? []).compactMap(Season.init(rawValue:))
         let created = (data["createdAt"] as? Double).map(Date.init(timeIntervalSince1970:)) ?? Date()
         let isPhoto = (data["isPhoto"] as? Bool) == true ? true : nil
-        return WardrobeItem(id: id, name: name, category: category, seasons: seasons, createdAt: created, isPhoto: isPhoto)
+        return WardrobeItem(id: id, name: name, category: category, seasons: seasons, createdAt: created,
+                            isPhoto: isPhoto, kindID: data["kind"] as? String)
     }
 
     // MARK: Аутфити

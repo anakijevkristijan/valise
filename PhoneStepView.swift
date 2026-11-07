@@ -1,7 +1,9 @@
 import SwiftUI
+import UserNotifications
 
 /// По најавата: телефонскиот број, за пријателите да те најдат од своите контакти.
-/// Се чува само шифриран отпечаток. Може да се прескокне и да се внесе подоцна во Профил.
+/// Се чува во акаунтот (го гледа само сопственикот), а пријателите го наоѓаат по шифриран отпечаток.
+/// Може да се прескокне и да се внесе подоцна во Профил.
 struct PhoneStepView: View {
     static let askedKey = "phoneAsked"
 
@@ -9,11 +11,12 @@ struct PhoneStepView: View {
     @AppStorage("userName") private var userName: String = ""
     @AppStorage(PhoneStepView.askedKey) private var asked: Bool = false
 
+    /// Целиот број со кодот на земјата (+38970123456).
     @State private var phone = ""
-    @State private var invalid = false
+    /// „Провери го бројот“ или „Овој број веќе е додаден во друг акаунт…“
+    @State private var problem: String?
     @State private var saving = false
     @State private var appeared = false
-    @FocusState private var focused: Bool
 
     var body: some View {
         ZStack {
@@ -45,19 +48,16 @@ struct PhoneStepView: View {
                         .padding(.bottom, 28)
 
                     VStack(alignment: .leading, spacing: 10) {
-                        TextField("", text: $phone, prompt: Text("+389 70 123 456").foregroundColor(Theme.muted.opacity(0.7)))
-                            .font(.serif(26))
-                            .foregroundStyle(Theme.ink)
-                            .keyboardType(.phonePad)
-                            .textContentType(.telephoneNumber)
-                            .focused($focused)
+                        // Кодот на земјата е веќе внесен (според телефонот) — се допишува само бројот
+                        PhoneNumberField(number: $phone, fontSize: 26)
                         Rectangle()
-                            .fill(focused ? Theme.navy : Theme.hairline)
+                            .fill(phone.isEmpty ? Theme.hairline : Theme.navy)
                             .frame(height: 1)
-                        if invalid {
-                            Text(L("Провери го бројот.", "Please check the number."))
+                        if let problem {
+                            Text(problem)
                                 .font(.sans(13, .medium))
                                 .foregroundStyle(Theme.terracotta)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                     .padding(.bottom, 14)
@@ -67,8 +67,8 @@ struct PhoneStepView: View {
                             .font(.system(size: 12))
                             .foregroundStyle(Theme.gold)
                             .padding(.top, 2)
-                        Text(L("Не го чуваме самиот број — само шифриран отпечаток. Никој не може да го види.",
-                               "We never store the number itself — only an encrypted fingerprint. No one can see it."))
+                        Text(L("Бројот се чува во твојот акаунт и го гледаш само ти. Пријателите те наоѓаат по шифриран отпечаток — бројот не им се покажува.",
+                               "Your number is kept in your account and only you can see it. Friends find you by an encrypted fingerprint — they're never shown the number."))
                             .font(.sans(12))
                             .foregroundStyle(Theme.muted)
                             .fixedSize(horizontal: false, vertical: true)
@@ -111,19 +111,35 @@ struct PhoneStepView: View {
         }
         .onAppear {
             withAnimation(.easeOut(duration: 0.9)) { appeared = true }
+            // Бројот од регистрацијата не можеше да се зачува (пр. веќе е во друг акаунт)
+            if let pending = account.pendingPhoneProblem {
+                phone = pending.number
+                problem = pending.message
+                account.pendingPhoneProblem = nil
+            }
         }
+        .onChange(of: phone) { _, _ in problem = nil }
     }
 
     private func save() {
         guard PhoneID.normalize(phone) != nil else {
-            invalid = true
+            problem = L("Провери го бројот.", "Please check the number.")
             return
         }
-        invalid = false
+        problem = nil
         saving = true
-        focused = false
         Task { @MainActor in
-            await account.updateProfile(name: userName, phone: phone)
+            // Ист број не може во два акаунта
+            if let failure = await account.updateProfile(name: userName, phone: phone) {
+                saving = false
+                withAnimation(.easeInOut(duration: 0.2)) { problem = failure }
+                return
+            }
+            // Пријателите ќе те додаваат во патувања → прашај за известувања (еднаш)
+            if await TripReminders.authorizationStatus() == .notDetermined {
+                await TripReminders.requestPermission()
+                await NotificationRouter.shared.refreshAuthorization()
+            }
             saving = false
             withAnimation(.easeInOut(duration: 0.3)) { asked = true }
         }

@@ -144,9 +144,23 @@ final class WardrobeStore: ObservableObject {
         return image
     }
 
+    /// Парчињата од групата, подредени по вид (маици, па џемпери…), најновите први.
     func items(in category: WardrobeCategory, season: Season?) -> [WardrobeItem] {
         items.filter { $0.category == category && $0.fits(season) }
-            .sorted { $0.createdAt > $1.createdAt }
+            .sorted { lhs, rhs in
+                let a = Self.kindOrder(lhs), b = Self.kindOrder(rhs)
+                return a == b ? lhs.createdAt > rhs.createdAt : a < b
+            }
+    }
+
+    /// Редослед по вид (без вид — на крај).
+    static func kindOrder(_ item: WardrobeItem) -> Int {
+        item.effectiveKind.flatMap { WardrobeKind.allCases.firstIndex(of: $0) } ?? WardrobeKind.allCases.count
+    }
+
+    /// Парчиња што уште немаат вид (стара облека што не можеше да се погоди од името).
+    var itemsNeedingKind: [WardrobeItem] {
+        items.filter(\.needsKind).sorted { $0.createdAt > $1.createdAt }
     }
 
     func outfitFits(_ outfit: Outfit, _ season: Season?) -> Bool {
@@ -198,36 +212,54 @@ final class WardrobeStore: ObservableObject {
             .sorted { lhs, rhs in
                 let a = WardrobeCategory.allCases.firstIndex(of: lhs.item.category) ?? 0
                 let b = WardrobeCategory.allCases.firstIndex(of: rhs.item.category) ?? 0
-                return a == b ? lhs.item.name < rhs.item.name : a < b
+                if a != b { return a < b }
+                let x = Self.kindOrder(lhs.item), y = Self.kindOrder(rhs.item)
+                return x == y ? lhs.item.name < rhs.item.name : x < y
             }
     }
 
     // MARK: Листата за пакување наспроти аутфитите
 
-    /// За секој вид облека: колку предлага листата (маици 5…) и колку различни парчиња има во аутфитите.
+    /// За секој ред од листата (маици 5, џемпер / дуксер 2…): колку предлага листата
+    /// и колку различни парчиња од аутфитите се бројат токму таму (џемперот — во џемпери, не во маици).
     /// `extra` — парчиња избрани во составувачот (уште не зачувани).
     func targets(for trip: Trip, extra: [UUID] = [], excludingOutfit: UUID? = nil) -> [ClothingTarget] {
         var pieceIDs = Set(wearCounts(for: trip, excludingOutfit: excludingOutfit).keys)
         for id in extra where item(id) != nil { pieceIDs.insert(id) }
-        let pieces = pieceIDs.compactMap { item($0) }
+        let pieces = pieceIDs.compactMap { item($0) }.sorted { $0.createdAt < $1.createdAt }
 
-        return WardrobeCategory.allCases.compactMap { category in
-            let keys = category.packingKeys
-            guard !keys.isEmpty else { return nil }
-            let need = trip.items
-                .filter { keys.contains($0.key ?? "") }
-                .reduce(0) { $0 + $1.quantity }
-            guard need > 0 else { return nil }
-            let have = pieces.filter { $0.category == category }.count
-            return ClothingTarget(category: category, need: need, have: have)
+        // Колку предлага листата, по ред (само редовите што гардеробата може да ги покрие)
+        var need: [String: Int] = [:]
+        var order: [String] = []
+        for row in trip.items {
+            guard let key = row.key, WardrobeKind.coveredKeys.contains(key) else { continue }
+            if need[key] == nil { order.append(key) }
+            need[key, default: 0] += row.quantity
+        }
+
+        // Секое парче во својот ред; ако видот има два можни реда (панталони / долги панталони) — прво во оној што не е полн
+        var have: [String: Int] = [:]
+        for piece in pieces {
+            let candidates = piece.packingKeys.filter { need[$0] != nil }
+            guard let first = candidates.first else { continue }
+            let key = candidates.first { have[$0, default: 0] < need[$0, default: 0] } ?? first
+            have[key, default: 0] += 1
+        }
+
+        return order.compactMap { key in
+            let wanted = need[key] ?? 0
+            let planned = have[key] ?? 0
+            // Облека и обувки секогаш; додатоците (очила, накит…) само ако се во некој аутфит
+            guard wanted > 0, WardrobeKind.coreKeys.contains(key) || planned > 0 else { return nil }
+            return ClothingTarget(key: key, need: wanted, have: planned)
         }
     }
 
-    /// Колку од аутфитите паѓа на секој ред во листата (пр. „Маици“ 3/5, „Кошула“ 0/1).
+    /// Колку од аутфитите паѓа на секој ред во листата (пр. „Маици“ 3/5, „Џемпер / дуксер“ 1/2).
     func shares(for trip: Trip) -> [UUID: ClothingTarget.Share] {
         var result: [UUID: ClothingTarget.Share] = [:]
         for target in targets(for: trip) {
-            let rows = trip.items.filter { target.category.packingKeys.contains($0.key ?? "") }
+            let rows = trip.items.filter { $0.key == target.key }
             var remaining = target.have
             for (index, row) in rows.enumerated() {
                 let isLast = index == rows.count - 1
@@ -248,10 +280,10 @@ final class WardrobeStore: ObservableObject {
         }
         let pieces = counts.keys.compactMap { item($0) }.sorted { $0.createdAt < $1.createdAt }
 
-        // Најобемната јакна и едни обувки ги облекуваш на пат.
+        // Најобемната јакна и најобемните обувки ги облекуваш на пат.
         var worn: [WardrobeItem] = []
-        if let jacket = pieces.first(where: { $0.category == .outerwear }) { worn.append(jacket) }
-        if let shoes = pieces.first(where: { $0.category == .shoes }) { worn.append(shoes) }
+        if let jacket = pieces.filter({ $0.category == .outerwear }).max(by: { $0.volume < $1.volume }) { worn.append(jacket) }
+        if let shoes = pieces.filter({ $0.category == .shoes }).max(by: { $0.volume < $1.volume }) { worn.append(shoes) }
         let packed = pieces.filter { piece in !worn.contains { $0.id == piece.id } }
 
         let slotCount = trip.outfitSlots.filter { $0.outfitID != excludingOutfit && outfit($0.outfitID) != nil }.count
@@ -261,13 +293,82 @@ final class WardrobeStore: ObservableObject {
         return OutfitLoad(pieces: pieces.count,
                           repeated: counts.values.filter { $0 > 1 }.count,
                           outfits: slotCount,
-                          packedVolume: packed.reduce(0) { $0 + $1.category.volume },
-                          packedWeight: packed.reduce(0) { $0 + $1.category.weight },
+                          packedVolume: packed.reduce(0) { $0 + $1.volume },
+                          packedWeight: packed.reduce(0) { $0 + $1.weight },
                           capacity: trip.totalUsableVolume * 0.6,
                           recommended: days + max(3, days / 2 + 2),
                           wornOnTravel: worn,
                           days: trip.dayCount,
                           bagName: trip.bagsTitle)
+    }
+
+    // MARK: Редови во листата што ги бараат аутфитите
+
+    /// Се менува кога ќе се сменат парчињата во аутфитите на патувањето (или редовите во листата).
+    func outfitRowSignature(for trip: Trip) -> String {
+        let pieces = wearCounts(for: trip).keys.compactMap { item($0) }
+            .map { "\($0.id.uuidString):\($0.effectiveKind?.rawValue ?? $0.category.rawValue)" }
+            .sorted()
+        let rows = trip.items.map { "\($0.key ?? $0.name):\($0.fromOutfits == true ? 1 : 0)" }.sorted()
+        return pieces.joined(separator: ",") + "|" + rows.joined(separator: ",")
+    }
+
+    /// Аутфитите имаат парче што листата го нема (пр. сукња, или џемпер на летно патување) → редот сам се додава,
+    /// со толку колку што има во аутфитите. Таквите редови сами се ажурираат и тргаат;
+    /// штом бројката се смени рачно, стануваат обичен ред. Избришан ред не се враќа.
+    @discardableResult
+    func syncOutfitRows(_ trip: inout Trip) -> Bool {
+        let pieces = wearCounts(for: trip).keys.compactMap { item($0) }
+        let normalKeys = Set(trip.items.filter { $0.fromOutfits != true }.compactMap(\.key)
+                             + trip.togetherItems.compactMap(\.key))
+
+        var needed: [String: (count: Int, kind: WardrobeKind)] = [:]
+        for piece in pieces {
+            guard let kind = piece.effectiveKind, let rowKey = kind.newRowKey else { continue }
+            if kind.packingKeys.contains(where: { normalKeys.contains($0) }) { continue }
+            let current = needed[rowKey]?.count ?? 0
+            needed[rowKey] = (count: current + 1, kind: kind)
+        }
+
+        var items = trip.items
+        var changed = false
+
+        // Постојните редови од аутфитите: нова бројка, или се тргаат ако повеќе не требаат
+        for index in items.indices.reversed() where items[index].fromOutfits == true {
+            let key = items[index].key ?? ""
+            if let entry = needed[key] {
+                if items[index].quantity != entry.count {
+                    items[index].quantity = entry.count
+                    changed = true
+                }
+                needed.removeValue(forKey: key)
+            } else if !items[index].isPacked {
+                items.remove(at: index)
+                changed = true
+            }
+        }
+
+        // Нови редови
+        let dismissed = Set(trip.dismissedSuggestions.map { $0.lowercased() })
+        for (key, entry) in needed.sorted(by: { $0.key < $1.key }) where !dismissed.contains(key.lowercased()) {
+            let row = PackingItem(name: Catalog.name(key) ?? entry.kind.title,
+                                  category: entry.kind.rowCategory,
+                                  quantity: entry.count,
+                                  unitVolume: entry.kind.volume,
+                                  unitWeight: entry.kind.weight,
+                                  key: key,
+                                  quantityEdited: true,
+                                  fromOutfits: true)
+            if let last = items.lastIndex(where: { $0.category == row.category }) {
+                items.insert(row, at: last + 1)
+            } else {
+                items.append(row)
+            }
+            changed = true
+        }
+
+        if changed { trip.items = items }
+        return changed
     }
 
     // MARK: Промени — парчиња
@@ -340,7 +441,9 @@ final class WardrobeStore: ObservableObject {
     @Published var cloudState: CloudState = .off
 
     /// Парче дојдено од облакот (друг телефон или после повторна најава).
-    func applyRemote(_ item: WardrobeItem, imageData: Data?) {
+    func applyRemote(_ incoming: WardrobeItem, imageData: Data?) {
+        // Од постара верзија (без вид): видот се погодува исто како на овој телефон
+        let item = incoming.migratedKind()
         let url = folder.appendingPathComponent(item.imageName)
         if let imageData, !FileManager.default.fileExists(atPath: url.path) {
             try? imageData.write(to: url, options: .atomic)
@@ -407,11 +510,14 @@ final class WardrobeStore: ObservableObject {
     private func load() {
         guard let data = try? Data(contentsOf: fileURL),
               let saved = try? JSONDecoder().decode(Saved.self, from: data) else { return }
-        items = saved.items
+        // Постоечката облека добива вид (маица, џемпер, сукња…) според името
+        let migrated = saved.items.map { $0.migratedKind() }
+        items = migrated
         outfits = saved.outfits
         // (за секој случај — набљудувачите не секогаш се викаат за време на init)
         itemIndex = Dictionary(items.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         outfitIndex = Dictionary(outfits.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        if migrated != saved.items { save() }
     }
 
     private func save() {

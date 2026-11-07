@@ -3,17 +3,10 @@ import SwiftUI
 /// „еднаш“, „двапати“, „3 пати“…
 enum RepeatText {
     static func times(_ n: Int) -> String {
-        if AppLanguage.current == .mk {
-            switch n {
-            case 1: return "еднаш"
-            case 2: return "двапати"
-            default: return "\(n) пати"
-            }
-        }
         switch n {
-        case 1: return "once"
-        case 2: return "twice"
-        default: return "\(n) times"
+        case 1: return L("еднаш", "once")
+        case 2: return L("двапати", "twice")
+        default: return L("\(n) пати", "\(n) times")
         }
     }
 
@@ -397,7 +390,7 @@ struct DayOutfitsSheet: View {
                                 .font(.codes(17))
                                 .foregroundStyle(Theme.inkSoft)
                             if weather.isEstimate {
-                                Text(L("* лани", "* last year"))
+                                Text(weather.isClimate ? L("~ проценка", "~ estimate") : L("* лани", "* last year"))
                                     .font(.sans(11))
                                     .foregroundStyle(Theme.muted)
                             }
@@ -713,9 +706,15 @@ struct OutfitPackingBlock: View {
     // MARK: Колку од секоја категорија
 
     private func summary(_ planned: [(item: WardrobeItem, times: Int)]) -> some View {
-        let counts = WardrobeCategory.allCases.compactMap { category -> String? in
-            let n = planned.filter { $0.item.category == category }.count
-            return n > 0 ? category.count(n) : nil
+        // По вид: „3 маици · 1 џемпер · 1 сукња · 2 пара патики“ (парчињата без вид — по групата)
+        var counts: [String] = []
+        for kind in WardrobeKind.allCases {
+            let n = planned.filter { $0.item.effectiveKind == kind }.count
+            if n > 0 { counts.append(kind.count(n)) }
+        }
+        for category in WardrobeCategory.allCases {
+            let n = planned.filter { $0.item.effectiveKind == nil && $0.item.category == category }.count
+            if n > 0 { counts.append(category.count(n)) }
         }
         return VStack(alignment: .leading, spacing: 4) {
             Text(L("Треба да спакуваш \(PieceText.pieces(planned.count)):", "You need to pack \(PieceText.pieces(planned.count)):"))

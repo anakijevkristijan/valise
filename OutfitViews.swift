@@ -6,48 +6,164 @@ struct OutfitCollage: View {
     let items: [WardrobeItem]
     @EnvironmentObject private var wardrobe: WardrobeStore
 
-    /// Позиција (центар 0…1) и големина (дел од ширината) по категорија.
-    private static func slot(_ category: WardrobeCategory) -> (x: CGFloat, y: CGFloat, size: CGFloat) {
-        switch category {
-        case .outerwear: return (0.33, 0.33, 0.58)
-        case .top: return (0.64, 0.30, 0.50)
-        case .dress: return (0.50, 0.42, 0.66)
-        case .bottom: return (0.50, 0.68, 0.52)
-        case .shoes: return (0.76, 0.85, 0.32)
-        case .bag: return (0.22, 0.80, 0.32)
-        case .accessory: return (0.84, 0.13, 0.24)
-        }
-    }
-
     var body: some View {
         GeometryReader { geo in
-            let side = min(geo.size.width, geo.size.height)
+            let frames = Self.layout(items, in: geo.size)
             ZStack {
                 ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                    let slot = Self.slot(item.category)
-                    let sameBefore = items.prefix(index).filter { $0.category == item.category }.count
-                    let nudge = CGFloat(sameBefore) * 0.08
-                    let isPhoto = item.isPhoto ?? false
-                    let size = side * slot.size * (isPhoto ? 0.82 : 1)
-                    let tilt: Double = isPhoto ? (index % 2 == 0 ? -4 : 4) : (sameBefore == 0 ? 0 : (sameBefore % 2 == 0 ? -6 : 6))
-                    if let image = wardrobe.thumbnail(for: item) {
+                    if let frame = frames[item.id], let image = wardrobe.thumbnail(for: item) {
+                        let fill = Self.fill(for: item)
                         Image(uiImage: image)
                             .resizable()
                             .scaledToFit()
-                            .frame(width: size, height: size)
+                            .frame(width: frame.width * fill, height: frame.height * fill)
                             .shadow(color: Theme.navy.opacity(0.14), radius: 6, x: 0, y: 4)
-                            .rotationEffect(.degrees(tilt))
-                            .position(x: geo.size.width * min(slot.x + nudge, 0.85),
-                                      y: geo.size.height * min(slot.y + nudge * 0.5, 0.88))
+                            .rotationEffect(.degrees(Self.tilt(for: item, index: index)))
+                            .position(x: frame.midX, y: frame.midY)
+                            .zIndex(item.layer)
                     }
                 }
                 if items.isEmpty {
                     Image(systemName: "hanger")
-                        .font(.system(size: side * 0.22, weight: .ultraLight))
+                        .font(.system(size: min(geo.size.width, geo.size.height) * 0.22, weight: .ultraLight))
                         .foregroundStyle(Theme.muted.opacity(0.5))
                 }
             }
+            .frame(width: geo.size.width, height: geo.size.height)
+            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: items.map(\.id))
         }
+    }
+
+    /// Колкав дел од ќелијата зафаќа парчето.
+    private static func fill(for item: WardrobeItem) -> CGFloat {
+        // Слика со позадина е полна до рабовите — малку помала, за да не се допира со соседната
+        if item.isPhoto ?? false { return 0.84 }
+        // Додатоците (накит, очила, капа) малку помали од облеката, како на вистински flat lay
+        if item.category == .accessory { return 0.78 }
+        return 0.94
+    }
+
+    /// Сликите со позадина малку накривени (како полароид); стикерите исправени.
+    private static func tilt(for item: WardrobeItem, index: Int) -> Double {
+        guard item.isPhoto ?? false else { return 0 }
+        return index % 2 == 0 ? -3 : 3
+    }
+
+    // MARK: Распоред без преклопување (flat lay)
+
+    /// Каде оди парчето: горе (јакна, горен дел, фустан, плажа/спорт), долу (панталони, сукња)
+    /// или во страничната колона (обувки, торба, додатоци).
+    private enum Zone { case upper, lower, side }
+
+    private static func zone(_ item: WardrobeItem) -> Zone {
+        switch item.effectiveKind {
+        case .skirt?: return .lower
+        case .swimwear?, .sportswear?: return .upper
+        default: break
+        }
+        switch item.category {
+        case .outerwear, .top, .dress, .active: return .upper
+        case .bottom: return .lower
+        case .shoes, .bag, .accessory: return .side
+        }
+    }
+
+    /// Редослед во својата зона: јакната лево од маицата; додатоците горе, торбата, па обувките најдолу.
+    private static func order(_ item: WardrobeItem) -> Int {
+        switch item.category {
+        case .outerwear: return 0
+        case .top: return 1
+        case .dress: return 2
+        case .active: return 3
+        case .bottom: return 4
+        case .accessory: return 5
+        case .bag: return 6
+        case .shoes: return 7
+        }
+    }
+
+    /// Секое парче добива своја ќелија — ништо не се преклопува и сè се гледа цело.
+    /// Облеката е во главниот дел (горе / долу), а обувките, торбата и додатоците во колона десно.
+    static func layout(_ items: [WardrobeItem], in size: CGSize) -> [UUID: CGRect] {
+        guard size.width > 0, size.height > 0, !items.isEmpty else { return [:] }
+        var upper: [WardrobeItem] = []
+        var lower: [WardrobeItem] = []
+        var side: [WardrobeItem] = []
+        for item in items {
+            switch zone(item) {
+            case .upper: upper.append(item)
+            case .lower: lower.append(item)
+            case .side: side.append(item)
+            }
+        }
+        func ordered(_ list: [WardrobeItem]) -> [WardrobeItem] {
+            list.enumerated()
+                .sorted { (order($0.element), $0.offset) < (order($1.element), $1.offset) }
+                .map(\.element)
+        }
+
+        let pad = size.width * 0.03
+        let canvas = CGRect(x: pad, y: pad, width: size.width - 2 * pad, height: size.height - 2 * pad)
+        var result: [UUID: CGRect] = [:]
+        func place(_ list: [WardrobeItem], in rect: CGRect) {
+            let cells = grid(count: list.count, in: rect)
+            for (item, cell) in zip(ordered(list), cells) { result[item.id] = cell }
+        }
+
+        var mainArea = canvas
+        if !side.isEmpty {
+            if upper.isEmpty && lower.isEmpty {
+                place(side, in: canvas)
+            } else {
+                let width = canvas.width * (side.count > 3 ? 0.34 : 0.30)
+                mainArea = CGRect(x: canvas.minX, y: canvas.minY, width: canvas.width - width, height: canvas.height)
+                place(side, in: CGRect(x: mainArea.maxX, y: canvas.minY, width: width, height: canvas.height))
+            }
+        }
+        if !upper.isEmpty && !lower.isEmpty {
+            // Горниот дел малку повисок (уште повеќе ако има повеќе горни парчиња); панталоните под него
+            let ratio = min(max(0.54 + 0.05 * CGFloat(upper.count - lower.count), 0.46), 0.64)
+            let split = mainArea.height * ratio
+            place(upper, in: CGRect(x: mainArea.minX, y: mainArea.minY, width: mainArea.width, height: split))
+            place(lower, in: CGRect(x: mainArea.minX, y: mainArea.minY + split, width: mainArea.width, height: mainArea.height - split))
+        } else if !upper.isEmpty {
+            place(upper, in: mainArea)
+        } else if !lower.isEmpty {
+            place(lower, in: mainArea)
+        }
+        return result
+    }
+
+    /// N ќелии во правоаголник: бројот колони што дава најголеми парчиња; редовите (и последниот) центрирани.
+    static func grid(count: Int, in rect: CGRect) -> [CGRect] {
+        guard count > 0, rect.width > 0, rect.height > 0 else { return [] }
+        var bestColumns = 1
+        var bestSide: CGFloat = 0
+        for columns in 1...count {
+            let rows = (count + columns - 1) / columns
+            let side = min(rect.width / CGFloat(columns), rect.height / CGFloat(rows))
+            if side > bestSide + 0.5 {
+                bestSide = side
+                bestColumns = columns
+            }
+        }
+        let columns = bestColumns
+        let rows = (count + columns - 1) / columns
+        // Ќелиите се рамномерни, но не повеќе од 1.4× пошироки/повисоки од квадрат (да не се развлечат)
+        let cellWidth = min(rect.width / CGFloat(columns), bestSide * 1.4)
+        let cellHeight = min(rect.height / CGFloat(rows), bestSide * 1.4)
+        let top = rect.minY + (rect.height - cellHeight * CGFloat(rows)) / 2
+        var cells: [CGRect] = []
+        for row in 0..<rows {
+            let inRow = min(columns, count - row * columns)
+            let left = rect.minX + (rect.width - cellWidth * CGFloat(inRow)) / 2
+            for column in 0..<inRow {
+                cells.append(CGRect(x: left + CGFloat(column) * cellWidth,
+                                    y: top + CGFloat(row) * cellHeight,
+                                    width: cellWidth, height: cellHeight))
+            }
+        }
+        return cells
     }
 }
 
@@ -199,7 +315,7 @@ struct SeasonFilter: View {
 
 // MARK: - Листата наспроти аутфитите
 
-/// „Горни дела 3/5 · Долни дела 2/2 …“ — зелено кога е исполнето, црвено кога фали.
+/// „Маици и топови 3/5 · Џемпер / дуксер 1/2 …“ — зелено кога е исполнето, црвено кога е над планираното.
 struct TargetChips: View {
     let targets: [ClothingTarget]
 
@@ -228,9 +344,9 @@ struct TargetChips: View {
 }
 
 enum TargetText {
-    /// „2 горни дела, 1 пар обувки“ — или nil ако сè е покриено.
+    /// „2 маици, 1 џемпер или дуксер“ — или nil ако сè е покриено.
     static func missing(_ targets: [ClothingTarget]) -> String? {
-        let parts = targets.filter { $0.missing > 0 }.map { $0.category.count($0.missing) }
+        let parts = targets.filter { $0.missing > 0 }.map { $0.countText($0.missing) }
         return parts.isEmpty ? nil : parts.joined(separator: ", ")
     }
 
@@ -510,11 +626,11 @@ struct OutfitBuilderView: View {
         }
         guard adding else { return }
 
-        // Предупредување: аутфитите го надминуваат планираното во листата (пр. 7 маици, а планирани 6)
+        // Предупредување: аутфитите го надминуваат планираното во листата (пр. 7 маици, а планирани 6) —
+        // само за редот каде што се брои ова парче (џемперот не ги полни маиците)
         if let trip,
            let target = wardrobe.targets(for: trip, extra: selected, excludingOutfit: existing?.id)
-               .first(where: { $0.category == item.category }),
-           target.over > 0 {
+               .first(where: { item.packingKeys.contains($0.key) && $0.over > 0 }) {
             show(L("Го надминуваш планираното: \(target.label). Листата предвидува \(target.need).",
                    "Over the plan: \(target.label). The list planned \(target.need)."))
             return

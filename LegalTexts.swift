@@ -16,17 +16,18 @@ enum LegalTexts {
 
     static func markdown(_ doc: LegalDoc) -> String {
         switch (doc, AppLanguage.current) {
+        // Правните текстови се на македонски и англиски; другите јазици добиваат англиски (меродавна верзија)
         case (.privacy, .mk): return privacyMK
-        case (.privacy, .en): return privacyEN
+        case (.privacy, _): return privacyEN
         case (.terms, .mk): return termsMK
-        case (.terms, .en): return termsEN
+        case (.terms, _): return termsEN
         }
     }
 
     static let privacyMK = #"""
     # Политика за приватност
 
-    Важи од: 30 октомври 2026
+    Важи од: 6 ноември 2026
 
     Tripdrobe („апликацијата“) ја развива и одржува Кристијан Анакијев, ул. Христо Татарчев 47ј 1/22, 1000 Скопје, Северна Македонија („ние“). Ние сме одговорни за обработката на твоите лични податоци. За сè што е поврзано со приватноста пиши на tripdrobe@gmail.com.
 
@@ -36,13 +37,15 @@ enum LegalTexts {
 
     **Акаунт.** Име, е-пошта и идентификатор на акаунтот. Ако се најавиш со Google или Apple, од нив ги добиваме името и е-поштата (кај Apple може да биде скриена адреса). Лозинката ја чува Firebase Authentication и ние не ја гледаме.
 
-    **Телефонски број (по избор).** Ако го внесеш, останува на твојот телефон. Во базата праќаме само шифриран отпечаток (SHA-256) од бројот и од е-поштата, за да можат пријателите да те најдат кога те канат на патување.
+    **Телефонски број (по избор).** Ако го внесеш, го чуваме во твојот акаунт, за да остане и кога ќе се одјавиш и пак ќе се најавиш. Го гледаш само ти — правилата на базата не дозволуваат никој друг да го чита. За пријателите да можат да те најдат кога те канат на патување, во посебна листа за пребарување се чува само шифриран отпечаток (SHA-256) од бројот и од е-поштата; од него бројот не може да се прочита и не им се покажува на другите.
 
     **Патувања.** Дестинација, датуми, превоз, авиокомпанија и багаж, листи за пакување, листата „Пред излез“ и имињата на сопатниците што ги додаваш.
 
     **Заеднички патувања.** Деталите на патувањето и делот „Заедно“ (што се носи и кој го носи) ги гледаат сите членови на тоа патување. Твојата лична листа ја гледаш само ти.
 
     **Гардероба и аутфити.** Фотографии од облека што ги правиш или избираш, категории, сезони, аутфити и план по денови. Пред да се зачува сликата, апликацијата го отстранува лицето, а слика на која останува лице не се зачувува. Гардеробата ја гледаш само ти.
+
+    **Известувања.** Потсетниците за пакување ги закажува самиот телефон и ништо не се праќа. За известувањата од пријателите (на пример, кога некој те додава во патување или те означува да понесеш нешто) чуваме технички токен за известувања на твојот уред, поврзан со акаунтот, и јазикот на апликацијата. Ги исклучуваш во Профил или во Поставки на iPhone; токенот се брише кога ќе се одјавиш.
 
     **Контакти.** Кога каниш пријател, го користиме само контактот што ќе го избереш (име и број или е-пошта) за да направиме шифриран клуч за поканата. Твојот именик не се праќа никаде.
 
@@ -61,6 +64,7 @@ enum LegalTexts {
     Само со услугите без кои апликацијата не може да работи:
 
     - **Google (Firebase Authentication, Cloud Firestore, Google Sign-In)** – најава и чување на податоците.
+    - **Google (Firebase Cloud Messaging, Cloud Functions) и Apple (Push Notification service)** – праќање известувања од пријателите.
     - **Apple** – Најава со Apple, купувања преку App Store, пребарување места (Apple Maps / MapKit) и, во верзијата од App Store, прогнозата (Apple Weather / WeatherKit). Се праќаат тоа што го пребаруваш, координатите на дестинацијата и датумите.
     - **Open-Meteo** – прогноза само во тест-верзиите. Се праќаат координатите на дестинацијата и датумите.
     - **Wikimedia (Wikipedia, Wikidata, Commons)** – фотографии од дестинацијата. Се праќаат името и координатите на местото.
@@ -73,7 +77,7 @@ enum LegalTexts {
 
     ## Колку долго ги чуваме
 
-    Додека го имаш акаунтот. Од телефонот податоците се бришат при одјава. Кога ќе го избришеш акаунтот (Поставки → Избриши акаунт), веднаш се бришат профилот, гардеробата, аутфитите, патувањата чиј сопственик си, како и твојата листа и членство во туѓите патувања. Тоа што си го додал во делот „Заедно“ на туѓо патување останува кај другите членови.
+    Додека го имаш акаунтот. Од телефонот податоците се бришат при одјава. Кога ќе го избришеш акаунтот (Поставки → Избриши акаунт), веднаш се бришат профилот (со телефонскиот број), гардеробата, аутфитите, патувањата чиј сопственик си, како и твојата листа и членство во туѓите патувања. Тоа што си го додал во делот „Заедно“ на туѓо патување останува кај другите членови.
 
     ## Твоите права
 
@@ -97,7 +101,7 @@ enum LegalTexts {
     static let privacyEN = #"""
     # Privacy Policy
 
-    Effective: October 30, 2026
+    Effective: November 6, 2026
 
     Tripdrobe (“the app”) is developed and run by Kristijan Anakijev, Hristo Tatarchev 47j 1/22, 1000 Skopje, North Macedonia (“we”). We are responsible for processing your personal data. For anything about privacy, write to tripdrobe@gmail.com.
 
@@ -107,13 +111,15 @@ enum LegalTexts {
 
     **Account.** Name, email and an account identifier. If you sign in with Google or Apple, we receive your name and email from them (with Apple this may be a private relay address). Your password is handled by Firebase Authentication; we never see it.
 
-    **Phone number (optional).** If you enter it, it stays on your phone. We upload only a one-way fingerprint (SHA-256) of your number and email so friends can find you when they invite you to a trip.
+    **Phone number (optional).** If you enter it, we keep it in your account so it's still there when you sign out and back in. Only you can see it — the database rules don't let anyone else read it. So that friends can find you when they invite you to a trip, a separate lookup list stores only a one-way fingerprint (SHA-256) of your number and email; the number can't be read from it and is never shown to others.
 
     **Trips.** Destination, dates, transport, airline and bags, packing lists, the “Before you leave” checklist and the names of companions you add.
 
     **Shared trips.** Trip details and the “Together” section (what is brought and by whom) are visible to every member of that trip. Your personal list is visible only to you.
 
     **Wardrobe and outfits.** Photos of clothes you take or choose, categories, seasons, outfits and your day-by-day plan. Before a photo is saved, the app removes any face, and a photo that still shows a face is not saved. Your wardrobe is visible only to you.
+
+    **Notifications.** Packing reminders are scheduled by your phone itself and nothing is sent anywhere. For notifications from friends (for example, when someone adds you to a trip or asks you to bring something) we store a technical notification token for your device, linked to your account, together with the app language. You can turn them off in Profile or in iPhone Settings; the token is removed when you sign out.
 
     **Contacts.** When you invite a friend, we use only the contact you pick (name and phone or email) to create an encrypted invite key. Your address book is never uploaded.
 
@@ -132,6 +138,7 @@ enum LegalTexts {
     Only with the services the app cannot work without:
 
     - **Google (Firebase Authentication, Cloud Firestore, Google Sign-In)** – sign-in and data storage.
+    - **Google (Firebase Cloud Messaging, Cloud Functions) and Apple (Push Notification service)** – delivering notifications from friends.
     - **Apple** – Sign in with Apple, App Store purchases, place search (Apple Maps / MapKit) and, in the App Store version, the forecast (Apple Weather / WeatherKit); what you search for, the destination's coordinates and the dates are sent.
     - **Open-Meteo** – forecast in test builds only; the destination's coordinates and dates are sent.
     - **Wikimedia (Wikipedia, Wikidata, Commons)** – destination photos; the place's name and coordinates are sent.
@@ -144,7 +151,7 @@ enum LegalTexts {
 
     ## How long we keep it
 
-    For as long as you have an account. Data on your phone is removed when you sign out. When you delete your account (Settings → Delete account), we immediately delete your profile, wardrobe, outfits, the trips you own, and your list and membership in other people's trips. Items you added to the “Together” section of someone else's trip stay with the other members.
+    For as long as you have an account. Data on your phone is removed when you sign out. When you delete your account (Settings → Delete account), we immediately delete your profile (including your phone number), wardrobe, outfits, the trips you own, and your list and membership in other people's trips. Items you added to the “Together” section of someone else's trip stay with the other members.
 
     ## Your rights
 
@@ -168,7 +175,7 @@ enum LegalTexts {
     static let termsMK = #"""
     # Услови за користење
 
-    Важи од: 30 октомври 2026
+    Важи од: 6 ноември 2026
 
     Овие услови важат за апликацијата Tripdrobe што ја нуди Кристијан Анакијев, ул. Христо Татарчев 47ј 1/22, 1000 Скопје, Северна Македонија („ние“). Кога создаваш акаунт или ја користиш апликацијата, се согласуваш со нив и со Политиката за приватност.
 
@@ -224,7 +231,7 @@ enum LegalTexts {
     static let termsEN = #"""
     # Terms of Use
 
-    Effective: October 30, 2026
+    Effective: November 6, 2026
 
     These terms apply to the Tripdrobe app offered by Kristijan Anakijev, Hristo Tatarchev 47j 1/22, 1000 Skopje, North Macedonia (“we”). By creating an account or using the app you agree to them and to the Privacy Policy.
 

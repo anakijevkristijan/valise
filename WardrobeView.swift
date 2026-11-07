@@ -10,10 +10,13 @@ struct WardrobeView: View {
 
     @State private var section: Pane = ScreenshotMode.screen == "looks" ? .outfits : .pieces
     @State private var season: Season?
+    /// Филтер по група во „Парчиња“ — nil = сите.
+    @State private var categoryFilter: WardrobeCategory?
     @State private var showAddItem = false
     @State private var editingItem: WardrobeItem?
     @State private var showNewOutfit = false
     @State private var editingOutfit: Outfit?
+    @State private var showSortKinds = false
 
     var body: some View {
         NavigationStack {
@@ -23,6 +26,9 @@ struct WardrobeView: View {
                     VStack(alignment: .leading, spacing: 24) {
                         header
                         sectionPicker
+                        if section == .pieces && !wardrobe.items.isEmpty {
+                            categoryPicker
+                        }
                         SeasonFilter(season: $season)
                         if section == .pieces { piecesContent } else { outfitsContent }
                     }
@@ -58,6 +64,11 @@ struct WardrobeView: View {
         }
         .sheet(item: $editingOutfit) { outfit in
             OutfitBuilderView(existing: outfit)
+                .environmentObject(wardrobe)
+                .presentationCornerRadius(28)
+        }
+        .sheet(isPresented: $showSortKinds) {
+            SortWardrobeKindsView()
                 .environmentObject(wardrobe)
                 .presentationCornerRadius(28)
         }
@@ -183,9 +194,22 @@ struct WardrobeView: View {
                                "Photograph your jacket, jeans, favourite shoes — each piece becomes a sticker you can style into outfits."),
                        action: L("Додај прво парче", "Add your first piece")) { showAddItem = true }
         } else {
-            ForEach(WardrobeCategory.allCases) { category in
+            let pending = wardrobe.itemsNeedingKind.count
+            if pending > 0 {
+                sortKindsCard(pending)
+            }
+            let shown = WardrobeCategory.allCases.filter { categoryFilter == nil || $0 == categoryFilter }
+            if shown.allSatisfy({ wardrobe.items(in: $0, season: season).isEmpty }) {
+                Text(season == nil ? L("Нема парчиња во оваа група.", "No pieces in this group.")
+                                   : L("Нема парчиња во оваа група за оваа сезона.", "No pieces in this group for this season."))
+                    .font(.sans(14))
+                    .foregroundStyle(Theme.muted)
+                    .padding(.top, 4)
+            }
+            ForEach(shown) { category in
                 let list = wardrobe.items(in: category, season: season)
                 if !list.isEmpty {
+                    let groups = WardrobeKindGroup.groups(list)
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
                             Eyebrow(category.title)
@@ -194,24 +218,95 @@ struct WardrobeView: View {
                                 .font(.codes(14))
                                 .foregroundStyle(Theme.muted)
                         }
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 12)], spacing: 14) {
-                            ForEach(list) { item in
-                                let inOutfits = wardrobe.outfitCount(of: item.id)
-                                WardrobeItemTile(item: item,
-                                                 badge: inOutfits > 0 ? PieceText.inOutfits(inOutfits) : nil)
-                                    .contextMenu {
-                                        Button(L("Уреди", "Edit"), systemImage: "pencil") { editingItem = item }
-                                        Button(L("Избриши", "Delete"), systemImage: "trash", role: .destructive) {
-                                            withAnimation { wardrobe.delete(item.id) }
-                                        }
+                        // Подгрупи по вид: Маици · Топови · Џемпери · Дуксери…
+                        ForEach(groups) { group in
+                            VStack(alignment: .leading, spacing: 10) {
+                                if groups.count > 1 {
+                                    HStack(spacing: 6) {
+                                        Text(group.title)
+                                            .font(.sans(12, .semibold))
+                                            .foregroundStyle(group.id == "none" ? Theme.terracotta : Theme.inkSoft)
+                                        Text("\(group.items.count)")
+                                            .font(.codes(13))
+                                            .foregroundStyle(Theme.muted)
                                     }
-                                    .onTapGesture { editingItem = item }
+                                }
+                                LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 12)], spacing: 14) {
+                                    ForEach(group.items) { item in
+                                        itemTile(item)
+                                    }
+                                }
                             }
                         }
                     }
                 }
             }
         }
+    }
+
+    /// Групи: Сите · Горни делови · Фустани и сукњи… (само групите што имаат парчиња).
+    private var categoryPicker: some View {
+        let present = WardrobeCategory.allCases.filter { category in
+            category == categoryFilter || wardrobe.items.contains { $0.category == category }
+        }
+        return ScrollView(.horizontal) {
+            HStack(spacing: 8) {
+                ChipButton(title: L("Сите", "All"), isSelected: categoryFilter == nil) {
+                    withAnimation(.easeInOut(duration: 0.2)) { categoryFilter = nil }
+                }
+                ForEach(present) { category in
+                    let count = wardrobe.items.filter { $0.category == category }.count
+                    ChipButton(title: "\(category.title) \(count)", isSelected: categoryFilter == category) {
+                        withAnimation(.easeInOut(duration: 0.2)) { categoryFilter = category }
+                    }
+                }
+            }
+            .padding(.vertical, 1)
+        }
+        .scrollIndicators(.hidden)
+    }
+
+    private func itemTile(_ item: WardrobeItem) -> some View {
+        let inOutfits = wardrobe.outfitCount(of: item.id)
+        return WardrobeItemTile(item: item,
+                                badge: inOutfits > 0 ? PieceText.inOutfits(inOutfits) : nil)
+            .contextMenu {
+                Button(L("Уреди", "Edit"), systemImage: "pencil") { editingItem = item }
+                Button(L("Избриши", "Delete"), systemImage: "trash", role: .destructive) {
+                    withAnimation { wardrobe.delete(item.id) }
+                }
+            }
+            .onTapGesture { editingItem = item }
+    }
+
+    /// Стара облека без вид — со еден допир по парче, за листата да брои точно.
+    private func sortKindsCard(_ count: Int) -> some View {
+        Button { showSortKinds = true } label: {
+            HStack(spacing: 14) {
+                Image(systemName: "square.grid.2x2")
+                    .font(.system(size: 16, weight: .light))
+                    .foregroundStyle(Theme.navy)
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(Theme.goldPale))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(count == 1 ? L("1 парче без вид", "1 piece without a type")
+                                    : L("\(count) парчиња без вид", "\(count) pieces without a type"))
+                        .font(.sans(15, .semibold))
+                        .foregroundStyle(Theme.ink)
+                    Text(L("Подреди ги — маица, џемпер, дуксер… за точна листа",
+                           "Sort them — T-shirt, sweater, hoodie… for an accurate list"))
+                        .font(.sans(12))
+                        .foregroundStyle(Theme.inkSoft)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.muted)
+            }
+            .luxCard(padding: 14, radius: 18)
+        }
+        .buttonStyle(PressableStyle())
     }
 
     // MARK: Аутфити
@@ -271,6 +366,7 @@ struct WardrobeView: View {
 struct MainTabView: View {
     @EnvironmentObject private var premium: PremiumStore
     @State private var tab = ScreenshotMode.tab
+    @ObservedObject private var router = NotificationRouter.shared
 
     var body: some View {
         TabView(selection: $tab) {
@@ -293,6 +389,8 @@ struct MainTabView: View {
                 .tag(1)
         }
         .tint(Theme.navy)
+        // Допир на потсетник → таб „Патувања“ (почетната го отвора патувањето)
+        .onChange(of: router.showTrips) { _, _ in tab = 0 }
     }
 }
 

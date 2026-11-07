@@ -13,10 +13,22 @@ enum ScreenshotMode {
     #endif
 
     /// Екранот што се слика:
-    /// home, trip, weather, outfits, bags, packing, day, story, wardrobe, looks.
+    /// home, trip, weather, outfits, bags, packing, day, story, wardrobe, looks,
+    /// language, name, age, settings, new (ново патување), offer (понуда за Premium),
+    /// friends (сопатници со свои датуми), exit („Пред излез“), dates (календар), edit-bags (багаж).
     static var screen: String {
         guard isOn else { return "" }
         return argument("-screen") ?? "home"
+    }
+
+    /// Кој чекор од апликацијата: language → избор на јазик, name → име, age → возраст; инаку почетна.
+    static var stage: Int {
+        switch screen {
+        case "language": return 0
+        case "name": return 1
+        case "age": return 4
+        default: return 3
+        }
     }
 
     /// 0 = Патувања, 1 = Гардероба.
@@ -26,16 +38,17 @@ enum ScreenshotMode {
 
     /// Дали веднаш се отвора главното демо-патување.
     static var opensTrip: Bool {
-        ["trip", "weather", "outfits", "bags", "packing", "day", "story"].contains(screen)
+        ["trip", "friends", "weather", "outfits", "bags", "packing", "exit", "day", "story", "dates", "edit-bags"].contains(screen)
     }
 
     /// До кој дел од патувањето се лизга екранот.
     static var anchor: String? {
         switch screen {
+        case "friends": return "shot-friends"
         case "weather": return "shot-weather"
         case "outfits", "day": return "shot-outfits"
         case "bags": return "shot-bags"
-        case "packing": return "shot-packing"
+        case "packing", "exit": return "shot-packing"
         default: return nil
         }
     }
@@ -55,7 +68,9 @@ enum ScreenshotMode {
         guard isOn else { return }
         let defaults = UserDefaults.standard
         defaults.set(true, forKey: "languageChosen")
-        defaults.set(AppLanguage.en.rawValue, forKey: AppLanguage.storageKey)
+        // -lang de → апликацијата на тој јазик (проверка на преводите); стандардно англиски
+        let language = argument("-lang").flatMap { AppLanguage(rawValue: $0) } ?? .en
+        defaults.set(language.rawValue, forKey: AppLanguage.storageKey)
         defaults.set(argument("-name") ?? "Emma", forKey: "userName")
         defaults.set(true, forKey: AgeGateView.verifiedKey)
         defaults.set(true, forKey: PhoneStepView.askedKey)
@@ -91,6 +106,13 @@ enum ScreenshotMode {
                             codes: [1, 0, 61, 3, 2, 0], rain: [10, 5, 70, 35, 15, 5], lastYear: false)
         hero.companions = [Companion(name: "Mia Laurent", uid: "demo-mia"),
                            Companion(name: "Leo Brooks", inviteKey: "p_demo")]
+        // Мија доаѓа два дена подоцна, од Лондон — свои градови и датуми
+        let london = Place(id: 2643743, name: "London", region: "England", country: "United Kingdom",
+                           countryCode: "GB", latitude: 51.5085, longitude: -0.1257, timezone: "Europe/London")
+        let miaStart = hero.startDate.adding(days: 2)
+        hero.memberPlans = ["demo-mia": MemberPlan(origin: london,
+                                                   stops: [TripStop(place: paris, startDate: miaStart, endDate: hero.endDate)],
+                                                   startDate: miaStart, endDate: hero.endDate)]
         PackingEngine.ensureTogether(&hero)
         if var together = hero.together, let companions = hero.companions {
             for index in together.indices {
@@ -187,6 +209,8 @@ enum ScreenshotMode {
                 let name: String
                 let category: WardrobeCategory
                 let seasons: [Season]?
+                /// Вид (маица, џемпер…), по избор — инаку се погодува од името.
+                let kind: WardrobeKind?
             }
             struct Look: Decodable {
                 let name: String
@@ -204,7 +228,8 @@ enum ScreenshotMode {
         var idsByFile: [String: UUID] = [:]
         for piece in manifest.pieces {
             guard let image = UIImage(contentsOfFile: folder.appendingPathComponent(piece.file).path) else { continue }
-            let item = WardrobeItem(name: piece.name, category: piece.category, seasons: piece.seasons ?? [])
+            let item = WardrobeItem(name: piece.name, category: piece.kind?.category ?? piece.category,
+                                    seasons: piece.seasons ?? [], kindID: piece.kind?.rawValue).migratedKind()
             wardrobe.add(item, image: image)
             idsByFile[piece.file] = item.id
         }

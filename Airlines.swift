@@ -29,15 +29,20 @@ struct Airline: Identifiable, Hashable {
     let website: String?
     let bags: [BagSpec]
     let tip: String?
+    /// Нема проверени мерки — типични правила според регионот (или име што корисникот го внел).
+    var isTypical: Bool = false
+
+    /// Авиокомпанија што ја нема во листата, внесена по име.
+    var isNamed: Bool { id.hasPrefix(Airlines.namedPrefix) }
 
     var countryName: String {
         AppLanguage.current.locale.localizedString(forRegionCode: country) ?? country
     }
 
-    /// За пребарување: име, IATA код, земја (на двата јазика).
+    /// За пребарување: име, IATA код, земја (на двата јазика), без дијакритици.
     var searchText: String {
         let english = Locale(identifier: "en").localizedString(forRegionCode: country) ?? ""
-        return [name, code, country, countryName, english].joined(separator: " ").lowercased()
+        return Airlines.fold([name, code, country, countryName, english].joined(separator: " "))
     }
 }
 
@@ -76,6 +81,7 @@ enum Airlines {
         var checkedRule: Rule = .fare
         var site: String? = nil
         var tip: (String, String)? = nil
+        var typical = false
     }
 
     // MARK: Податоци
@@ -267,6 +273,10 @@ enum Airlines {
                 personal: nil, cabin: (55, 40, 20, 8), checkedRule: .included, site: "csair.com"))
         add(Row(id: "hainan", code: "HU", name: "Hainan Airlines", country: "CN", region: .asia,
                 personal: nil, cabin: (55, 40, 20, 10), checkedRule: .included, site: "hainanairlines.com"))
+        add(Row(id: "juneyao", code: "HO", name: "Juneyao Airlines", country: "CN", region: .asia,
+                personal: nil, cabin: (55, 40, 20, 8), checkedRule: .included, site: "juneyaoair.com",
+                tip: ("Кабинскиот е до 8 kg на летовите за Европа, а до 10 kg на другите. За Јапонија, Кореја и Сингапур добиваш 2 чекирани по 23 kg.",
+                      "The cabin bag is up to 8 kg on flights to and from Europe and up to 10 kg elsewhere. To Japan, Korea and Singapore you get 2 checked bags of 23 kg.")))
         add(Row(id: "eva", code: "BR", name: "EVA Air", country: "TW", region: .asia,
                 personal: nil, cabin: (56, 36, 23, 7), site: "evaair.com"))
         add(Row(id: "chinaairlines", code: "CI", name: "China Airlines", country: "TW", region: .asia,
@@ -397,7 +407,115 @@ enum Airlines {
         add(Row(id: "rwandair", code: "WB", name: "RwandAir", country: "RW", region: .africa,
                 personal: nil, cabin: (55, 40, 23, 7), site: "rwandair.com"))
 
+        // ——— Уште авиокомпании (AirlineDirectory): типични правила ———
+        var codes = Set(list.map(\.code))
+        var ids = Set(list.map(\.id))
+        for line in AirlineDirectory.data.split(separator: "\n") {
+            let parts = line.split(separator: "|", omittingEmptySubsequences: false)
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+            guard parts.count >= 4, !parts[0].hasPrefix("#"), let region = parseRegion(parts[3]) else { continue }
+            let code = parts[0]
+            let id = slug(parts[1])
+            guard !codes.contains(code), !ids.contains(id) else { continue }
+            codes.insert(code)
+            ids.insert(id)
+            add(typical(id: id, code: code, name: parts[1], country: parts[2], region: region,
+                        lowCost: parts.count > 4 && parts[4] == "L"))
+        }
+
         return list
+    }
+
+    private static func parseRegion(_ short: String) -> AirlineRegion? {
+        switch short {
+        case "eu": return .europe
+        case "me": return .middleEast
+        case "as": return .asia
+        case "am": return .americas
+        case "af": return .africa
+        case "oc": return .oceania
+        default: return nil
+        }
+    }
+
+    /// „Air Côte d'Ivoire“ → „air-cote-d-ivoire“ (без точки, бидејќи клучот на багажот е „id.cabin“).
+    private static func slug(_ name: String) -> String {
+        let folded = fold(name)
+        var result = ""
+        for ch in folded {
+            if ch.isLetter || ch.isNumber { result.append(ch) } else if !result.hasSuffix("-") { result.append("-") }
+        }
+        return result.trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+    }
+
+    /// Мало, без дијакритици — за пребарување („Widerøe“ = „wideroe“).
+    static func fold(_ text: String) -> String {
+        text.folding(options: [.diacriticInsensitive, .caseInsensitive, .widthInsensitive], locale: Locale(identifier: "en"))
+            .replacingOccurrences(of: "ø", with: "o")
+            .replacingOccurrences(of: "æ", with: "ae")
+            .replacingOccurrences(of: "ł", with: "l")
+            .replacingOccurrences(of: "’", with: "'")
+            .lowercased()
+    }
+
+    /// Најчести правила за авиокомпанија без проверени мерки, според регионот и типот.
+    private static func typical(id: String, code: String, name: String, country: String,
+                                region: AirlineRegion, lowCost: Bool) -> Row {
+        var row = Row(id: id, code: code, name: name, country: country, region: region, lowCost: lowCost)
+        row.typical = true
+        row.tip = ("Типични мерки за овој вид авиокомпанија — точните правила ги немаме проверено. Провери ги на нејзиниот сајт пред лет.",
+                   "Typical sizes for this kind of airline — we haven't checked its exact rules. Check its website before you fly.")
+        let northAmerica = ["US", "CA"].contains(country)
+        if lowCost {
+            switch region {
+            case .europe:
+                row.personal = (40, 30, 20, nil)
+                row.cabin = (55, 40, 20, 10)
+                row.cabinRule = .paid
+                row.checkedKg = 20
+            case .americas:
+                row.personal = (43, 33, 20, nil)
+                row.cabin = (56, 36, 23, nil)
+                row.cabinRule = northAmerica ? .paid : .fare
+                row.checkedKg = 23
+            default:
+                row.personal = (40, 30, 10, nil)
+                row.cabin = (56, 36, 23, 7)
+                row.cabinRule = .included
+                row.checkedKg = 20
+            }
+            row.checkedRule = .paid
+            return row
+        }
+        switch region {
+        case .europe:
+            if ["RU", "BY"].contains(country) {
+                row.cabin = (55, 40, 20, 10)
+            } else {
+                row.cabin = (55, 40, 23, 8)
+            }
+        case .asia:
+            if country == "CN" {
+                row.personal = nil
+                row.cabin = (55, 40, 20, 10)
+            } else if ["JP", "KR", "TW", "HK", "MO", "MN"].contains(country) {
+                row.cabin = (55, 40, 25, 10)
+            } else {
+                row.cabin = (56, 36, 23, 7)
+                row.checkedKg = 20
+            }
+        case .middleEast, .africa:
+            row.cabin = (55, 40, 20, 7)
+        case .americas:
+            if northAmerica {
+                row.cabin = (56, 36, 23, nil)
+            } else {
+                row.cabin = (55, 35, 25, 10)
+            }
+        case .oceania:
+            row.cabin = (56, 36, 23, 7)
+        }
+        return row
     }
 
     // MARK: Градење
@@ -438,7 +556,7 @@ enum Airlines {
 
         return Airline(id: row.id, code: row.code, name: row.name, country: row.country, region: row.region,
                        isLowCost: row.lowCost, website: row.site, bags: bags,
-                       tip: row.tip.map { L($0.0, $0.1) })
+                       tip: row.tip.map { L($0.0, $0.1) }, isTypical: row.typical)
     }
 
     private static func other() -> Airline {
@@ -456,31 +574,85 @@ enum Airlines {
 
     // MARK: Кеш (по јазик) — листата се гради еднаш, не при секое цртање
 
-    private static var cache: (language: String, list: [Airline], index: [String: Airline])?
+    private static var cache: (language: String, list: [Airline], index: [String: Airline], searchTexts: [String])?
 
     static var all: [Airline] {
         let language = AppLanguage.current.rawValue
         if let cache, cache.language == language { return cache.list }
         let list = rows.map(build).sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending } + [other()]
         let index = Dictionary(list.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        cache = (language, list, index)
+        cache = (language, list, index, list.map(\.searchText))
         return list
     }
 
     static func find(_ id: String?) -> Airline? {
         guard let id else { return nil }
+        if id.hasPrefix(namedPrefix) {
+            let name = String(id.dropFirst(namedPrefix.count))
+            return name.isEmpty ? nil : named(name)
+        }
         _ = all
         return cache?.index[id]
+    }
+
+    // MARK: Авиокомпанија што ја нема во листата
+
+    static let namedPrefix = "named:"
+
+    /// Име внесено од корисникот → безбеден дел од клуч (без точки и вишок празни места).
+    static func cleanName(_ text: String) -> String {
+        let trimmed = text.replacingOccurrences(of: ".", with: " ")
+            .split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        return String(trimmed.prefix(40))
+    }
+
+    static func namedID(_ text: String) -> String? {
+        let name = cleanName(text)
+        return name.count >= 2 ? namedPrefix + name : nil
+    }
+
+    /// Авиокомпанија по име, со најчестите мерки (како „Друга“).
+    static func named(_ rawName: String) -> Airline {
+        let name = cleanName(rawName)
+        let id = namedPrefix + name
+        let words = name.split(separator: " ").filter { $0.first?.isLetter == true || $0.first?.isNumber == true }
+        let initials = words.prefix(2).compactMap(\.first).map { String($0).uppercased() }.joined()
+        let code = initials.isEmpty ? "✈︎" : initials
+        let base = other()
+        let bags = base.bags.map { bag -> BagSpec in
+            var copy = bag
+            copy.key = bag.key?.replacingOccurrences(of: "other.", with: "\(id).")
+            return copy
+        }
+        return Airline(id: id, code: code, name: name, country: "", region: .europe, isLowCost: false,
+                       website: nil, bags: bags,
+                       tip: L("„\(name)“ ја немаме во листата, па ставив најчести мерки. Провери ги правилата на сајтот на авиокомпанијата.",
+                              "“\(name)” isn't in our list, so these are the most common sizes. Check the airline's own rules."),
+                       isTypical: true)
     }
 
     static var popular: [Airline] {
         popularIDs.compactMap { find($0) }
     }
 
+    /// Секој збор од барањето мора да го има (име, код или земја); точниот код и почеток на името се први.
     static func search(_ text: String) -> [Airline] {
-        let query = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let query = fold(text.trimmingCharacters(in: .whitespacesAndNewlines))
         guard !query.isEmpty else { return all }
-        return all.filter { $0.searchText.contains(query) }
+        let words = query.split(whereSeparator: { $0.isWhitespace || $0 == "-" }).map(String.init)
+        let list = all
+        let texts = cache?.searchTexts ?? list.map(\.searchText)
+        let matches = zip(list, texts).filter { pair in
+            words.allSatisfy { pair.1.contains($0) }
+        }.map { $0.0 }
+        func rank(_ airline: Airline) -> Int {
+            if fold(airline.code) == query { return 0 }
+            if fold(airline.name).hasPrefix(query) { return 1 }
+            return 2
+        }
+        return matches.enumerated()
+            .sorted { (rank($0.element), $0.offset) < (rank($1.element), $1.offset) }
+            .map(\.element)
     }
 
     /// Багажи за кола, воз или автобус.
@@ -506,7 +678,9 @@ enum Airlines {
     static func spec(forKey key: String) -> BagSpec? {
         if key == "custom" { return customBag() }
         if key.hasPrefix("ground.") { return groundBags.first { $0.key == key } }
-        let airlineID = key.split(separator: ".").first.map(String.init)
+        // Клучот е „<id авиокомпанија>.<багаж>“; id никогаш нема точка
+        guard let dot = key.lastIndex(of: ".") else { return nil }
+        let airlineID = String(key[..<dot])
         return find(airlineID)?.bags.first { $0.key == key }
     }
 }

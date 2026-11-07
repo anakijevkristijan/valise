@@ -11,6 +11,7 @@ struct HomeView: View {
     @State private var showSettings = false
     @State private var pendingTripID: UUID?
     @AppStorage("homeFilter") private var filter: PassFilter = .upcoming
+    @ObservedObject private var router = NotificationRouter.shared
 
     enum PassFilter: String, CaseIterable {
         case upcoming, past, all
@@ -56,6 +57,9 @@ struct HomeView: View {
         }
         .task { await store.refreshAllUpcoming() }
         .onAppear(perform: openScreenshotTrip)
+        .onAppear(perform: openScreenshotSheet)
+        .onAppear(perform: openFromNotification)
+        .onChange(of: router.openTripID) { _, _ in openFromNotification() }
         .fullScreenCover(isPresented: $showWizard, onDismiss: openPendingTrip) {
             TripWizardView { newID in
                 pendingTripID = newID
@@ -139,11 +143,11 @@ struct HomeView: View {
     }
 
     private func subtitle(for trip: Trip) -> String {
-        if trip.isOngoing { return L("Уживај во \(trip.destination.name).", "Enjoy \(trip.destination.name).") }
+        if trip.isOngoing { return L("Уживај во \(trip.placeSummary).", "Enjoy \(trip.placeSummary).") }
         if trip.daysUntil <= 3 {
-            return L("\(trip.destination.name) е речиси тука. Време е за пакување.", "\(trip.destination.name) is almost here. Time to pack.")
+            return L("\(trip.placeSummary) е речиси тука. Време е за пакување.", "\(trip.placeSummary) is almost here. Time to pack.")
         }
-        return L("Твојата карта за \(trip.destination.name) е спремна.", "Your ticket to \(trip.destination.name) is ready.")
+        return L("Твојата карта за \(trip.placeSummary) е спремна.", "Your ticket to \(trip.placeSummary) is ready.")
     }
 
     // MARK: Патувања — пасови во мрежа
@@ -165,7 +169,7 @@ struct HomeView: View {
                 ForEach(PassFilter.allCases, id: \.self) { option in
                     filterTab(option)
                 }
-                Spacer()
+                Spacer(minLength: 0)
             }
             .overlay(alignment: .bottom) { Hairline() }
 
@@ -209,6 +213,9 @@ struct HomeView: View {
                 Text(option.title.uppercased())
                     .font(.sans(12, .semibold))
                     .tracking(1.4)
+                    // Подолгите зборови (Bevorstehend, Nadchodzące) не се кршат во два реда
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
                 Text("\(count)")
                     .font(.codes(14))
                     .opacity(0.6)
@@ -278,6 +285,27 @@ struct HomeView: View {
         pendingTripID = nil
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             path.append(id)
+        }
+    }
+
+    /// Допир на потсетник → се отвора тоа патување.
+    private func openFromNotification() {
+        guard let id = router.openTripID else { return }
+        router.openTripID = nil
+        guard store.trip(id) != nil else { return }
+        showSettings = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            path = [id]
+        }
+    }
+
+    /// Демо-режим (само Debug): Профил или ново патување за сликање.
+    private func openScreenshotSheet() {
+        guard ScreenshotMode.isOn else { return }
+        switch ScreenshotMode.screen {
+        case "settings": showSettings = true
+        case "new": showWizard = true
+        default: break
         }
     }
 

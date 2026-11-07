@@ -2,7 +2,7 @@ import SwiftUI
 
 struct OnboardingView: View {
     @AppStorage("userName") private var userName: String = ""
-    @AppStorage(AppLanguage.storageKey) private var language: String = AppLanguage.mk.rawValue
+    @AppStorage(AppLanguage.storageKey) private var language: String = AppLanguage.en.rawValue
     @State private var name: String = ""
     @State private var appeared = false
     @FocusState private var focused: Bool
@@ -19,7 +19,7 @@ struct OnboardingView: View {
                             .tracking(4)
                             .foregroundStyle(Theme.navy)
                         Spacer()
-                        LanguageToggle(language: $language)
+                        LanguageButton(language: $language)
                     }
                     .padding(.top, 20)
                     .padding(.bottom, 36)
@@ -158,111 +158,224 @@ struct OnboardingView: View {
     }
 }
 
-/// MK | EN прекинувач.
-struct LanguageToggle: View {
+/// Мало копче за јазикот (горе десно): отвора избор на сите јазици.
+struct LanguageButton: View {
     @Binding var language: String
+    @State private var showPicker = false
 
     var body: some View {
-        HStack(spacing: 0) {
-            ForEach(AppLanguage.allCases) { lang in
-                Button {
-                    language = lang.rawValue
-                } label: {
-                    Text(lang.shortName)
-                        .font(.sans(11, .semibold))
-                        .tracking(1.4)
-                        .foregroundStyle(language == lang.rawValue ? Theme.goldLight : Theme.navy)
-                        .frame(width: 40, height: 28)
-                        .background(Capsule().fill(language == lang.rawValue ? Theme.navy : Color.clear))
-                }
-                .buttonStyle(.plain)
+        Button {
+            showPicker = true
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "globe")
+                    .font(.system(size: 12, weight: .light))
+                Text((AppLanguage(rawValue: language) ?? .en).shortName)
+                    .font(.sans(11, .semibold))
+                    .tracking(1.4)
             }
+            .foregroundStyle(Theme.navy)
+            .padding(.horizontal, 12)
+            .frame(height: 30)
+            .overlay(Capsule().strokeBorder(Theme.navy.opacity(0.25), lineWidth: 0.75))
         }
-        .padding(3)
-        .overlay(Capsule().strokeBorder(Theme.navy.opacity(0.25), lineWidth: 0.75))
+        .buttonStyle(.plain)
+        .accessibilityLabel(L("Јазик", "Language"))
+        .sheet(isPresented: $showPicker) {
+            LanguageSheet(language: $language)
+        }
     }
 }
 
-/// Прв екран: избор на јазик пред сè друго.
+/// Мрежа со сите јазици — без лизгање, 3 колони, последниот ред на средина.
+struct LanguageGrid: View {
+    @Binding var language: String
+    var rowHeight: CGFloat = 58
+    var onSelect: (AppLanguage) -> Void = { _ in }
+
+    private let spacing: CGFloat = 10
+    private let columns = 3
+
+    private var rows: [[AppLanguage]] {
+        stride(from: 0, to: AppLanguage.allCases.count, by: columns).map {
+            Array(AppLanguage.allCases[$0..<min($0 + columns, AppLanguage.allCases.count)])
+        }
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            let width = (geo.size.width - spacing * CGFloat(columns - 1)) / CGFloat(columns)
+            VStack(spacing: spacing) {
+                ForEach(rows, id: \.first) { row in
+                    HStack(spacing: spacing) {
+                        ForEach(row) { lang in
+                            tile(lang, width: width)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+        }
+        .frame(height: CGFloat(rows.count) * rowHeight + CGFloat(rows.count - 1) * spacing)
+    }
+
+    private func tile(_ lang: AppLanguage, width: CGFloat) -> some View {
+        let selected = language == lang.rawValue
+        return Button {
+            withAnimation(.easeOut(duration: 0.2)) { language = lang.rawValue }
+            onSelect(lang)
+        } label: {
+            VStack(spacing: 3) {
+                Text(lang.nativeName)
+                    .font(.serif(rowHeight > 52 ? 18 : 16))
+                    .foregroundStyle(selected ? Theme.goldLight : Theme.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                Text(lang.englishName.uppercased())
+                    .font(.sans(8, .semibold))
+                    .tracking(1.3)
+                    .foregroundStyle(selected ? Theme.goldLight.opacity(0.75) : Theme.muted)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+            .padding(.horizontal, 6)
+            .frame(width: width, height: rowHeight)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(selected ? Theme.navy : Theme.surface)
+                    .shadow(color: Theme.navy.opacity(selected ? 0.22 : 0.05), radius: selected ? 10 : 4, y: selected ? 5 : 2)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(selected ? Theme.gold.opacity(0.7) : Theme.hairline, lineWidth: selected ? 1 : 0.75)
+            )
+        }
+        .buttonStyle(PressableStyle())
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+}
+
+/// Избор на јазик во лист (од Профил или од почетниот екран).
+/// Изборот се применува кога листот ќе се затвори — апликацијата се преисцртува на новиот јазик
+/// по затворањето, наместо листот да исчезне под прстот.
+struct LanguageSheet: View {
+    @Binding var language: String
+    var onSelect: (AppLanguage) -> Void = { _ in }
+    @Environment(\.dismiss) private var dismiss
+    @State private var pending: String?
+
+    private var selection: Binding<String> {
+        Binding(get: { pending ?? language }, set: { pending = $0 })
+    }
+
+    private func commit() {
+        guard let pending, pending != language, let chosen = AppLanguage(rawValue: pending) else { return }
+        language = pending
+        onSelect(chosen)
+    }
+
+    var body: some View {
+        ZStack {
+            PaperBackground()
+            VStack(alignment: .leading, spacing: 18) {
+                HStack {
+                    Eyebrow(L("Јазик", "Language"), color: Theme.gold)
+                    Spacer()
+                    CircleIconButton(systemName: "xmark") { dismiss() }
+                }
+                Text(L("Избери јазик", "Choose your language"))
+                    .font(.serif(30))
+                    .foregroundStyle(Theme.ink)
+                LanguageGrid(language: selection, rowHeight: 58)
+                Button { dismiss() } label: {
+                    Text(L("Готово", "Done"))
+                }
+                .buttonStyle(PrimaryButtonStyle())
+                .padding(.top, 6)
+                Spacer(minLength: 0)
+            }
+            .padding(24)
+            .frame(maxWidth: 560)
+            .frame(maxWidth: .infinity)
+        }
+        .presentationDetents([.large])
+        .presentationCornerRadius(28)
+        .onDisappear(perform: commit)
+    }
+}
+
+/// Прв екран: избор на јазик пред сè друго. Сè е на еден екран, без лизгање.
 struct LanguagePickerView: View {
-    @AppStorage(AppLanguage.storageKey) private var language: String = AppLanguage.mk.rawValue
+    @AppStorage(AppLanguage.storageKey) private var language: String = AppLanguage.en.rawValue
     @AppStorage("languageChosen") private var languageChosen: Bool = false
-    @State private var appeared = false
+    /// Секој избор на јазик го преисцртува екранот — влезната анимација само првиот пат.
+    private static var introPlayed = false
+    @State private var appeared = LanguagePickerView.introPlayed
 
     var body: some View {
         ZStack {
             PaperBackground()
 
-            VStack(alignment: .leading, spacing: 0) {
-                Text("TRIPDROBE")
-                    .font(.sans(12, .semibold))
-                    .tracking(4)
-                    .foregroundStyle(Theme.navy)
-                    .padding(.top, 20)
+            GeometryReader { geo in
+                let logo = min(max(geo.size.height * 0.15, 72), 140)
+                let fixed = logo + 190 + 56 + 40
+                let rowHeight = min(max((geo.size.height - fixed - 4 * 10) / 5, 44), 64)
+                VStack(spacing: 0) {
+                    Image("BrandMark")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: logo)
+                        .shadow(color: Theme.navy.opacity(0.18), radius: 14, y: 8)
+                        .padding(.top, 8)
 
-                Spacer()
+                    Text("TRIPDROBE")
+                        .font(.sans(11, .semibold))
+                        .tracking(5)
+                        .foregroundStyle(Theme.navy)
+                        .padding(.top, 14)
 
-                Text("Добредојде.")
-                    .font(.serif(40))
-                    .foregroundStyle(Theme.ink)
-                Text("Welcome.")
-                    .font(.serif(40))
-                    .foregroundStyle(Theme.muted)
-                    .padding(.bottom, 14)
+                    Text(L("Добредојде.", "Welcome."))
+                        .font(.serif(36))
+                        .foregroundStyle(Theme.ink)
+                        .padding(.top, 10)
+                        .contentTransition(.opacity)
 
-                Text("Избери јазик · Choose your language")
-                    .font(.sans(14))
-                    .foregroundStyle(Theme.inkSoft)
-                    .padding(.bottom, 30)
+                    Text(L("Избери јазик", "Choose your language"))
+                        .font(.sans(14))
+                        .foregroundStyle(Theme.inkSoft)
+                        .padding(.top, 4)
 
-                VStack(spacing: 12) {
-                    option(.mk, code: "MK", subtitle: "Северна Македонија")
-                    option(.en, code: "EN", subtitle: "International")
+                    Spacer(minLength: 14)
+
+                    LanguageGrid(language: $language, rowHeight: rowHeight)
+
+                    Spacer(minLength: 14)
+
+                    Button {
+                        languageChosen = true
+                    } label: {
+                        HStack(spacing: 10) {
+                            Text(L("Продолжи", "Continue"))
+                            Image(systemName: "arrow.right")
+                                .font(.system(size: 13, weight: .regular))
+                        }
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
                 }
-
-                Spacer()
-                Spacer()
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .frame(maxWidth: 560)
+                .frame(maxWidth: .infinity)
+                .frame(height: geo.size.height)
             }
-            .padding(.horizontal, 26)
-            .frame(maxWidth: 560)
-            .frame(maxWidth: .infinity)
             .opacity(appeared ? 1 : 0)
             .offset(y: appeared ? 0 : 16)
         }
         .onAppear {
+            guard !appeared else { return }
+            Self.introPlayed = true
             withAnimation(.easeOut(duration: 0.9)) { appeared = true }
         }
-    }
-
-    private func option(_ lang: AppLanguage, code: String, subtitle: String) -> some View {
-        Button {
-            language = lang.rawValue
-            languageChosen = true
-        } label: {
-            HStack(spacing: 18) {
-                Text(code)
-                    .font(.codes(30))
-                    .foregroundStyle(Theme.goldLight)
-                    .frame(width: 64, height: 64)
-                    .background(Circle().fill(Theme.navy))
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(lang.nativeName)
-                        .font(.serif(24))
-                        .foregroundStyle(Theme.ink)
-                    Text(subtitle.uppercased())
-                        .font(.sans(10, .semibold))
-                        .tracking(1.8)
-                        .foregroundStyle(Theme.muted)
-                }
-                Spacer()
-                Image(systemName: "arrow.right")
-                    .font(.system(size: 14, weight: .light))
-                    .foregroundStyle(Theme.navy)
-            }
-            .padding(16)
-            .luxCard(padding: 0, radius: 20)
-        }
-        .buttonStyle(PressableStyle())
     }
 }
 

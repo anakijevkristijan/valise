@@ -218,8 +218,8 @@ final class TripStore: ObservableObject {
     static func inviteMessage(friend name: String, trip: Trip, me: String) -> String {
         let first = name.split(separator: " ").first.map(String.init) ?? name
         let range = Fmt.range(trip.startDate, trip.endDate)
-        return L("Здраво \(first)! ✈︎ Патувам за \(trip.destination.name) (\(range)) и те додадов во Tripdrobe. Симни ја апликацијата и регистрирај се со твојот број — патувањето и листата ќе те чекаат. — \(me)",
-                 "Hi \(first)! ✈︎ I'm going to \(trip.destination.name) (\(range)) and added you on Tripdrobe. Get the app and sign up with your number — the trip and packing list will be waiting. — \(me)")
+        return L("Здраво \(first)! ✈︎ Патувам за \(trip.placeSummary) (\(range)) и те додадов во Tripdrobe. Симни ја апликацијата и регистрирај се со твојот број — патувањето и листата ќе те чекаат. — \(me)",
+                 "Hi \(first)! ✈︎ I'm going to \(trip.placeSummary) (\(range)) and added you on Tripdrobe. Get the app and sign up with your number — the trip and packing list will be waiting. — \(me)")
     }
 
     // MARK: Прогноза — се освежува при секое отворање
@@ -237,17 +237,39 @@ final class TripStore: ObservableObject {
         refreshing.insert(id)
         defer { refreshing.remove(id) }
 
-        let result = await WeatherService.fetchWeather(for: current.destination, from: current.startDate, to: current.endDate)
+        let result = await WeatherService.fetchWeather(for: current.allStops)
         guard !result.days.isEmpty else { return }
+        // Ако сега не стигнало нешто (пр. без интернет), не ги губи вистинските податоци од претходно:
+        // наместо климатска проценка (~) за тој ден останува старата прогноза / лани.
+        let previous = Dictionary(current.weather.filter { !$0.isClimate }.map { ($0.date.startOfDay, $0) },
+                                  uniquingKeysWith: { first, _ in first })
+        let merged = result.days.map { day -> WeatherDay in
+            guard day.isClimate, let old = previous[day.date.startOfDay], old.place == day.place else { return day }
+            return old
+        }
+        let gotData = result.days.contains { !$0.isClimate }
         mutate(id) {
-            $0.weather = result.days
+            $0.weather = merged
             $0.weatherSource = result.source
-            $0.weatherUpdatedAt = Date()
+            // Само проценка (ништо не стигнало) → не се смета за освежено, пак се пробува при следното отворање
+            $0.weatherUpdatedAt = gotData ? Date() : nil
+            // Маиците, долгите ракави, џемперите и јакните се усогласуваат со новата прогноза
+            PackingEngine.syncWithWeather(&$0)
         }
     }
 
     private static func autoRefreshInterval(for trip: Trip) -> TimeInterval {
-        trip.daysUntil > WeatherService.forecastHorizonDays ? 24 * 3600 : 2 * 3600
+        // Дупки (~) во деновите што можат да имаат податоци → пак за 3 часа
+        let checkable = trip.weather.prefix(WeatherService.maxTripDays)
+        if checkable.contains(where: \.isClimate) { return 3 * 3600 }
+        return trip.daysUntil > WeatherService.forecastHorizonDays ? 24 * 3600 : 2 * 3600
+    }
+
+    /// По купување Premium: паметни бројки во сите претстојни патувања (рачно сменетото останува).
+    func applySmartQuantities() {
+        for trip in upcoming {
+            mutate(trip.id) { PackingEngine.applySmartQuantities(&$0) }
+        }
     }
 
     /// При отворање на апликацијата и враќање во неа.
