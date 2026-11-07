@@ -228,15 +228,15 @@ struct PackingItem: Codable, Identifiable, Hashable {
     var unitWeight: Double
     var wornCount: Int = 0
     var isCustom: Bool = false
-    /// Клуч од каталогот — името се преведува при приказ.
+    /// Клуч од каталогот - името се преведува при приказ.
     var key: String?
     var noteKey: String?
     /// Само за делот „Заедно“: кој го носи (id на сопатник).
     /// nil = локално „јас“, кај патување со акаунти „уште не е одлучено“.
     var assignee: UUID?
-    /// Бројката е рачно сменета — новата прогноза повеќе не ја менува.
+    /// Бројката е рачно сменета - новата прогноза повеќе не ја менува.
     var quantityEdited: Bool?
-    /// Редот е додаден сам, бидејќи го има во аутфитите (пр. сукња) — бројката ја следи гардеробата.
+    /// Редот е додаден сам, бидејќи го има во аутфитите (пр. сукња) - бројката ја следи гардеробата.
     var fromOutfits: Bool?
 
     /// Парчиња во торбата (без облеченото).
@@ -321,7 +321,7 @@ struct WeatherDay: Codable, Hashable, Identifiable {
     var fromLastYear: Bool?
     /// Градот (кај патување низ повеќе градови).
     var place: String?
-    /// true = климатска проценка (нема податоци за денот) — само за приказ, листата не се гради од неа.
+    /// true = климатска проценка (нема податоци за денот) - само за приказ, листата не се гради од неа.
     var fromClimate: Bool? = nil
 
     var id: Date { date }
@@ -490,7 +490,7 @@ struct Trip: Codable, Identifiable, Hashable {
     var endDate: Date
     var transport: Transport
     var airlineID: String?
-    /// Главниот (најголемиот) багаж — за компатибилност со постарите верзии.
+    /// Главниот (најголемиот) багаж - за компатибилност со постарите верзии.
     var bag: BagSpec
     /// Сите багажи на патувањето (пр. мала торба + кабински + 2 чекирани).
     var bags: [BagSpec]?
@@ -499,7 +499,7 @@ struct Trip: Codable, Identifiable, Hashable {
     var hasLaundry: Bool
     /// Мојата лична листа.
     var items: [PackingItem] = []
-    /// Заедничките работи (шампон, паста…) — со избор кој носи. nil = нема делот.
+    /// Заедничките работи (шампон, паста…) - со избор кој носи. nil = нема делот.
     var together: [PackingItem]?
     var exitChecklist: [ChecklistItem] = []
     var weather: [WeatherDay] = []
@@ -520,20 +520,20 @@ struct Trip: Codable, Identifiable, Hashable {
     var outfitPacked: [UUID]?
     /// Градовите по ред (Premium). nil или еден = патување во еден град (`destination`).
     var stops: [TripStop]?
-    /// Своето име на патувањето (по избор). Без него — „Париз“ / „Грција“ автоматски.
+    /// Своето име на патувањето (по избор). Без него - „Париз“ / „Грција“ автоматски.
     var name: String?
     /// Заедничко патување: јас сум си го избрал својот багаж и стил (не се тие на сопственикот).
-    /// Само на телефонот — во облакот се чуваат во `personal.{uid}`.
+    /// Само на телефонот - во облакот се чуваат во `personal.{uid}`.
     var ownBags: Bool?
     /// Заедничко патување: имам свои градови и датуми (тргам од друго место, доаѓам подоцна…).
-    /// Без ова — ги следам градовите и датумите на тој што го направил патувањето.
+    /// Без ова - ги следам градовите и датумите на тој што го направил патувањето.
     var ownPlan: Bool?
     /// Градовите и датумите на другите во заедничкото патување (uid → план). Само за приказ, од облакот.
     var memberPlans: [String: MemberPlan]?
 
     // MARK: Градови и име
 
-    /// Сите градови по ред; кај обично патување — само дестинацијата.
+    /// Сите градови по ред; кај обично патување - само дестинацијата.
     var allStops: [TripStop] {
         if let stops, !stops.isEmpty { return stops }
         return [TripStop(place: destination, startDate: startDate, endDate: endDate, hasLaundry: hasLaundry)]
@@ -541,7 +541,7 @@ struct Trip: Codable, Identifiable, Hashable {
 
     var isMultiStop: Bool { (stops?.count ?? 0) > 1 }
 
-    /// Мојот план (градови и датуми) — за споредба со другите во заедничко патување.
+    /// Мојот план (градови и датуми) - за споредба со другите во заедничко патување.
     var myPlan: MemberPlan {
         MemberPlan(origin: origin, stops: allStops, startDate: startDate, endDate: endDate)
     }
@@ -555,7 +555,7 @@ struct Trip: Codable, Identifiable, Hashable {
         }
     }
 
-    /// Во кој град си тој ден (на ден на преселба — новиот град, таму спиеш).
+    /// Во кој град си тој ден (на ден на преселба - новиот град, таму спиеш).
     func stopIndex(on date: Date) -> Int {
         let day = date.startOfDay
         let list = allStops
@@ -579,13 +579,13 @@ struct Trip: Codable, Identifiable, Hashable {
         return names
     }
 
-    /// Каде одиш: „Париз“; повеќе градови во една држава — „Грција“; повеќе држави — „Грција и Италија“.
+    /// Каде одиш: „Париз“; повеќе градови во една држава - „Грција“; повеќе држави - „Грција и Италија“.
     var placeSummary: String {
         guard isMultiStop else { return destination.name }
         return Trip.joined(countryNames)
     }
 
-    /// Името: своето, или автоматско — „Патување во Париз“ / „Greece trip“.
+    /// Името: своето, или автоматско - „Патување во Париз“ / „Greece trip“.
     var title: String {
         if let name, !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -697,7 +697,7 @@ struct Trip: Codable, Identifiable, Hashable {
         return allStops.contains { $0.place.countryCode.uppercased() != home }
     }
 
-    var originCode: String { origin?.code ?? "———" }
+    var originCode: String { origin?.code ?? "---" }
     var destinationCode: String { destination.code }
 
     var packedVolume: Double {
@@ -715,7 +715,7 @@ struct Trip: Codable, Identifiable, Hashable {
         allBags.reduce(0) { $0 + $1.usableVolume }
     }
 
-    /// Збир на дозволените тежини — само ако секој багаж има ограничување.
+    /// Збир на дозволените тежини - само ако секој багаж има ограничување.
     var totalWeightLimit: Double? {
         let limits = allBags.compactMap(\.weightLimit)
         guard limits.count == allBags.count, !limits.isEmpty else { return nil }
@@ -821,7 +821,7 @@ struct Trip: Codable, Identifiable, Hashable {
         }
         lines.append("")
         let sender = me.split(separator: " ").first.map(String.init) ?? me
-        lines.append(L("— \(sender), преку Tripdrobe", "— \(sender), via Tripdrobe"))
+        lines.append(L("- \(sender), преку Tripdrobe", "- \(sender), via Tripdrobe"))
         return lines.joined(separator: "\n")
     }
 }

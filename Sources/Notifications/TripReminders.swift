@@ -5,7 +5,7 @@ import Combine
 /// Локални потсетници (без сервер): ги закажува самиот телефон, ништо не излегува од него.
 /// - 3 дена пред тргнување (19:00): колку работи уште не се спакувани
 /// - ден пред тргнување (19:00): што фали, или „сè е спакувано“
-/// - на денот на тргнување (08:00): „Пред излез“ — шпорет, прозорци, клучеви (Premium)
+/// - на денот на тргнување (08:00): „Пред излез“ - шпорет, прозорци, клучеви (Premium)
 /// - ден пред враќање (20:00): спакувај се за дома (патувања од 3+ дена)
 /// Се закажуваат одново по секоја промена на патувањата, за бројките да се точни.
 enum TripReminders {
@@ -41,7 +41,7 @@ enum TripReminders {
         let status = await authorizationStatus()
         guard status == .authorized || status == .provisional || status == .ephemeral else { return }
 
-        // iOS чува најмногу 64 закажани известувања — доволно за следните 15 патувања
+        // iOS чува најмногу 64 закажани известувања - доволно за следните 15 патувања
         let upcoming = trips
             .filter { $0.endDate.startOfDay >= Date().startOfDay }
             .sorted { $0.startDate < $1.startDate }
@@ -66,8 +66,8 @@ enum TripReminders {
         if left > 0, let date = time(start.adding(days: -3), hour: 19) {
             result.append(make(trip, "pack3", at: date,
                                title: L("\(place) за 3 дена", "\(place) in 3 days"),
-                               body: L("Време е за пакување — на листата уште \(things(left)).",
-                                       "Time to pack — \(thingsEN(left)) left on your list.")))
+                               body: L("Време е за пакување - на листата уште \(things(left)).",
+                                       "Time to pack - \(thingsEN(left)) left on your list.")))
         }
 
         // Ден пред
@@ -85,20 +85,20 @@ enum TripReminders {
                                body: body))
         }
 
-        // На денот на тргнување — „Пред излез“ (Premium)
+        // На денот на тргнување - „Пред излез“ (Premium)
         if premium, let date = time(start, hour: 8) {
             result.append(make(trip, "exit", at: date,
                                title: L("Пред излез од дома", "Before you leave home"),
-                               body: L("Шпорет, прозорци, полнач, клучеви — брза проверка пред \(place).",
-                                       "Stove, windows, charger, keys — a quick check before \(place).")))
+                               body: L("Шпорет, прозорци, полнач, клучеви - брза проверка пред \(place).",
+                                       "Stove, windows, charger, keys - a quick check before \(place).")))
         }
 
         // Ден пред враќање
         if trip.dayCount >= 3, let date = time(trip.endDate.startOfDay.adding(days: -1), hour: 20) {
             result.append(make(trip, "home", at: date,
                                title: L("Утре се враќаш од \(place)", "Heading home from \(place) tomorrow"),
-                               body: L("Спакувај се навреме — полначи, документи и облеката од шкафот.",
-                                       "Pack in good time — chargers, documents and the clothes in the wardrobe.")))
+                               body: L("Спакувај се навреме - полначи, документи и облеката од шкафот.",
+                                       "Pack in good time - chargers, documents and the clothes in the wardrobe.")))
         }
         return result
     }
@@ -115,7 +115,7 @@ enum TripReminders {
         return UNNotificationRequest(identifier: "\(prefix)\(trip.id.uuidString).\(kind)", content: content, trigger: trigger)
     }
 
-    /// Денот во дадениот час — само ако е во иднина.
+    /// Денот во дадениот час - само ако е во иднина.
     private static func time(_ day: Date, hour: Int) -> Date? {
         guard let date = Calendar.current.date(bySettingHour: hour, minute: 0, second: 0, of: day),
               date > Date() else { return nil }
@@ -139,7 +139,7 @@ final class NotificationRouter: ObservableObject {
 
     /// Патувањето што треба да се отвори (го зема почетната).
     @Published var openTripID: UUID?
-    /// Се зголемува при секој допир — табот се префрла на „Патувања“.
+    /// Се зголемува при секој допир - табот се префрла на „Патувања“.
     @Published var showTrips = 0
     /// Дозволата за известувања (nil = уште непроверено).
     @Published private(set) var authorization: UNAuthorizationStatus?

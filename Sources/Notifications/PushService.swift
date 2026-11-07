@@ -19,7 +19,7 @@ final class PushService: NSObject, MessagingDelegate {
         Messaging.messaging().delegate = self
     }
 
-    /// Се вика кога известувањата се дозволени — iOS го дава токенот од Apple, Firebase го претвора во свој.
+    /// Се вика кога известувањата се дозволени - iOS го дава токенот од Apple, Firebase го претвора во свој.
     func registerWithApple() {
         UIApplication.shared.registerForRemoteNotifications()
     }

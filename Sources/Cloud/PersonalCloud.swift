@@ -2,13 +2,13 @@ import Foundation
 import UIKit
 import FirebaseFirestore
 
-/// Лични податоци на акаунтот — само ги гледа сопственикот:
-/// users/{uid}/wardrobe   — парчиња (со сликата)
-/// users/{uid}/outfits    — аутфити
-/// users/{uid}/tripPlans  — по патување: аутфити по денови, спакувано, „пред излез“
+/// Лични податоци на акаунтот - само ги гледа сопственикот:
+/// users/{uid}/wardrobe   - парчиња (со сликата)
+/// users/{uid}/outfits    - аутфити
+/// users/{uid}/tripPlans  - по патување: аутфити по денови, спакувано, „пред излез“
 ///
 /// При најава: сè од облакот доаѓа на телефонот (а она што е само на телефонот се качува).
-/// При одјава телефонот се празни — податоците остануваат тука, на акаунтот.
+/// При одјава телефонот се празни - податоците остануваат тука, на акаунтот.
 final class PersonalCloud {
     let uid: String
     private let db = Firestore.firestore()
@@ -77,7 +77,7 @@ final class PersonalCloud {
     }
 
     private func failed(_ error: Error?) {
-        if let error { print("Valise: personal cloud — \(error)") }
+        if let error { print("Valise: personal cloud - \(error)") }
         wardrobe?.cloudState = .failed
     }
 
@@ -89,7 +89,7 @@ final class PersonalCloud {
 
     private func handleItems(_ snapshot: QuerySnapshot) {
         guard let wardrobe else { return }
-        // Качувај го она што е само на телефонот — откако облакот навистина одговорил.
+        // Качувај го она што е само на телефонот - откако облакот навистина одговорил.
         if !mergedItems && !snapshot.metadata.isFromCache {
             mergedItems = true
             let remote = Set(snapshot.documents.map(\.documentID))
@@ -232,7 +232,7 @@ final class PersonalCloud {
             trips.applyPersonal(id, plan: plan)
         }
 
-        // Првиот вистински одговор: патувањата што немаат лични податоци горе — качи ги.
+        // Првиот вистински одговор: патувањата што немаат лични податоци горе - качи ги.
         if !mergedPlans && !snapshot.metadata.isFromCache {
             mergedPlans = true
             for trip in trips.trips where plans[trip.id] == nil {
@@ -288,7 +288,7 @@ final class PersonalCloud {
             let ids = trip.outfitIDs(forKey: key)
             if !ids.isEmpty { days[key] = ids }
         }
-        // И денови надвор од датумите (ако патувањето е скратено) — да не се изгубат
+        // И денови надвор од датумите (ако патувањето е скратено) - да не се изгубат
         for (key, ids) in trip.outfitDays ?? [:] where days[key] == nil && !ids.isEmpty {
             days[key] = ids
         }

@@ -17,13 +17,13 @@ enum AppConfig {
         return false
     }
 
-    /// Прогноза од Apple Weather (WeatherKit) — бесплатно до 500.000 барања месечно со платената сметка.
+    /// Прогноза од Apple Weather (WeatherKit) - бесплатно до 500.000 барања месечно со платената сметка.
     /// Бара капацитет „WeatherKit“ на App ID. Вклучено во TestFlight/App Store изградбата (VALISE_STORE_BUILD = YES).
     /// Исклучено (тест-верзии со Sideloadly) = Open-Meteo, кое е бесплатно само за некомерцијална употреба.
     static var weatherKitEnabled: Bool { flag("ValiseWeatherKit") }
 }
 
-/// Резултат од Apple — само она што ни треба за Firebase.
+/// Резултат од Apple - само она што ни треба за Firebase.
 struct AppleIDResult: Sendable {
     let idToken: String
     let authorizationCode: String?

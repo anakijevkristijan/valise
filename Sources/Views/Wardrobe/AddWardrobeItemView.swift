@@ -20,7 +20,7 @@ struct AddWardrobeItemView: View {
     @State private var showCamera = false
     @State private var problem: String?
     @State private var style: StickerMaker.Style = .sticker
-    /// Стикерот е исечен сам (без означување) — во деталите се нуди „Означи рачно“.
+    /// Стикерот е исечен сам (без означување) - во деталите се нуди „Означи рачно“.
     @State private var autoCut = false
 
     @State private var name = ""
@@ -71,8 +71,8 @@ struct AddWardrobeItemView: View {
             Text(L("Сликај го парчето", "Photograph the piece"))
                 .font(.serif(30))
                 .foregroundStyle(Theme.ink)
-            Text(L("Најдобро е парчето само — на кревет, на под или на закачалка, на светла подлога. Стикерот сам се сече: не мораш да означуваш каде е облеката.",
-                   "Best with the piece on its own — on a bed, the floor or a hanger, on a light background. The sticker cuts itself out: no need to mark where the clothing is."))
+            Text(L("Најдобро е парчето само - на кревет, на под или на закачалка, на светла подлога. Стикерот сам се сече: не мораш да означуваш каде е облеката.",
+                   "Best with the piece on its own - on a bed, the floor or a hanger, on a light background. The sticker cuts itself out: no need to mark where the clothing is."))
                 .font(.sans(15))
                 .foregroundStyle(Theme.inkSoft)
                 .lineSpacing(3)
@@ -118,7 +118,7 @@ struct AddWardrobeItemView: View {
         problem = nil
         autoCut = false
         if style == .sticker {
-            // Стикер: сам го наоѓа парчето и го сече; ако не успее — рачно означување
+            // Стикер: сам го наоѓа парчето и го сече; ако не успее - рачно означување
             Task { await cutAutomatically(prepared) }
         } else {
             step = .crop(prepared)
@@ -366,8 +366,8 @@ struct WardrobeItemForm: View {
                     }
                 }
                 if kind == nil {
-                    Text(L("Избери вид — така листата знае дали е маица, џемпер или дуксер.",
-                           "Pick a type — so the list knows if it's a T-shirt, a sweater or a hoodie."))
+                    Text(L("Избери вид - така листата знае дали е маица, џемпер или дуксер.",
+                           "Pick a type - so the list knows if it's a T-shirt, a sweater or a hoodie."))
                         .font(.sans(12))
                         .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
@@ -427,7 +427,7 @@ struct WardrobeItemForm: View {
     }
 }
 
-/// Копче за вид — во еден ред и кога името е подолго („Елегантни панталони“).
+/// Копче за вид - во еден ред и кога името е подолго („Елегантни панталони“).
 struct KindChip: View {
     let title: String
     let isSelected: Bool

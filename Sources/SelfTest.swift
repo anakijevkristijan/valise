@@ -2,7 +2,7 @@
 import Foundation
 import CoreGraphics
 
-/// Автоматска проверка на логиката — само Debug изградба, само со аргументот -TripdrobeSelfTest
+/// Автоматска проверка на логиката - само Debug изградба, само со аргументот -TripdrobeSelfTest
 /// (workflow-от „Провери ја апликацијата“, во симулатор). Резултатот: Documents/selftest.json.
 /// Во TestFlight и App Store (Release) овој код воопшто не постои.
 enum SelfTest {
@@ -37,7 +37,7 @@ enum SelfTest {
         do {
             try body()
         } catch {
-            failures.append("прекинато — \(error)")
+            failures.append("прекинато - \(error)")
         }
         let detail = failures.prefix(10).joined(separator: " | ")
             + (failures.count > 10 ? " | …и уште \(failures.count - 10)" : "")
@@ -356,7 +356,7 @@ enum SelfTest {
         let personal = try unwrap(allPersonal[member] as? [String: Any], "personal.\(member)")
         check(personal["startDate"] != nil, "датумите на членот не се во personal")
 
-        // Облакот: горе — сопственикот, во personal — секој свое
+        // Облакот: горе - сопственикот, во personal - секој свое
         var cloud = ownerDocument
         var personalMap: [String: Any] = [member: personal]
         if let ownerPersonal = (ownerDocument["personal"] as? [String: Any])?[owner] {

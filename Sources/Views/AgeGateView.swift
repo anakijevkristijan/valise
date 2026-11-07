@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Неутрално прашање за возраст пред регистрација (COPPA / GDPR).
 /// Не кажува која возраст е потребна, ништо не е однапред избрано
-/// и датумот никаде не се чува — само знак „проверено“ на уредот.
+/// и датумот никаде не се чува - само знак „проверено“ на уредот.
 struct AgeGateView: View {
     static let verifiedKey = "ageVerified"
     static let blockedKey = "ageBlockedAt"
@@ -166,7 +166,7 @@ struct AgeGateView: View {
         }
         let age = calendar.dateComponents([.year], from: birth, to: Date()).year ?? 0
 
-        // Ништо од внесеното не се чува — само дали е проверено.
+        // Ништо од внесеното не се чува - само дали е проверено.
         self.day = nil
         self.month = nil
         self.year = nil

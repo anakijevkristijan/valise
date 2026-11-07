@@ -71,7 +71,7 @@ enum PhoneID {
         if digits.hasPrefix(preferredCode) {
             return (preferred, String(digits.dropFirst(preferredCode.count)))
         }
-        // Најдолгиот код што одговара (за +1 — САД)
+        // Најдолгиот код што одговара (за +1 - САД)
         let ordered = callingCodes.sorted { a, b in
             if a.value.count != b.value.count { return a.value.count > b.value.count }
             if a.key == "US" { return true }
@@ -84,7 +84,7 @@ enum PhoneID {
         return (preferred, digits)
     }
 
-    /// Земјата на телефонот — од неа се зема почетниот код (+389 во Македонија).
+    /// Земјата на телефонот - од неа се зема почетниот код (+389 во Македонија).
     static var defaultRegion: String {
         let region = Locale.current.region?.identifier ?? "MK"
         return callingCodes[region] != nil ? region : "MK"

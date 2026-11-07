@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Политиката за приватност / Условите — прикажани во апликацијата (работи и без интернет).
+/// Политиката за приватност / Условите - прикажани во апликацијата (работи и без интернет).
 struct LegalView: View {
     let doc: LegalDoc
     @Environment(\.dismiss) private var dismiss
@@ -95,7 +95,7 @@ struct LegalView: View {
     }
 }
 
-/// „Со продолжување се согласуваш со Условите и Политиката“ — со линкови до двата текста.
+/// „Со продолжување се согласуваш со Условите и Политиката“ - со линкови до двата текста.
 struct LegalConsentNote: View {
     @State private var shown: LegalDoc?
 

@@ -40,7 +40,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
 
     func application(_ application: UIApplication,
                      didFailToRegisterForRemoteNotificationsWithError error: Error) {
-        print("Tripdrobe: push registration failed — \(error)")
+        print("Tripdrobe: push registration failed - \(error)")
     }
 
     func application(_ application: UIApplication,
@@ -63,7 +63,7 @@ struct ValiseApp: App {
     init() {
         FirebaseApp.configure()
         PushService.shared.start()
-        // Само за сликите за App Store (Debug во симулатор) — во TestFlight/App Store isOn е false.
+        // Само за сликите за App Store (Debug во симулатор) - во TestFlight/App Store isOn е false.
         if ScreenshotMode.isOn {
             ScreenshotMode.prepareDefaults()
             let trips = TripStore()
@@ -73,7 +73,7 @@ struct ValiseApp: App {
             _wardrobe = StateObject(wrappedValue: closet)
         }
         #if DEBUG
-        // Автоматска проверка (workflow „Провери ја апликацијата“) — само Debug
+        // Автоматска проверка (workflow „Провери ја апликацијата“) - само Debug
         if SelfTest.isOn { SelfTest.run() }
         #endif
     }
@@ -122,7 +122,7 @@ struct RootView: View {
         if ScreenshotMode.isOn { return ScreenshotMode.stage }
         if !languageChosen { return 0 }
         if account.hasSession {
-            // Најавен, но профилот (бројот, името) уште се враќа — да не се прашува за број/име без потреба
+            // Најавен, но профилот (бројот, името) уште се враќа - да не се прашува за број/име без потреба
             if account.isRestoring { return 6 }
             if userName.isEmpty { return 1 }
             if !phoneAsked && storedPhone.isEmpty { return 5 }

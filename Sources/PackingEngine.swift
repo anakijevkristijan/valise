@@ -162,7 +162,7 @@ enum Catalog {
     ]
 }
 
-/// Паметна листа без AI — чиста логика според денови, време, превоз, багаж и активности.
+/// Паметна листа без AI - чиста логика според денови, време, превоз, багаж и активности.
 enum PackingEngine {
 
     // MARK: Градител
@@ -201,7 +201,7 @@ enum PackingEngine {
 
         let days = trip.dayCount
         let clothDays = clothingDays(for: trip)
-        // Климатската проценка (~) е само за приказ — листата се гради од вистинските податоци
+        // Климатската проценка (~) е само за приказ - листата се гради од вистинските податоци
         let w = WeatherSummary(days: trip.weather.filter { !$0.isClimate })
         let acts = Set(trip.activities)
         let isPlane = trip.transport == .plane
@@ -239,7 +239,7 @@ enum PackingEngine {
         b.add("booking", .documents, vol: 0.01, kg: 0.01)
         b.add("cards", .documents, vol: 0.05, kg: 0.05, note: international ? "localCash" : nil)
 
-        // Облека — горните делови според типичната температура преку ден.
+        // Облека - горните делови според типичната температура преку ден.
         // Топло → маици. Благо → пола маици, пола долги ракави. Свежо и студено → помалку горни делови
         // (се носат под џемпер и може да се облечат повеќе пати) и повеќе слоеви.
         let n = clothDays
@@ -419,7 +419,7 @@ enum PackingEngine {
             if trip.dayCount > 1 { b.add("neckPillow", .journey, vol: 1.5, kg: 0.2) }
         }
 
-        // Бесплатно: секој предмет по 1 — бројките ги поставуваш сам со + и −.
+        // Бесплатно: секој предмет по 1 - бројките ги поставуваш сам со + и −.
         // Со Premium бројките се пресметуваат според деновите и времето.
         guard PremiumStore.cachedIsPremium else {
             return b.items.map { item in
@@ -445,7 +445,7 @@ enum PackingEngine {
         let isEstimate: Bool
     }
 
-    /// Од прогнозата (просек по денови), а без прогноза (бесплатно или далечно патување) —
+    /// Од прогнозата (просек по денови), а без прогноза (бесплатно или далечно патување) -
     /// груба климатска проценка според географската ширина на дестинацијата и датумите.
     static func climate(for trip: Trip) -> Climate {
         let forecast = trip.weather.filter { !$0.isClimate }
@@ -721,8 +721,8 @@ enum PackingEngine {
                          "Over the \(Fmt.number(limit)) kg limit. Wear the heaviest pieces or pack fewer.")
             }
             if trip.allBags.allSatisfy({ $0.kind == .personal }) {
-                return L("Премногу за малата торба. Намали количини, облечи го обемното на пат или земи кабински куфер — однапред е многу поевтино отколку на излезот.",
-                         "Too much for the small bag. Pack fewer, wear the bulky pieces, or add a cabin bag — it's far cheaper online than at the gate.")
+                return L("Премногу за малата торба. Намали количини, облечи го обемното на пат или земи кабински куфер - однапред е многу поевтино отколку на излезот.",
+                         "Too much for the small bag. Pack fewer, wear the bulky pieces, or add a cabin bag - it's far cheaper online than at the gate.")
             }
             return L("Не собира сè. Намали количини или размисли за поголем багаж.",
                      "It won't all fit. Pack fewer or consider a bigger bag.")

@@ -13,7 +13,7 @@ final class PremiumStore: ObservableObject {
     static let allIDs = [yearlyID, monthlyID]
     private static let storageKey = "premiumUnlocked"
 
-    /// Последната позната состојба — за код надвор од екраните (пр. освежување на прогнозата).
+    /// Последната позната состојба - за код надвор од екраните (пр. освежување на прогнозата).
     nonisolated static var cachedIsPremium: Bool {
         UserDefaults.standard.bool(forKey: "premiumUnlocked")
     }
@@ -36,7 +36,7 @@ final class PremiumStore: ObservableObject {
     @Published private(set) var isSandbox = false
     /// Само за тестирање во TestFlight: апликацијата се однесува како бесплатна иако Premium е купен.
     /// Во App Store (вистинско купување) нема ефект.
-    /// Тест-прекинувачот е тргнат за App Store — секогаш false (стара поставка се брише при старт).
+    /// Тест-прекинувачот е тргнат за App Store - секогаш false (стара поставка се брише при старт).
     @Published private(set) var simulatesFree = false
     /// Дали корисникот може да ја добие бесплатната проба (само еднаш по Apple ID).
     @Published private(set) var trialEligible = false
@@ -64,10 +64,10 @@ final class PremiumStore: ObservableObject {
     }
 
     init() {
-        // Демо-режимот (само Debug, слики и автоматска проверка) — секогаш со Premium
+        // Демо-режимот (само Debug, слики и автоматска проверка) - секогаш со Premium
         isPremium = ScreenshotMode.isOn || UserDefaults.standard.bool(forKey: Self.storageKey)
         UserDefaults.standard.removeObject(forKey: "testSimulateFree")
-        // Веднаш при старт, а не дури кога ќе се вчитаат производите — за тест-отклучувањето
+        // Веднаш при старт, а не дури кога ќе се вчитаат производите - за тест-отклучувањето
         // никогаш да не се појави во App Store/TestFlight (пр. без интернет или пред да се направат претплатите).
         isStoreInstall = !Self.isSideloaded
         updatesTask = Task { [weak self] in
@@ -113,7 +113,7 @@ final class PremiumStore: ObservableObject {
             switch result {
             case .success(let verification):
                 if case .verified(let transaction) = verification {
-                    // Веднаш отклучено — без да се чека на целата листа од App Store
+                    // Веднаш отклучено - без да се чека на целата листа од App Store
                     activeProductID = transaction.productID
                     expirationDate = transaction.expirationDate
                     isSandbox = transaction.environment == .sandbox
@@ -153,9 +153,9 @@ final class PremiumStore: ObservableObject {
 
     /// Активно право: претплата што не е истечена или откажана со враќање пари.
     /// Истечена важи само ако е во „grace period“ (плаќањето не поминало, а Apple се обидува
-    /// повторно) — тогаш корисникот го задржува Premium (App Store Connect → Billing Grace Period).
+    /// повторно) - тогаш корисникот го задржува Premium (App Store Connect → Billing Grace Period).
     func refreshEntitlements() async {
-        // Демо-режим (само Debug, слики/проверка): App Store не одлучува — Premium е отклучен
+        // Демо-режим (само Debug, слики/проверка): App Store не одлучува - Premium е отклучен
         if ScreenshotMode.isOn {
             setPremium(true)
             return

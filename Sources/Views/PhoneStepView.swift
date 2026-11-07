@@ -40,15 +40,15 @@ struct PhoneStepView: View {
                         .lineSpacing(2)
                         .padding(.bottom, 14)
 
-                    Text(L("Пријателите што те имаат во контакти ќе те најдат и ќе те додадат во патување — без кодови и линкови.",
-                           "Friends who have you in their contacts can find you and add you to a trip — no codes, no links."))
+                    Text(L("Пријателите што те имаат во контакти ќе те најдат и ќе те додадат во патување - без кодови и линкови.",
+                           "Friends who have you in their contacts can find you and add you to a trip - no codes, no links."))
                         .font(.sans(15))
                         .foregroundStyle(Theme.inkSoft)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.bottom, 28)
 
                     VStack(alignment: .leading, spacing: 10) {
-                        // Кодот на земјата е веќе внесен (според телефонот) — се допишува само бројот
+                        // Кодот на земјата е веќе внесен (според телефонот) - се допишува само бројот
                         PhoneNumberField(number: $phone, fontSize: 26)
                         Rectangle()
                             .fill(phone.isEmpty ? Theme.hairline : Theme.navy)
@@ -67,8 +67,8 @@ struct PhoneStepView: View {
                             .font(.system(size: 12))
                             .foregroundStyle(Theme.gold)
                             .padding(.top, 2)
-                        Text(L("Бројот се чува во твојот акаунт и го гледаш само ти. Пријателите те наоѓаат по шифриран отпечаток — бројот не им се покажува.",
-                               "Your number is kept in your account and only you can see it. Friends find you by an encrypted fingerprint — they're never shown the number."))
+                        Text(L("Бројот се чува во твојот акаунт и го гледаш само ти. Пријателите те наоѓаат по шифриран отпечаток - бројот не им се покажува.",
+                               "Your number is kept in your account and only you can see it. Friends find you by an encrypted fingerprint - they're never shown the number."))
                             .font(.sans(12))
                             .foregroundStyle(Theme.muted)
                             .fixedSize(horizontal: false, vertical: true)
@@ -89,7 +89,7 @@ struct PhoneStepView: View {
                     Button {
                         withAnimation(.easeInOut(duration: 0.3)) { asked = true }
                     } label: {
-                        Text(L("Прескокни — ќе го внесам подоцна во Профил", "Skip — I'll add it later in Profile"))
+                        Text(L("Прескокни - ќе го внесам подоцна во Профил", "Skip - I'll add it later in Profile"))
                             .font(.sans(14, .medium))
                             .foregroundStyle(Theme.navy)
                             .frame(maxWidth: .infinity)

@@ -14,7 +14,7 @@ struct DateRangeCalendar: View {
     /// По изборот на враќањето календарот се собира; „Промени датуми“ го отвора повторно.
     @State private var collapsed = false
 
-    /// Најран ден што може да се избере (пр. вториот град — не пред заминувањето од првиот).
+    /// Најран ден што може да се избере (пр. вториот град - не пред заминувањето од првиот).
     let earliest: Date?
     /// Изборот е готов и календарот се собра (екранот оди на следниот град).
     var onCollapse: (() -> Void)? = nil
@@ -147,7 +147,7 @@ struct DateRangeCalendar: View {
                         .font(.sans(11))
                         .foregroundStyle(Theme.inkSoft)
                 } else {
-                    Text("— —")
+                    Text("- -")
                         .font(.codes(28))
                         .foregroundStyle(Theme.muted.opacity(0.6))
                     Text(L("избери ден", "pick a day"))
@@ -335,8 +335,8 @@ struct DateRangeCalendar: View {
     private var quickLengths: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(editing == .end
-                 ? (arriveLeave ? L("Сега допри го денот кога заминуваш — или избери траење:", "Now tap the day you leave — or pick a length:")
-                                : L("Сега допри го денот на враќање — или избери траење:", "Now tap your return day — or pick a length:"))
+                 ? (arriveLeave ? L("Сега допри го денот кога заминуваш - или избери траење:", "Now tap the day you leave - or pick a length:")
+                                : L("Сега допри го денот на враќање - или избери траење:", "Now tap your return day - or pick a length:"))
                  : (arriveLeave ? L("Брзо траење од пристигнувањето:", "Quick length from arrival:")
                                 : L("Брзо траење од поаѓањето:", "Quick length from departure:")))
                 .font(.sans(12))

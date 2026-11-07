@@ -18,7 +18,7 @@ final class AccountService: ObservableObject {
 
     @Published private(set) var profile: Profile?
     @Published private(set) var isWorking = false
-    /// По најава: бројот (и името) се враќаат од акаунтот — дотогаш не се прашува за број.
+    /// По најава: бројот (и името) се враќаат од акаунтот - дотогаш не се прашува за број.
     @Published private(set) var isRestoring = false
     /// Стар акаунт: бројот е зачуван само како шифриран отпечаток, па не може да се прикаже.
     @Published private(set) var hasHiddenPhone = false
@@ -43,7 +43,7 @@ final class AccountService: ObservableObject {
         PushService.friendAlertsKey
     ]
 
-    /// Најавен (и веднаш при старт, пред Firebase да јави) — за да нема трепкање на екранот за најава.
+    /// Најавен (и веднаш при старт, пред Firebase да јави) - за да нема трепкање на екранот за најава.
     var hasSession: Bool { profile != nil || Auth.auth().currentUser != nil }
 
     var phone: String {
@@ -79,7 +79,7 @@ final class AccountService: ObservableObject {
             currentUID = user.uid
             Session.uid = user.uid
             let storedName = UserDefaults.standard.string(forKey: "userName") ?? ""
-            // Едно име насекаде: внесеното на телефонот, а ако го нема — тоа од акаунтот.
+            // Едно име насекаде: внесеното на телефонот, а ако го нема - тоа од акаунтот.
             let name = storedName.isEmpty ? (user.displayName ?? "") : storedName
             profile = Profile(uid: user.uid, email: user.email ?? "", name: name)
             if storedName.isEmpty, !name.isEmpty {
@@ -125,7 +125,7 @@ final class AccountService: ObservableObject {
     // MARK: Враќање на бројот од акаунтот
 
     /// Веднаш по успешна најава (пред Firebase да јави): да не блесне чекорот за број.
-    /// Најмногу 8 секунди — ако нешто запне, апликацијата продолжува.
+    /// Најмногу 8 секунди - ако нешто запне, апликацијата продолжува.
     private func beginRestoreWindow() {
         guard phone.isEmpty, !UserDefaults.standard.bool(forKey: PhoneStepView.askedKey) else { return }
         isRestoring = true
@@ -141,7 +141,7 @@ final class AccountService: ObservableObject {
         let name: String?
     }
 
-    /// Бројот (и името, ако го нема) од профилот на акаунтот. Без интернет — по 5 секунди продолжува,
+    /// Бројот (и името, ако го нема) од профилот на акаунтот. Без интернет - по 5 секунди продолжува,
     /// а чекорот за број се покажува (бројот на серверот останува, па пак ќе се врати).
     private func restoreFromAccount(uid: String) async {
         defer { isRestoring = false }
@@ -151,7 +151,7 @@ final class AccountService: ObservableObject {
             savePhone(number)
             UserDefaults.standard.set(true, forKey: PhoneStepView.askedKey)
         } else if saved.hasPhoneHash {
-            // Стар акаунт: бројот е зачуван само шифрирано — пријателите те наоѓаат, не се бара пак
+            // Стар акаунт: бројот е зачуван само шифрирано - пријателите те наоѓаат, не се бара пак
             hasHiddenPhone = true
             UserDefaults.standard.set(true, forKey: PhoneStepView.askedKey)
         }
@@ -183,7 +183,7 @@ final class AccountService: ObservableObject {
     // MARK: Дали акаунтот уште постои
 
     /// Акаунтот е избришан или блокиран (пр. од Firebase Console, или на друг телефон) →
-    /// одјава на овој телефон и сè лично се брише. Без интернет — ништо не се менува.
+    /// одјава на овој телефон и сè лично се брише. Без интернет - ништо не се менува.
     func verifySession() async {
         guard let user = Auth.auth().currentUser else { return }
         do {
@@ -383,7 +383,7 @@ final class AccountService: ObservableObject {
     }
 
     /// Бришење акаунт (Apple го бара ова во самата апликација).
-    /// Редослед: 1) потврда (лозинка / Google / Apple) — Firebase брише само по скорешна најава,
+    /// Редослед: 1) потврда (лозинка / Google / Apple) - Firebase брише само по скорешна најава,
     /// па ова е пред да се избрише било што; 2) податоците; 3) акаунтот; 4) одјава и почеток од нула.
     func deleteAccount(password: String? = nil) async -> String? {
         guard let user = Auth.auth().currentUser else { return nil }
@@ -515,11 +515,11 @@ final class AccountService: ObservableObject {
         return nil
     }
 
-    // MARK: Еден број — еден акаунт
+    // MARK: Еден број - еден акаунт
 
     enum PhoneCheck { case free, mine, taken, offline }
 
-    /// Број при регистрација што не можеше да се зачува — го покажува чекорот за телефон.
+    /// Број при регистрација што не можеше да се зачува - го покажува чекорот за телефон.
     struct PhoneProblem: Equatable {
         let number: String
         let message: String
@@ -551,8 +551,8 @@ final class AccountService: ObservableObject {
     }
 
     static var phoneOfflineMessage: String {
-        L("Не можам да го проверам бројот — провери дали имаш интернет и обиди се повторно.",
-          "Couldn't check the number — make sure you're online and try again.")
+        L("Не можам да го проверам бројот - провери дали имаш интернет и обиди се повторно.",
+          "Couldn't check the number - make sure you're online and try again.")
     }
 
     private func savePhone(_ phone: String) {

@@ -187,7 +187,7 @@ struct LanguageButton: View {
     }
 }
 
-/// Мрежа со сите јазици — без лизгање, 3 колони, последниот ред на средина.
+/// Мрежа со сите јазици - без лизгање, 3 колони, последниот ред на средина.
 struct LanguageGrid: View {
     @Binding var language: String
     var rowHeight: CGFloat = 58
@@ -256,7 +256,7 @@ struct LanguageGrid: View {
 }
 
 /// Избор на јазик во лист (од Профил или од почетниот екран).
-/// Изборот се применува кога листот ќе се затвори — апликацијата се преисцртува на новиот јазик
+/// Изборот се применува кога листот ќе се затвори - апликацијата се преисцртува на новиот јазик
 /// по затворањето, наместо листот да исчезне под прстот.
 struct LanguageSheet: View {
     @Binding var language: String
@@ -308,7 +308,7 @@ struct LanguageSheet: View {
 struct LanguagePickerView: View {
     @AppStorage(AppLanguage.storageKey) private var language: String = AppLanguage.en.rawValue
     @AppStorage("languageChosen") private var languageChosen: Bool = false
-    /// Секој избор на јазик го преисцртува екранот — влезната анимација само првиот пат.
+    /// Секој избор на јазик го преисцртува екранот - влезната анимација само првиот пат.
     private static var introPlayed = false
     @State private var appeared = LanguagePickerView.introPlayed
 
@@ -413,10 +413,10 @@ struct AccountChoiceView: View {
                         .padding(.bottom, 24)
 
                     VStack(alignment: .leading, spacing: 16) {
-                        benefit("icloud", L("Резервна копија — ништо не се губи", "Backed up — nothing gets lost"))
+                        benefit("icloud", L("Резервна копија - ништо не се губи", "Backed up - nothing gets lost"))
                         benefit("ipad.and.iphone", L("Истите патувања на секој уред", "The same trips on every device"))
-                        benefit("hanger", L("Гардероба и аутфити — секогаш со тебе", "Wardrobe and outfits — always with you"))
-                        benefit("person.2", L("Патувај со пријатели — заедничка листа", "Travel with friends — a shared list"))
+                        benefit("hanger", L("Гардероба и аутфити - секогаш со тебе", "Wardrobe and outfits - always with you"))
+                        benefit("person.2", L("Патувај со пријатели - заедничка листа", "Travel with friends - a shared list"))
                     }
                     .padding(.bottom, 36)
 
@@ -452,7 +452,7 @@ struct AccountChoiceView: View {
                         Button {
                             sheetMode = .signIn
                         } label: {
-                            Text(L("Веќе имам акаунт — најави се", "I already have an account — sign in"))
+                            Text(L("Веќе имам акаунт - најави се", "I already have an account - sign in"))
                                 .font(.sans(14, .medium))
                                 .foregroundStyle(Theme.navy)
                                 .frame(maxWidth: .infinity)
@@ -468,8 +468,8 @@ struct AccountChoiceView: View {
                             .padding(.top, 12)
                     }
 
-                    Text(L("Акаунтот е задолжителен: патувањата, гардеробата и аутфитите се чуваат на него — ништо не се губи, а при одјава ништо не останува на телефонот.",
-                           "An account is required: your trips, wardrobe and outfits live in it — nothing gets lost, and nothing stays on the phone after you sign out."))
+                    Text(L("Акаунтот е задолжителен: патувањата, гардеробата и аутфитите се чуваат на него - ништо не се губи, а при одјава ништо не останува на телефонот.",
+                           "An account is required: your trips, wardrobe and outfits live in it - nothing gets lost, and nothing stays on the phone after you sign out."))
                         .font(.sans(12))
                         .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
