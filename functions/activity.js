@@ -111,33 +111,159 @@ function groupEvents(events) {
   return result;
 }
 
+// Текстовите на сите 13 јазици на апликацијата. {a} = кој, {i} = работа, {n} = колку работи.
+// Клучот со „N“ е збирната порака (повеќе од 2 работи одеднаш).
 const TEXTS = {
-  added: {
-    mk: (e) => `${e.actor} те додаде во патувањето.`,
-    en: (e) => `${e.actor} added you to the trip.`
+  mk: {
+    added: "{a} те додаде во патувањето.",
+    joined: "{a} се приклучи на патувањето.",
+    assigned: "{a} те означи да носиш: {i}.",
+    assignedN: "{a} те означи да носиш {n} заеднички работи.",
+    took: "{a} ќе носи: {i}.",
+    tookN: "{a} ќе носи {n} заеднички работи.",
+    tookFromYou: "{a} ќе носи наместо тебе: {i}.",
+    tookFromYouN: "{a} ќе носи {n} работи наместо тебе."
   },
-  joined: {
-    mk: (e) => `${e.actor} се приклучи на патувањето.`,
-    en: (e) => `${e.actor} joined the trip.`
+  en: {
+    added: "{a} added you to the trip.",
+    joined: "{a} joined the trip.",
+    assigned: "{a} asked you to bring: {i}.",
+    assignedN: "{a} asked you to bring {n} shared items.",
+    took: "{a} will bring: {i}.",
+    tookN: "{a} will bring {n} shared items.",
+    tookFromYou: "{a} will bring {i} instead of you.",
+    tookFromYouN: "{a} will bring {n} items instead of you."
   },
-  assigned: {
-    mk: (e) => e.count ? `${e.actor} те означи да носиш ${e.count} заеднички работи.` : `${e.actor} те означи да носиш: ${e.item}.`,
-    en: (e) => e.count ? `${e.actor} asked you to bring ${e.count} shared items.` : `${e.actor} asked you to bring: ${e.item}.`
+  sq: {
+    added: "{a} të shtoi në udhëtim.",
+    joined: "{a} u bashkua me udhëtimin.",
+    assigned: "{a} të kërkoi të marrësh: {i}.",
+    assignedN: "{a} të kërkoi të marrësh {n} gjëra të përbashkëta.",
+    took: "{a} do të marrë: {i}.",
+    tookN: "{a} do të marrë {n} gjëra të përbashkëta.",
+    tookFromYou: "{a} do të marrë në vendin tënd: {i}.",
+    tookFromYouN: "{a} do të marrë {n} gjëra në vendin tënd."
   },
-  took: {
-    mk: (e) => e.count ? `${e.actor} ќе носи ${e.count} заеднички работи.` : `${e.actor} ќе носи: ${e.item}.`,
-    en: (e) => e.count ? `${e.actor} will bring ${e.count} shared items.` : `${e.actor} will bring: ${e.item}.`
+  sr: {
+    added: "{a} te dodaje na putovanje.",
+    joined: "{a} se pridružuje putovanju.",
+    assigned: "{a} te moli da poneseš: {i}.",
+    assignedN: "{a} te moli da poneseš {n} zajedničkih stvari.",
+    took: "{a} nosi: {i}.",
+    tookN: "{a} nosi {n} zajedničkih stvari.",
+    tookFromYou: "{a} nosi umesto tebe: {i}.",
+    tookFromYouN: "{a} nosi {n} stvari umesto tebe."
   },
-  tookFromYou: {
-    mk: (e) => e.count ? `${e.actor} ќе носи ${e.count} работи наместо тебе.` : `${e.actor} ќе носи наместо тебе: ${e.item}.`,
-    en: (e) => e.count ? `${e.actor} will bring ${e.count} items instead of you.` : `${e.actor} will bring ${e.item} instead of you.`
+  bg: {
+    added: "{a} те добави към пътуването.",
+    joined: "{a} се присъедини към пътуването.",
+    assigned: "{a} те помоли да вземеш: {i}.",
+    assignedN: "{a} те помоли да вземеш {n} общи неща.",
+    took: "{a} ще вземе: {i}.",
+    tookN: "{a} ще вземе {n} общи неща.",
+    tookFromYou: "{a} ще вземе вместо теб: {i}.",
+    tookFromYouN: "{a} ще вземе {n} неща вместо теб."
+  },
+  el: {
+    added: "{a} σε πρόσθεσε στο ταξίδι.",
+    joined: "{a} μπήκε στο ταξίδι.",
+    assigned: "{a} σου ζήτησε να φέρεις: {i}.",
+    assignedN: "{a} σου ζήτησε να φέρεις {n} κοινά πράγματα.",
+    took: "{a} θα φέρει: {i}.",
+    tookN: "{a} θα φέρει {n} κοινά πράγματα.",
+    tookFromYou: "{a} θα φέρει αντί για σένα: {i}.",
+    tookFromYouN: "{a} θα φέρει {n} πράγματα αντί για σένα."
+  },
+  tr: {
+    added: "{a} seni seyahate ekledi.",
+    joined: "{a} seyahate katıldı.",
+    assigned: "{a} getirmeni istedi: {i}.",
+    assignedN: "{a} {n} ortak şeyi getirmeni istedi.",
+    took: "{a} getirecek: {i}.",
+    tookN: "{a} {n} ortak şeyi getirecek.",
+    tookFromYou: "{a} senin yerine getirecek: {i}.",
+    tookFromYouN: "{a} senin yerine {n} şey getirecek."
+  },
+  de: {
+    added: "{a} hat dich zur Reise hinzugefügt.",
+    joined: "{a} ist der Reise beigetreten.",
+    assigned: "{a} bittet dich mitzubringen: {i}.",
+    assignedN: "{a} bittet dich, {n} gemeinsame Sachen mitzubringen.",
+    took: "{a} bringt mit: {i}.",
+    tookN: "{a} bringt {n} gemeinsame Sachen mit.",
+    tookFromYou: "{a} bringt statt dir mit: {i}.",
+    tookFromYouN: "{a} bringt {n} Sachen statt dir mit."
+  },
+  fr: {
+    added: "{a} t'ajoute au voyage.",
+    joined: "{a} a rejoint le voyage.",
+    assigned: "{a} te demande d'apporter : {i}.",
+    assignedN: "{a} te demande d'apporter {n} choses en commun.",
+    took: "{a} apportera : {i}.",
+    tookN: "{a} apportera {n} choses en commun.",
+    tookFromYou: "{a} apportera à ta place : {i}.",
+    tookFromYouN: "{a} apportera {n} choses à ta place."
+  },
+  es: {
+    added: "{a} te ha añadido al viaje.",
+    joined: "{a} se ha unido al viaje.",
+    assigned: "{a} te pide que lleves: {i}.",
+    assignedN: "{a} te pide que lleves {n} cosas compartidas.",
+    took: "{a} llevará: {i}.",
+    tookN: "{a} llevará {n} cosas compartidas.",
+    tookFromYou: "{a} llevará en tu lugar: {i}.",
+    tookFromYouN: "{a} llevará {n} cosas en tu lugar."
+  },
+  it: {
+    added: "{a} ti ha aggiunto al viaggio.",
+    joined: "{a} ora fa parte del viaggio.",
+    assigned: "{a} ti chiede di portare: {i}.",
+    assignedN: "{a} ti chiede di portare {n} cose in comune.",
+    took: "{a} porterà: {i}.",
+    tookN: "{a} porterà {n} cose in comune.",
+    tookFromYou: "{a} porterà al posto tuo: {i}.",
+    tookFromYouN: "{a} porterà {n} cose al posto tuo."
+  },
+  pl: {
+    added: "{a} dodaje cię do podróży.",
+    joined: "{a} dołącza do podróży.",
+    assigned: "{a} prosi cię o zabranie: {i}.",
+    assignedN: "{a} prosi cię o zabranie {n} wspólnych rzeczy.",
+    took: "{a} zabierze: {i}.",
+    tookN: "{a} zabierze {n} wspólnych rzeczy.",
+    tookFromYou: "{a} zabierze zamiast ciebie: {i}.",
+    tookFromYouN: "{a} zabierze {n} rzeczy zamiast ciebie."
+  },
+  pt: {
+    added: "{a} te adicionou à viagem.",
+    joined: "{a} entrou na viagem.",
+    assigned: "{a} pediu para você levar: {i}.",
+    assignedN: "{a} pediu para você levar {n} itens compartilhados.",
+    took: "{a} vai levar: {i}.",
+    tookN: "{a} vai levar {n} itens compartilhados.",
+    tookFromYou: "{a} vai levar no seu lugar: {i}.",
+    tookFromYouN: "{a} vai levar {n} itens no seu lugar."
   }
 };
 
-function render(event, lang) {
-  const texts = TEXTS[event.type];
-  if (!texts) return "";
-  return (lang === "en" ? texts.en : texts.mk)(event);
+/** Јазикот на корисникот; непознат → англиски. */
+function language(lang) {
+  return (typeof lang === "string" && TEXTS[lang]) ? lang : "en";
 }
 
-module.exports = { tripTitle, firstName, computeEvents, groupEvents, render };
+function fill(template, values) {
+  let out = template;
+  for (const [key, value] of Object.entries(values)) {
+    out = out.split(`{${key}}`).join(String(value));
+  }
+  return out;
+}
+
+function render(event, lang) {
+  if (!event || !TEXTS.en[event.type]) return "";
+  const key = event.count ? `${event.type}N` : event.type;
+  const template = TEXTS[language(lang)][key] || TEXTS.en[key];
+  return fill(template, { a: event.actor || "", i: event.item || "", n: event.count || 0 });
+}
+
+module.exports = { tripTitle, firstName, computeEvents, groupEvents, render, language };

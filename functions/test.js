@@ -95,4 +95,11 @@ assert.strictEqual(tripTitle(base), "Рим");
 assert.strictEqual(tripTitle({ name: "Грција со другарките", destination: { name: "Солун" } }), "Грција со другарките");
 assert.strictEqual(tripTitle({ destination: { name: "Солун" }, stops: [{ place: { name: "Солун" } }, { place: { name: "Лефкада" } }] }), "Солун → Лефкада");
 
+// Други јазици и непознат јазик → англиски
+assert.strictEqual(render({ type: "added", actor: "Ана" }, "de"), "Ана hat dich zur Reise hinzugefügt.");
+assert.strictEqual(render({ type: "assigned", actor: "Ана", count: 3 }, "tr"), "Ана 3 ortak şeyi getirmeni istedi.");
+assert.strictEqual(render({ type: "joined", actor: "Ана" }, "xx"), "Ана joined the trip.");
+assert.strictEqual(render({ type: "took", actor: "$1 Ана", item: "$&" }, "fr"), "$1 Ана apportera : $&.");
+assert.strictEqual(render({ type: "nope", actor: "Ана" }, "en"), "");
+
 console.log("Сите проверки поминаа ✓");

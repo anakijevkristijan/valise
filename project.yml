@@ -32,6 +32,9 @@ targets:
         buildPhase: resources
       - path: Resources/PrivacyInfo.xcprivacy
         buildPhase: resources
+      # 13 јазици: името и прашањата за дозвола (камера, контакти, слики) — App Store ги наведува сите јазици
+      - path: Resources/Localizations
+        buildPhase: resources
     dependencies:
       - package: Firebase
         product: FirebaseCore

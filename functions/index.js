@@ -9,7 +9,7 @@ const { setGlobalOptions, logger } = require("firebase-functions/v2");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getMessaging } = require("firebase-admin/messaging");
-const { computeEvents, groupEvents, render, tripTitle } = require("./activity");
+const { computeEvents, groupEvents, render, tripTitle, language } = require("./activity");
 
 initializeApp();
 setGlobalOptions({ region: "europe-west1", maxInstances: 10 });
@@ -56,7 +56,7 @@ exports.tripActivity = onDocumentUpdatedWithAuthContext("trips/{tripId}", async 
     if (user.friendAlerts === false) { logger.info("skip: friend alerts off", { uid }); continue; }
     const tokens = Array.isArray(user.fcmTokens) ? user.fcmTokens.filter((t) => typeof t === "string" && t) : [];
     if (tokens.length === 0) { logger.info("skip: no device token", { uid }); continue; }
-    const lang = user.lang === "en" ? "en" : "mk";
+    const lang = language(user.lang);
 
     for (const item of list) {
       const body = render(item, lang);
