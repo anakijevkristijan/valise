@@ -138,6 +138,8 @@ struct BoardingPassCard: View {
                 Text(headerRight)
                     .font(.sans(10, .semibold))
                     .tracking(2.4)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
             .foregroundStyle(Theme.goldLight)
 
@@ -335,7 +337,9 @@ struct PassTile: View {
                 Text("TRIPDROBE")
                     .font(.sans(8, .semibold))
                     .tracking(2.4)
-                Spacer()
+                    .lineLimit(1)
+                    .fixedSize()
+                Spacer(minLength: 6)
                 Text(trip.countdownText.uppercased())
                     .font(.sans(8, .semibold))
                     .tracking(1.2)

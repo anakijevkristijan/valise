@@ -64,7 +64,8 @@ final class PremiumStore: ObservableObject {
     }
 
     init() {
-        isPremium = UserDefaults.standard.bool(forKey: Self.storageKey)
+        // Демо-режимот (само Debug, слики и автоматска проверка) — секогаш со Premium
+        isPremium = ScreenshotMode.isOn || UserDefaults.standard.bool(forKey: Self.storageKey)
         UserDefaults.standard.removeObject(forKey: "testSimulateFree")
         // Веднаш при старт, а не дури кога ќе се вчитаат производите — за тест-отклучувањето
         // никогаш да не се појави во App Store/TestFlight (пр. без интернет или пред да се направат претплатите).
@@ -154,6 +155,11 @@ final class PremiumStore: ObservableObject {
     /// Истечена важи само ако е во „grace period“ (плаќањето не поминало, а Apple се обидува
     /// повторно) — тогаш корисникот го задржува Premium (App Store Connect → Billing Grace Period).
     func refreshEntitlements() async {
+        // Демо-режим (само Debug, слики/проверка): App Store не одлучува — Premium е отклучен
+        if ScreenshotMode.isOn {
+            setPremium(true)
+            return
+        }
         var best: Transaction?
         for await result in Transaction.currentEntitlements {
             guard case .verified(let transaction) = result,
@@ -221,8 +227,10 @@ final class PremiumStore: ObservableObject {
     }
 
     private func setPremium(_ value: Bool) {
-        isPremium = value
-        UserDefaults.standard.set(value, forKey: Self.storageKey)
+        // Во демо-режимот (само Debug во симулатор) App Store не смее да го заклучи Premium
+        let unlocked = value || ScreenshotMode.isOn
+        isPremium = unlocked
+        UserDefaults.standard.set(unlocked, forKey: Self.storageKey)
     }
 }
 

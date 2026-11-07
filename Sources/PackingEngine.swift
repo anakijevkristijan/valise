@@ -37,7 +37,7 @@ enum Catalog {
         "passport": ("Пасош / лична карта", "Passport / ID card"),
         "insurance": ("Патничко здравствено осигурување", "Travel health insurance"),
         "idCard": ("Лична карта", "ID card"),
-        "boardingPass": ("Boarding pass", "Boarding pass"),
+        "boardingPass": ("Карта за качување", "Boarding pass"),
         "tickets": ("Билети", "Tickets"),
         "carDocs": ("Возачка и сообраќајна дозвола", "Driving licence and car papers"),
         "greenCard": ("Зелен картон", "Green card (car insurance)"),

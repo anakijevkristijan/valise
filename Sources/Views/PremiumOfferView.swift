@@ -107,13 +107,17 @@ struct PremiumOfferView: View {
             .foregroundStyle(Theme.goldLight)
 
             HStack(spacing: 10) {
-                Text(L("SKP", "JFK"))
+                Text(AppLanguage.current == .mk ? "SKP" : "JFK")
+                    .lineLimit(1)
+                    .fixedSize()
                 dashes(Theme.goldLight.opacity(0.55))
                 Image(systemName: "airplane")
                     .font(.system(size: 15, weight: .light))
                     .foregroundStyle(Theme.goldLight)
                 dashes(Theme.goldLight.opacity(0.55))
                 Text("CDG")
+                    .lineLimit(1)
+                    .fixedSize()
             }
             .font(.codes(32))
             .foregroundStyle(Theme.ticketText)

@@ -65,7 +65,17 @@ struct TripDetailView: View {
         if let anchor = ScreenshotMode.anchor {
             proxy.scrollTo(anchor, anchor: .top)
         }
-        if ScreenshotMode.screen == "story" { showStory = true }
+        switch ScreenshotMode.screen {
+        case "story": showStory = true
+        case "exit": tab = .exit
+        case "dates":
+            editStartStep = 1
+            showEdit = true
+        case "edit-bags":
+            editStartStep = 2
+            showEdit = true
+        default: break
+        }
     }
 
     // MARK: Распоред
@@ -88,6 +98,7 @@ struct TripDetailView: View {
                         }
                         if premium.isPremium {
                             companionsSection(trip)
+                                .id("shot-friends")
                             weatherSection(trip)
                                 .id("shot-weather")
                             TripOutfitsSection(trip: trip)

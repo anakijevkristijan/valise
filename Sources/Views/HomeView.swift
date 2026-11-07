@@ -169,7 +169,7 @@ struct HomeView: View {
                 ForEach(PassFilter.allCases, id: \.self) { option in
                     filterTab(option)
                 }
-                Spacer()
+                Spacer(minLength: 0)
             }
             .overlay(alignment: .bottom) { Hairline() }
 
@@ -213,6 +213,9 @@ struct HomeView: View {
                 Text(option.title.uppercased())
                     .font(.sans(12, .semibold))
                     .tracking(1.4)
+                    // Подолгите зборови (Bevorstehend, Nadchodzące) не се кршат во два реда
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
                 Text("\(count)")
                     .font(.codes(14))
                     .opacity(0.6)

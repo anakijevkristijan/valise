@@ -14,7 +14,8 @@ enum ScreenshotMode {
 
     /// Екранот што се слика:
     /// home, trip, weather, outfits, bags, packing, day, story, wardrobe, looks,
-    /// language, name, age, settings, new (ново патување), offer (понуда за Premium).
+    /// language, name, age, settings, new (ново патување), offer (понуда за Premium),
+    /// friends (сопатници со свои датуми), exit („Пред излез“), dates (календар), edit-bags (багаж).
     static var screen: String {
         guard isOn else { return "" }
         return argument("-screen") ?? "home"
@@ -37,16 +38,17 @@ enum ScreenshotMode {
 
     /// Дали веднаш се отвора главното демо-патување.
     static var opensTrip: Bool {
-        ["trip", "weather", "outfits", "bags", "packing", "day", "story"].contains(screen)
+        ["trip", "friends", "weather", "outfits", "bags", "packing", "exit", "day", "story", "dates", "edit-bags"].contains(screen)
     }
 
     /// До кој дел од патувањето се лизга екранот.
     static var anchor: String? {
         switch screen {
+        case "friends": return "shot-friends"
         case "weather": return "shot-weather"
         case "outfits", "day": return "shot-outfits"
         case "bags": return "shot-bags"
-        case "packing": return "shot-packing"
+        case "packing", "exit": return "shot-packing"
         default: return nil
         }
     }
@@ -104,6 +106,13 @@ enum ScreenshotMode {
                             codes: [1, 0, 61, 3, 2, 0], rain: [10, 5, 70, 35, 15, 5], lastYear: false)
         hero.companions = [Companion(name: "Mia Laurent", uid: "demo-mia"),
                            Companion(name: "Leo Brooks", inviteKey: "p_demo")]
+        // Мија доаѓа два дена подоцна, од Лондон — свои градови и датуми
+        let london = Place(id: 2643743, name: "London", region: "England", country: "United Kingdom",
+                           countryCode: "GB", latitude: 51.5085, longitude: -0.1257, timezone: "Europe/London")
+        let miaStart = hero.startDate.adding(days: 2)
+        hero.memberPlans = ["demo-mia": MemberPlan(origin: london,
+                                                   stops: [TripStop(place: paris, startDate: miaStart, endDate: hero.endDate)],
+                                                   startDate: miaStart, endDate: hero.endDate)]
         PackingEngine.ensureTogether(&hero)
         if var together = hero.together, let companions = hero.companions {
             for index in together.indices {
