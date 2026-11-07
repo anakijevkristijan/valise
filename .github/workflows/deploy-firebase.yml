@@ -1,5 +1,9 @@
 name: Firebase — известувања и правила
 
+# Ја качува функцијата за известувања од пријателите (functions/) и правилата (firestore.rules).
+# Пред прв пат: Firebase Blaze, APNs клуч во Firebase → Cloud Messaging,
+# и тајната FIREBASE_SERVICE_ACCOUNT во GitHub (Settings → Secrets and variables → Actions).
+
 on:
   workflow_dispatch:
     inputs:

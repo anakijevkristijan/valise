@@ -7,12 +7,16 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest
+    # macOS 26 со Xcode 27.x — потребно за iPhone Duo (iOS 27.1 SDK) и за App Store (минимум Xcode 26)
+    runs-on: macos-26
     timeout-minutes: 60
 
     steps:
       - name: Преземи код
         uses: actions/checkout@v4
+
+      - name: Достапни Xcode верзии
+        run: ls -d /Applications/Xcode*.app || true
 
       - name: Најди го проектот
         run: |
@@ -27,23 +31,39 @@ jobs:
         working-directory: ${{ env.APP_DIR }}
         run: xcodegen generate
 
-      - name: Изгради апликација
+      - name: Изгради апликација (најнов Xcode, ако не успее — претходниот)
         working-directory: ${{ env.APP_DIR }}
         run: |
           set -o pipefail
-          xcodebuild \
-            -project Valise.xcodeproj \
-            -scheme Valise \
-            -configuration Release \
-            -sdk iphoneos \
-            -destination 'generic/platform=iOS' \
-            -derivedDataPath build \
-            -skipPackagePluginValidation \
-            -skipMacroValidation \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            build 2>&1 | tee build.log
+          for XCODE in $(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -vi beta | sort -Vr | head -2); do
+            sudo xcode-select -s "$XCODE/Contents/Developer"
+            echo "▶︎ Градам со $XCODE"
+            xcodebuild -version
+            rm -rf build
+            if xcodebuild \
+                -project Valise.xcodeproj \
+                -scheme Valise \
+                -configuration Release \
+                -sdk iphoneos \
+                -destination 'generic/platform=iOS' \
+                -derivedDataPath build \
+                -skipPackagePluginValidation \
+                -skipMacroValidation \
+                CODE_SIGNING_ALLOWED=NO \
+                CODE_SIGNING_REQUIRED=NO \
+                CODE_SIGN_IDENTITY="" \
+                build 2>&1 | tee build.log; then
+              {
+                echo "### Изградено со"
+                echo '```'
+                xcodebuild -version
+                echo '```'
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            echo "✗ Не успеа со $XCODE"
+          done
+          exit 1
 
       - name: Спакувај .ipa
         working-directory: ${{ env.APP_DIR }}

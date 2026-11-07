@@ -8,7 +8,7 @@ name: Качи на TestFlight
 #   ASC_KEY_P8      – целата содржина на датотеката AuthKey_XXXX.p8
 #
 # Како работи (без Mac и без рачни сертификати):
-# 1) архива без потпис  2) локален потпис со entitlements (Најава со Apple, WeatherKit)
+# 1) архива без потпис  2) локален потпис со entitlements (Најава со Apple, WeatherKit, известувања)
 # 3) извоз со API клучот — Apple сам потпишува со сертификат што го чува во облак и го качува на App Store Connect.
 
 on:
