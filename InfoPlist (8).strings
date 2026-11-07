@@ -1,5 +1,5 @@
-/* Tripdrobe — sq */
+/* Tripdrobe — el */
 "CFBundleDisplayName" = "Tripdrobe";
-"NSCameraUsageDescription" = "Tripdrobe përdor kamerën që të fotografosh rrobat për garderobën tënde.";
-"NSContactsUsageDescription" = "Tripdrobe përdor kontaktin që zgjedh për të ftuar një shok udhëtimi.";
-"NSPhotoLibraryAddUsageDescription" = "Tripdrobe ruan imazhin e story-t të udhëtimit në Photos.";
+"NSCameraUsageDescription" = "Το Tripdrobe χρησιμοποιεί την κάμερα για να φωτογραφίζεις ρούχα για τη γκαρνταρόμπα σου.";
+"NSContactsUsageDescription" = "Το Tripdrobe χρησιμοποιεί την επαφή που διαλέγεις για να προσκαλέσεις συνταξιδιώτη.";
+"NSPhotoLibraryAddUsageDescription" = "Το Tripdrobe αποθηκεύει την εικόνα της ιστορίας του ταξιδιού σου στις Φωτογραφίες.";

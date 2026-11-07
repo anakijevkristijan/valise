@@ -1,0 +1,5 @@
+/* Tripdrobe — es */
+"CFBundleDisplayName" = "Tripdrobe";
+"NSCameraUsageDescription" = "Tripdrobe usa la cámara para fotografiar la ropa de tu armario.";
+"NSContactsUsageDescription" = "Tripdrobe usa el contacto que elijas para invitar a un compañero de viaje.";
+"NSPhotoLibraryAddUsageDescription" = "Tripdrobe guarda la imagen de tu story de viaje en Fotos.";
