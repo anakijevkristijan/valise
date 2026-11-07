@@ -124,7 +124,7 @@ enum WardrobeKind: String, Codable, CaseIterable, Identifiable {
 
     /// „1 маица“, „3 џемпера“, „2 пара патики“…
     func count(_ n: Int) -> String {
-        n == 1 ? L("1 \(names.oneMK)", "1 \(names.oneEN)") : L("\(n) \(names.manyMK)", "\(n) \(names.manyEN)")
+        countNoun(n, names.oneMK, names.manyMK, names.oneEN, names.manyEN)
     }
 
     // MARK: Врска со листата за пакување
@@ -449,9 +449,8 @@ extension WardrobeItem {
 
 enum PackingRowText {
     static func count(_ key: String, _ n: Int) -> String {
-        let one = n == 1
         func w(_ oneMK: String, _ manyMK: String, _ oneEN: String, _ manyEN: String) -> String {
-            one ? L("1 \(oneMK)", "1 \(oneEN)") : L("\(n) \(manyMK)", "\(n) \(manyEN)")
+            countNoun(n, oneMK, manyMK, oneEN, manyEN)
         }
         switch key {
         case "tshirts": return w("маица", "маици", "T-shirt", "T-shirts")

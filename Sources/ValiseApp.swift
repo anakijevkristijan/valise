@@ -97,7 +97,7 @@ struct RootView: View {
     @AppStorage("accountStepDone") private var accountStepDone: Bool = false
     @AppStorage("userName") private var userName: String = ""
     @AppStorage("languageChosen") private var languageChosen: Bool = false
-    @AppStorage(AppLanguage.storageKey) private var language: String = AppLanguage.mk.rawValue
+    @AppStorage(AppLanguage.storageKey) private var language: String = AppLanguage.en.rawValue
     @AppStorage(Theme.storageKey) private var themeID: String = Palette.classic.id
     @AppStorage(AgeGateView.verifiedKey) private var ageVerified: Bool = false
     @AppStorage(PhoneStepView.askedKey) private var phoneAsked: Bool = false

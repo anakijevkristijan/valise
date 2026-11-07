@@ -3,17 +3,10 @@ import SwiftUI
 /// „еднаш“, „двапати“, „3 пати“…
 enum RepeatText {
     static func times(_ n: Int) -> String {
-        if AppLanguage.current == .mk {
-            switch n {
-            case 1: return "еднаш"
-            case 2: return "двапати"
-            default: return "\(n) пати"
-            }
-        }
         switch n {
-        case 1: return "once"
-        case 2: return "twice"
-        default: return "\(n) times"
+        case 1: return L("еднаш", "once")
+        case 2: return L("двапати", "twice")
+        default: return L("\(n) пати", "\(n) times")
         }
     }
 

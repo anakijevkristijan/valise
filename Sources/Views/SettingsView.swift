@@ -11,7 +11,8 @@ struct SettingsView: View {
     @AppStorage(Theme.storageKey) private var themeID: String = Palette.classic.id
     @State private var showPremium = false
     @AppStorage("userName") private var userName: String = ""
-    @AppStorage(AppLanguage.storageKey) private var language: String = AppLanguage.mk.rawValue
+    @AppStorage(AppLanguage.storageKey) private var language: String = AppLanguage.en.rawValue
+    @State private var showLanguages = false
 
     @State private var draftName = ""
     @State private var confirmSignOut = false
@@ -34,7 +35,6 @@ struct SettingsView: View {
 
                     accountCard
                     premiumCard
-                    if premium.isSandbox { testFreeSwitch }
 
                     VStack(alignment: .leading, spacing: 10) {
                         Eyebrow(L("Твоето име", "Your name"))
@@ -50,15 +50,36 @@ struct SettingsView: View {
 
                     VStack(alignment: .leading, spacing: 12) {
                         Eyebrow(L("Јазик", "Language"))
-                        HStack(spacing: 8) {
-                            ForEach(AppLanguage.allCases) { lang in
-                                ChipButton(title: lang.nativeName, isSelected: language == lang.rawValue, expand: true) {
-                                    save()
-                                    language = lang.rawValue
-                                    // Известувањата од пријателите на новиот јазик
-                                    Task { await PushService.shared.upload() }
-                                }
+                        Button {
+                            save()
+                            showLanguages = true
+                        } label: {
+                            HStack(spacing: 14) {
+                                Image(systemName: "globe")
+                                    .font(.system(size: 16, weight: .light))
+                                    .foregroundStyle(Theme.navy)
+                                    .frame(width: 24)
+                                Text((AppLanguage(rawValue: language) ?? .en).nativeName)
+                                    .font(.serif(20))
+                                    .foregroundStyle(Theme.ink)
+                                Spacer()
+                                Text(L("Смени", "Change"))
+                                    .font(.sans(13, .medium))
+                                    .foregroundStyle(Theme.gold)
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(Theme.muted)
                             }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 14)
+                            .luxCard(padding: 0, radius: 18)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .sheet(isPresented: $showLanguages) {
+                        LanguageSheet(language: $language) { _ in
+                            // Известувањата од пријателите на новиот јазик
+                            Task { await PushService.shared.upload() }
                         }
                     }
 
@@ -326,24 +347,6 @@ struct SettingsView: View {
     }
 
     /// Само во TestFlight (тест-купување): да се види апликацијата без Premium.
-    private var testFreeSwitch: some View {
-        Toggle(isOn: Binding(get: { premium.simulatesFree },
-                             set: { on in Task { await premium.setSimulatesFree(on) } })) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(L("Тест: бесплатна верзија", "Test: free version"))
-                    .font(.sans(14, .medium))
-                    .foregroundStyle(Theme.ink)
-                Text(L("Само во TestFlight — да видиш како изгледа апликацијата без Premium.",
-                       "TestFlight only — see the app without Premium."))
-                    .font(.sans(11))
-                    .foregroundStyle(Theme.muted)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .tint(Theme.navy)
-        .luxCard(padding: 14, radius: 18)
-    }
-
     // MARK: Теми
 
     private var themesSection: some View {

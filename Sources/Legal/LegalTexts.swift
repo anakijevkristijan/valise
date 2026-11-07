@@ -16,10 +16,11 @@ enum LegalTexts {
 
     static func markdown(_ doc: LegalDoc) -> String {
         switch (doc, AppLanguage.current) {
+        // Правните текстови се на македонски и англиски; другите јазици добиваат англиски (меродавна верзија)
         case (.privacy, .mk): return privacyMK
-        case (.privacy, .en): return privacyEN
+        case (.privacy, _): return privacyEN
         case (.terms, .mk): return termsMK
-        case (.terms, .en): return termsEN
+        case (.terms, _): return termsEN
         }
     }
 

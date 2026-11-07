@@ -12,12 +12,17 @@ enum CloudCodec {
     /// Лични работи што воопшто не одат во облакот.
     static let personalKeys: Set<String> = [
         "exitChecklist", "dismissedSuggestions", "weather", "weatherSource", "weatherUpdatedAt",
-        "outfitPlan", "outfitDays", "outfitPacked", "ownBags"
+        "outfitPlan", "outfitDays", "outfitPacked", "ownBags", "ownPlan", "memberPlans"
     ]
 
     /// Секој член има свои: багаж и стил (жена/маж). Во облакот: `personal.{uid}`.
     /// Сопственикот ги пишува и горе (за постари верзии и како почеток за новите членови).
     static let memberKeys: [String] = ["bag", "bags", "style"]
+
+    /// Градовите и датумите. Горе се на тој што го направил патувањето; член што ги сменил
+    /// ги има свои во `personal.{uid}` — тие не ги менуваат другите, а другите не ги менуваат нив.
+    static let planKeys: [String] = ["origin", "destination", "startDate", "endDate", "stops",
+                                     "transport", "airlineID", "hasLaundry"]
 
     static func encode(_ trip: Trip, myUID: String) -> [String: Any]? {
         guard let data = try? JSONEncoder().encode(trip),
@@ -28,15 +33,22 @@ enum CloudCodec {
         dict.removeValue(forKey: "items")
         dict["lists"] = [myUID: itemMap(mine)]
 
-        // Мојот багаж и стил — само ако се мои (сопственик, или член што ги избрал)
+        // Мојот багаж и стил — само ако се мои (сопственик, или член што ги избрал);
+        // моите градови и датуми — кај член само ако ги сменил (инаку ги следи сопственикот)
         let isOwner = trip.ownerUID == nil || trip.ownerUID == myUID
+        var personal: [String: Any] = [:]
         if isOwner || trip.ownBags == true {
-            var personal: [String: Any] = [:]
             for key in memberKeys { if let value = dict[key] { personal[key] = value } }
+        }
+        if !isOwner && trip.ownPlan == true {
+            for key in planKeys { if let value = dict[key] { personal[key] = value } }
+        }
+        if !personal.isEmpty {
             dict["personal"] = [myUID: personal]
         }
         if !isOwner {
-            for key in memberKeys { dict.removeValue(forKey: key) }
+            // Член никогаш не ги менува горните полиња (тие се на сопственикот)
+            for key in memberKeys + planKeys { dict.removeValue(forKey: key) }
         }
 
         if let together = dict["together"] as? [[String: Any]] {
@@ -79,15 +91,35 @@ enum CloudCodec {
         dict.removeValue(forKey: "lists")
 
         // Мојот багаж и стил; ако уште не сум ги избрал — багажот на сопственикот, стил неутрален
-        let personal = (dict["personal"] as? [String: Any])?[myUID] as? [String: Any]
+        let allPersonal = (dict["personal"] as? [String: Any]) ?? [:]
+        let personal = allPersonal[myUID] as? [String: Any]
         dict.removeValue(forKey: "personal")
-        let isOwner = (dict["ownerUID"] as? String) == myUID
-        if let personal {
+        let ownerUID = dict["ownerUID"] as? String
+        let isOwner = ownerUID == myUID
+        let hasOwnBags = personal?["bag"] != nil
+        if let personal, hasOwnBags {
             // Само моите (пр. ако имам еден багаж, не смее да остане листата багажи на сопственикот)
             for key in memberKeys { dict.removeValue(forKey: key) }
             for key in memberKeys { if let value = personal[key] { dict[key] = value } }
         } else if !isOwner {
             dict["style"] = TravelerStyle.neutral.rawValue
+        }
+
+        // Градовите и датумите на сопственикот (горе) и на членовите што имаат свои
+        var ownerPlanFields: [String: Any] = [:]
+        for key in planKeys { if let value = dict[key] { ownerPlanFields[key] = value } }
+        let ownerPlan = plan(from: ownerPlanFields)
+        var plans: [String: MemberPlan] = [:]
+        if let ownerUID, ownerUID != myUID, let ownerPlan { plans[ownerUID] = ownerPlan }
+        for uid in (dict["memberUIDs"] as? [String]) ?? [] where uid != myUID && uid != ownerUID {
+            let theirs = (allPersonal[uid] as? [String: Any]).flatMap { $0["startDate"] != nil ? plan(from: $0) : nil }
+            if let found = theirs ?? ownerPlan { plans[uid] = found }
+        }
+        // Мојот план: мој ако сум го сменил, инаку тој на сопственикот
+        let hasOwnPlan = !isOwner && personal?["startDate"] != nil
+        if hasOwnPlan, let personal {
+            for key in planKeys { dict.removeValue(forKey: key) }
+            for key in planKeys { if let value = personal[key] { dict[key] = value } }
         }
 
         if dict["together"] != nil {
@@ -116,8 +148,32 @@ enum CloudCodec {
         } else {
             trip.exitChecklist = PackingEngine.defaultExitChecklist()
         }
-        trip.ownBags = isOwner || personal != nil
+        trip.ownBags = isOwner || hasOwnBags
+        trip.ownPlan = hasOwnPlan ? true : nil
+        trip.memberPlans = plans.isEmpty ? nil : plans
         return (trip, hasMyList)
+    }
+
+    /// Поле од облакот → план (градови и датуми). Датумите се како ги запишува JSONEncoder.
+    private static func plan(from fields: [String: Any]) -> MemberPlan? {
+        guard let start = fields["startDate"], let end = fields["endDate"], let destination = fields["destination"] else { return nil }
+        struct Raw: Decodable {
+            var origin: Place?
+            var destination: Place
+            var startDate: Date
+            var endDate: Date
+            var stops: [TripStop]?
+            var hasLaundry: Bool?
+        }
+        var raw: [String: Any] = ["startDate": start, "endDate": end, "destination": destination]
+        if let origin = fields["origin"] { raw["origin"] = origin }
+        if let stops = fields["stops"] { raw["stops"] = stops }
+        guard JSONSerialization.isValidJSONObject(raw),
+              let json = try? JSONSerialization.data(withJSONObject: raw),
+              let decoded = try? JSONDecoder().decode(Raw.self, from: json) else { return nil }
+        let stops = (decoded.stops?.isEmpty == false) ? decoded.stops!
+            : [TripStop(place: decoded.destination, startDate: decoded.startDate, endDate: decoded.endDate)]
+        return MemberPlan(origin: decoded.origin, stops: stops, startDate: decoded.startDate, endDate: decoded.endDate)
     }
 
     /// Мојата листа како мапа (за прво качување кога ќе се приклучам).

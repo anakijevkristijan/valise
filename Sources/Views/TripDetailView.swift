@@ -80,8 +80,8 @@ struct TripDetailView: View {
                         topBar(trip)
                         titleBlock(trip)
                         BoardingPassCard(trip: trip)
-                        if trip.isCloud && !trip.isMine && trip.ownBags != true && !trip.isPast {
-                            ownBagsCard(trip)
+                        if trip.isCloud && !trip.isMine && !trip.isPast && needsMemberSetup(trip) {
+                            memberSetupCard(trip)
                         }
                         if !trip.isPast {
                             ReminderOfferCard()
@@ -259,6 +259,13 @@ struct TripDetailView: View {
                     editStartStep = 0
                     showEdit = true
                 }
+                if trip.isCloud && !trip.isMine {
+                    // Член: свои датуми (доаѓа подоцна, си оди порано…) — важат само за него
+                    Button(L("Смени датуми", "Change dates"), systemImage: "calendar") {
+                        editStartStep = 1
+                        showEdit = true
+                    }
+                }
                 if premium.isPremium {
                     Button(L("Освежи прогноза", "Refresh forecast"), systemImage: "arrow.clockwise") {
                         Task { await refreshWeather(force: true) }
@@ -418,6 +425,7 @@ struct TripDetailView: View {
                 .padding(.vertical, 1)
             }
             .scrollIndicators(.hidden)
+            companionPlans(trip)
 
             if !trip.travelers.isEmpty {
                 Text(L("Секој ја гледа само својата листа. Заедничките работи се во „Заедно“ — таму избирате кој што носи.",
@@ -819,37 +827,128 @@ struct TripDetailView: View {
     }
 
     /// Додаден во туѓо патување: багажот и стилот се засега на сопственикот → избери ги своите.
-    private func ownBagsCard(_ trip: Trip) -> some View {
+    private static let samePlanKey = "member-same-plan"
+
+    /// Член што уште ги има градовите/датумите или багажот на сопственикот.
+    private func needsMemberSetup(_ trip: Trip) -> Bool {
+        let planOpen = trip.ownPlan != true && !trip.dismissedSuggestions.contains(Self.samePlanKey)
+        return trip.ownBags != true || planOpen
+    }
+
+    /// Поканет во туѓо патување: свои градови и датуми (тргам од друго место, доаѓам подоцна…) и свој багаж.
+    private func memberSetupCard(_ trip: Trip) -> some View {
         let owner = (trip.companions ?? []).first { $0.uid != nil && $0.uid == trip.ownerUID }?.firstName
+        let planOpen = trip.ownPlan != true && !trip.dismissedSuggestions.contains(Self.samePlanKey)
+        let bagsOpen = trip.ownBags != true
         return VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
-                Image(systemName: "suitcase.rolling")
+                Image(systemName: "person.crop.circle.badge.checkmark")
                     .font(.system(size: 15, weight: .light))
                     .foregroundStyle(Theme.navy)
                     .frame(width: 36, height: 36)
                     .background(Circle().fill(Theme.goldPale))
-                Text(L("Избери го твојот багаж", "Choose your own luggage"))
+                Text(L("Направи го твое", "Make it yours"))
                     .font(.sans(15, .semibold))
                     .foregroundStyle(Theme.ink)
             }
             Text(owner.map {
-                L("\($0) те додаде во патувањето. Багажот засега е ист како кај \($0) — избери го твојот куфер и стил, за листата и „дали собира“ да се по тебе. Другите нема да го видат.",
-                  "\($0) added you to this trip. For now the luggage is theirs — pick your own bag and style so your list and “does it fit” are about you. Others won't see it.")
-            } ?? L("Багажот засега е на тој што те додаде — избери го твојот куфер и стил, за листата да е по тебе.",
-                   "For now the luggage belongs to whoever added you — pick your own bag and style so your list is about you."))
+                L("\($0) те додаде во патувањето. Засега градовите, датумите и багажот се како кај \($0). Тргаш од друго место, доаѓаш подоцна или остануваш подолго? Смени ги — важат само за тебе, а кај \($0) ништо не се менува.",
+                  "\($0) added you to this trip. For now the cities, dates and luggage are \($0)'s. Leaving from somewhere else, arriving later or staying longer? Change them — they're only yours and nothing changes for \($0).")
+            } ?? L("Засега градовите, датумите и багажот се како кај тој што те додаде. Смени ги — важат само за тебе.",
+                   "For now the cities, dates and luggage are those of whoever added you. Change them — they're only yours."))
                 .font(.sans(13))
                 .foregroundStyle(Theme.inkSoft)
                 .fixedSize(horizontal: false, vertical: true)
-            Button {
-                editStartStep = 2
-                showEdit = true
-            } label: {
-                Text(L("Избери багаж", "Choose luggage"))
-                    .frame(maxWidth: .infinity)
+            HStack(spacing: 10) {
+                if planOpen {
+                    Button {
+                        editStartStep = 0
+                        showEdit = true
+                    } label: {
+                        Text(L("Мои градови и датуми", "My cities & dates"))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(SecondaryButtonStyle())
+                }
+                if bagsOpen {
+                    Button {
+                        editStartStep = 2
+                        showEdit = true
+                    } label: {
+                        Text(L("Мој багаж", "My luggage"))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(SecondaryButtonStyle())
+                }
             }
-            .buttonStyle(SecondaryButtonStyle())
+            if planOpen {
+                Button {
+                    store.mutate(tripID) { $0.dismissedSuggestions.append(Self.samePlanKey) }
+                } label: {
+                    Text(owner.map { L("Патувам исто како \($0)", "I'm travelling the same as \($0)") }
+                         ?? L("Патувам истите датуми", "I'm travelling the same dates"))
+                        .font(.sans(12, .medium))
+                        .foregroundStyle(Theme.muted)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.plain)
+            }
         }
         .luxCard(padding: 16, radius: 18)
+    }
+
+    /// Кој е со мене кога и каде (заедничко патување со различни градови и датуми).
+    @ViewBuilder
+    private func companionPlans(_ trip: Trip) -> some View {
+        let mine = trip.myPlan
+        let differing = trip.travelerPlans.filter { !$0.plan.sameRoute(as: mine) }
+        if !differing.isEmpty {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(differing) { entry in
+                    if entry.id != differing.first?.id { Hairline().padding(.leading, 46) }
+                    HStack(alignment: .top, spacing: 12) {
+                        Text(String(entry.companion.firstName.prefix(1)).uppercased())
+                            .font(.serif(13))
+                            .foregroundStyle(Theme.goldLight)
+                            .frame(width: 24, height: 24)
+                            .background(Circle().fill(Theme.navy))
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(entry.companion.firstName)
+                                .font(.sans(14, .semibold))
+                                .foregroundStyle(Theme.ink)
+                            Text("\(entry.plan.routeText) · \(entry.plan.dateText)")
+                                .font(.sans(12))
+                                .foregroundStyle(Theme.inkSoft)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Text(togetherText(mine: mine, theirs: entry.plan))
+                                .font(.sans(12, .medium))
+                                .foregroundStyle(Theme.gold)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.vertical, 10)
+                    .padding(.horizontal, 12)
+                }
+            }
+            .luxCard(padding: 0, radius: 18)
+        }
+    }
+
+    private func togetherText(mine: MemberPlan, theirs: MemberPlan) -> String {
+        guard let overlap = mine.overlap(with: theirs) else {
+            return L("Не се преклопувате", "You don't overlap")
+        }
+        let dates = MemberPlan.range(overlap.start, overlap.end)
+        if overlap.cities.isEmpty {
+            return L("Во исто време, на различни места · \(dates)", "Same time, different places · \(dates)")
+        }
+        let cities = overlap.cities.joined(separator: ", ")
+        return L("Заедно · \(dates) · \(cities)", "Together · \(dates) · \(cities)")
     }
 
     /// Аутфитите имаат парче што листата го нема (пр. сукња) → редот сам се додава.

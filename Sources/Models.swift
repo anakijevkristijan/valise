@@ -394,6 +394,78 @@ struct Companion: Codable, Hashable, Identifiable {
 
 // MARK: - Град во патувањето (повеќе градови, Premium)
 
+/// Сопатник и неговите градови и датуми.
+struct CompanionPlan: Identifiable {
+    let companion: Companion
+    let plan: MemberPlan
+    var id: UUID { companion.id }
+}
+
+/// Нечии градови и датуми во заедничко патување.
+struct MemberPlan: Codable, Hashable {
+    var origin: Place?
+    var stops: [TripStop]
+    var startDate: Date
+    var endDate: Date
+
+    /// „Скопје → Солун → Атина“
+    var routeText: String {
+        var names: [String] = []
+        if let origin { names.append(origin.name) }
+        for stop in stops where names.last != stop.place.name { names.append(stop.place.name) }
+        return names.joined(separator: " → ")
+    }
+
+    var dateText: String { MemberPlan.range(startDate, endDate) }
+
+    static func range(_ start: Date, _ end: Date) -> String {
+        let cal = Calendar.current
+        let day = DateFormatter()
+        day.locale = AppLanguage.current.locale
+        day.setLocalizedDateFormatFromTemplate("d")
+        let full = DateFormatter()
+        full.locale = AppLanguage.current.locale
+        full.setLocalizedDateFormatFromTemplate("d MMM")
+        if cal.isDate(start, inSameDayAs: end) { return full.string(from: start) }
+        if cal.isDate(start, equalTo: end, toGranularity: .month) {
+            return "\(day.string(from: start))–\(full.string(from: end))"
+        }
+        return "\(full.string(from: start)) – \(full.string(from: end))"
+    }
+
+    /// Во кој град е тој ден (или nil ако тогаш не е на патувањето).
+    func city(on date: Date) -> String? {
+        let d = date.startOfDay
+        guard startDate.startOfDay <= d, d <= endDate.startOfDay else { return nil }
+        let index = stops.lastIndex(where: { $0.startDate.startOfDay <= d && d <= $0.endDate.startOfDay })
+            ?? stops.lastIndex(where: { $0.startDate.startOfDay <= d })
+        return index.map { stops[$0].place.name } ?? stops.first?.place.name
+    }
+
+    /// Кога сме заедно: деновите што се преклопуваат и градовите каде сме двајцата истиот ден.
+    func overlap(with other: MemberPlan) -> (start: Date, end: Date, cities: [String])? {
+        let start = max(startDate.startOfDay, other.startDate.startOfDay)
+        let end = min(endDate.startOfDay, other.endDate.startOfDay)
+        guard start <= end else { return nil }
+        var cities: [String] = []
+        var day = start
+        while day <= end {
+            if let mine = city(on: day), let theirs = other.city(on: day), mine == theirs, !cities.contains(mine) {
+                cities.append(mine)
+            }
+            day = day.adding(days: 1)
+        }
+        return (start, end, cities)
+    }
+
+    func sameRoute(as other: MemberPlan) -> Bool {
+        origin?.id == other.origin?.id
+            && stops.map(\.place.id) == other.stops.map(\.place.id)
+            && Calendar.current.isDate(startDate, inSameDayAs: other.startDate)
+            && Calendar.current.isDate(endDate, inSameDayAs: other.endDate)
+    }
+}
+
 struct TripStop: Codable, Hashable, Identifiable {
     var id: UUID = UUID()
     var place: Place
@@ -453,6 +525,11 @@ struct Trip: Codable, Identifiable, Hashable {
     /// Заедничко патување: јас сум си го избрал својот багаж и стил (не се тие на сопственикот).
     /// Само на телефонот — во облакот се чуваат во `personal.{uid}`.
     var ownBags: Bool?
+    /// Заедничко патување: имам свои градови и датуми (тргам од друго место, доаѓам подоцна…).
+    /// Без ова — ги следам градовите и датумите на тој што го направил патувањето.
+    var ownPlan: Bool?
+    /// Градовите и датумите на другите во заедничкото патување (uid → план). Само за приказ, од облакот.
+    var memberPlans: [String: MemberPlan]?
 
     // MARK: Градови и име
 
@@ -463,6 +540,20 @@ struct Trip: Codable, Identifiable, Hashable {
     }
 
     var isMultiStop: Bool { (stops?.count ?? 0) > 1 }
+
+    /// Мојот план (градови и датуми) — за споредба со другите во заедничко патување.
+    var myPlan: MemberPlan {
+        MemberPlan(origin: origin, stops: allStops, startDate: startDate, endDate: endDate)
+    }
+
+    /// Другите патници со нивниот план (ако го знаеме), по редот на сопатниците.
+    var travelerPlans: [CompanionPlan] {
+        guard let plans = memberPlans else { return [] }
+        return travelers.compactMap { companion in
+            guard let uid = companion.uid, let plan = plans[uid] else { return nil }
+            return CompanionPlan(companion: companion, plan: plan)
+        }
+    }
 
     /// Во кој град си тој ден (на ден на преселба — новиот град, таму спиеш).
     func stopIndex(on date: Date) -> Int {

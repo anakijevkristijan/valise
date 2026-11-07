@@ -1,0 +1,253 @@
+{
+  "pieces": [
+    {
+      "file": "check-jacket.png",
+      "name": "Check Jacket",
+      "category": "outerwear",
+      "kind": "blazer",
+      "seasons": [
+        "spring",
+        "autumn",
+        "winter"
+      ]
+    },
+    {
+      "file": "cotton-jacket.png",
+      "name": "Cotton Jacket",
+      "category": "outerwear",
+      "kind": "lightJacket",
+      "seasons": [
+        "spring",
+        "autumn"
+      ]
+    },
+    {
+      "file": "fur-jacket.png",
+      "name": "Fur Jacket",
+      "category": "outerwear",
+      "kind": "warmJacket",
+      "seasons": [
+        "autumn",
+        "winter"
+      ]
+    },
+    {
+      "file": "navy-zip-cardigan.png",
+      "name": "Navy Zip Cardigan",
+      "category": "top",
+      "kind": "cardigan",
+      "seasons": [
+        "spring",
+        "autumn",
+        "winter"
+      ]
+    },
+    {
+      "file": "white-shirt.png",
+      "name": "White Shirt",
+      "category": "top",
+      "kind": "shirt",
+      "seasons": [
+        "spring",
+        "summer",
+        "autumn"
+      ]
+    },
+    {
+      "file": "cream-tshirt.png",
+      "name": "Cream T-shirt",
+      "category": "top",
+      "kind": "tshirt",
+      "seasons": [
+        "spring",
+        "summer",
+        "autumn"
+      ]
+    },
+    {
+      "file": "navy-bodysuit.png",
+      "name": "Navy Bodysuit",
+      "category": "top",
+      "kind": "longSleeve",
+      "seasons": [
+        "spring",
+        "autumn",
+        "winter"
+      ]
+    },
+    {
+      "file": "horse-sweater.png",
+      "name": "Horse Sweater",
+      "category": "top",
+      "kind": "sweater",
+      "seasons": [
+        "autumn",
+        "winter"
+      ]
+    },
+    {
+      "file": "slip-dress.png",
+      "name": "Navy Slip Dress",
+      "category": "dress",
+      "kind": "dress",
+      "seasons": [
+        "spring",
+        "summer",
+        "autumn"
+      ]
+    },
+    {
+      "file": "satin-skirt.png",
+      "name": "Satin Midi Skirt",
+      "category": "dress",
+      "kind": "skirt",
+      "seasons": [
+        "spring",
+        "summer",
+        "autumn"
+      ]
+    },
+    {
+      "file": "jeans.png",
+      "name": "Straight Jeans",
+      "category": "bottom",
+      "kind": "jeans",
+      "seasons": [
+        "spring",
+        "autumn",
+        "winter"
+      ]
+    },
+    {
+      "file": "camo-pants.png",
+      "name": "Camo Trousers",
+      "category": "bottom",
+      "kind": "trousers",
+      "seasons": [
+        "spring",
+        "autumn"
+      ]
+    },
+    {
+      "file": "zebra-boots.png",
+      "name": "Zebra Boots",
+      "category": "shoes",
+      "kind": "boots",
+      "seasons": [
+        "autumn",
+        "winter"
+      ]
+    },
+    {
+      "file": "sneakers.png",
+      "name": "Blue Sneakers",
+      "category": "shoes",
+      "kind": "sneakers",
+      "seasons": [
+        "spring",
+        "summer",
+        "autumn",
+        "winter"
+      ]
+    },
+    {
+      "file": "zebra-bag.png",
+      "name": "Zebra Shoulder Bag",
+      "category": "bag",
+      "kind": "bag",
+      "seasons": [
+        "spring",
+        "summer",
+        "autumn",
+        "winter"
+      ]
+    },
+    {
+      "file": "sunglasses.png",
+      "name": "Black Sunglasses",
+      "category": "accessory",
+      "kind": "sunglasses",
+      "seasons": [
+        "spring",
+        "summer",
+        "autumn"
+      ]
+    },
+    {
+      "file": "belt.png",
+      "name": "Leather Belt",
+      "category": "accessory",
+      "kind": "belt",
+      "seasons": [
+        "spring",
+        "summer",
+        "autumn",
+        "winter"
+      ]
+    }
+  ],
+  "outfits": [
+    {
+      "name": "Left Bank",
+      "pieces": [
+        "check-jacket.png",
+        "white-shirt.png",
+        "satin-skirt.png",
+        "zebra-boots.png",
+        "zebra-bag.png"
+      ]
+    },
+    {
+      "name": "Louvre & Tuileries",
+      "pieces": [
+        "cotton-jacket.png",
+        "cream-tshirt.png",
+        "jeans.png",
+        "sneakers.png",
+        "sunglasses.png",
+        "belt.png"
+      ]
+    },
+    {
+      "name": "Le Marais Evening",
+      "pieces": [
+        "navy-bodysuit.png",
+        "camo-pants.png",
+        "zebra-boots.png",
+        "zebra-bag.png",
+        "sunglasses.png"
+      ]
+    },
+    {
+      "name": "Saint-Germain",
+      "pieces": [
+        "fur-jacket.png",
+        "white-shirt.png",
+        "slip-dress.png",
+        "zebra-boots.png",
+        "zebra-bag.png"
+      ]
+    },
+    {
+      "name": "Montmartre Walk",
+      "pieces": [
+        "horse-sweater.png",
+        "jeans.png",
+        "sneakers.png",
+        "sunglasses.png",
+        "belt.png"
+      ]
+    },
+    {
+      "name": "Canal Saint-Martin",
+      "pieces": [
+        "navy-zip-cardigan.png",
+        "cream-tshirt.png",
+        "jeans.png",
+        "sneakers.png",
+        "sunglasses.png",
+        "belt.png"
+      ]
+    }
+  ]
+}

@@ -259,6 +259,12 @@ struct TripWizardView: View {
 
     private var isEditing: Bool { editing != nil }
 
+    /// Член (не сопственик) на заедничко патување ги менува своите градови и датуми.
+    private var editsSharedAsMember: Bool {
+        guard let editing else { return false }
+        return editing.isCloud && !editing.isMine
+    }
+
 
     var body: some View {
         ZStack {
@@ -403,6 +409,12 @@ struct TripWizardView: View {
 
     private var subtitle: String {
         switch step {
+        case 0 where editsSharedAsMember:
+            return L("Градовите и датумите што ќе ги смениш важат само за тебе — другите си ги задржуваат своите. Тргаш од друго место, доаѓаш подоцна или остануваш подолго? Само смени.",
+                     "Cities and dates you change are only yours — everyone else keeps theirs. Leaving from somewhere else, arriving later or staying longer? Just change them.")
+        case 1 where editsSharedAsMember:
+            return L("Твоите датуми — не мора да се исти како кај другите.",
+                     "Your dates — they don't have to match anyone else's.")
         case 0: return isEditing
                     ? L("Допри ја цртата горе за да скокнеш на кој било чекор, или „Зачувај“ кога ќе завршиш.",
                         "Tap the bar above to jump to any step, or “Save” when you're done.")
@@ -610,8 +622,7 @@ struct TripWizardView: View {
     }
 
     private var dayWord: String {
-        if AppLanguage.current == .mk { return draft.dayCount == 1 ? "ден" : "дена" }
-        return draft.dayCount == 1 ? "day" : "days"
+        draft.dayCount == 1 ? L("ден", "day") : L("дена", "days")
     }
 
     // Чекор 3
@@ -1225,6 +1236,16 @@ struct TripWizardView: View {
         updated.outfitPacked = original.outfitPacked
         // Багажот и стилот сега се мои (кај заедничко патување — само за мене)
         updated.ownBags = true
+        // Член на заедничко патување: сменетите градови и датуми се само мои,
+        // а ако не ги менувал — продолжува да ги следи тие на сопственикот
+        updated.memberPlans = original.memberPlans
+        if original.isCloud && !original.isMine {
+            let planChanged = !original.myPlan.sameRoute(as: updated.myPlan)
+                || original.transport != updated.transport
+                || original.airlineID != updated.airlineID
+                || original.hasLaundry != updated.hasLaundry
+            updated.ownPlan = (original.ownPlan == true || planChanged) ? true : nil
+        }
 
         // Заедничко патување: мојот запис, сопственикот и членовите остануваат
         updated.ownerUID = original.ownerUID

@@ -1,0 +1,5 @@
+/* Tripdrobe — sr-Latn */
+"CFBundleDisplayName" = "Tripdrobe";
+"NSCameraUsageDescription" = "Tripdrobe koristi kameru da fotografišeš odeću za svoju garderobu.";
+"NSContactsUsageDescription" = "Tripdrobe koristi kontakt koji izabereš da pozoveš saputnika.";
+"NSPhotoLibraryAddUsageDescription" = "Tripdrobe čuva sliku priče o putovanju u Photos.";

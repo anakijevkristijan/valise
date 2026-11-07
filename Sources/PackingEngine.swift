@@ -9,12 +9,12 @@ enum Catalog {
             return L("Адаптер за штекер (тип \(type))", "Plug adapter (type \(type))")
         }
         guard let pair = names[key] else { return nil }
-        return AppLanguage.current == .mk ? pair.0 : pair.1
+        return L(pair.0, pair.1)
     }
 
     static func note(_ key: String) -> String? {
         guard let pair = notes[key] else { return nil }
-        return AppLanguage.current == .mk ? pair.0 : pair.1
+        return L(pair.0, pair.1)
     }
 
     /// Работи што може да ги носи само еден од друштвото.
@@ -29,7 +29,7 @@ enum Catalog {
 
     static func exitTitle(_ key: String) -> String? {
         guard let pair = exit[key] else { return nil }
-        return AppLanguage.current == .mk ? pair.0 : pair.1
+        return L(pair.0, pair.1)
     }
 
     private static let names: [String: (String, String)] = [

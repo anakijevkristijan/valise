@@ -36,7 +36,8 @@ final class PremiumStore: ObservableObject {
     @Published private(set) var isSandbox = false
     /// Само за тестирање во TestFlight: апликацијата се однесува како бесплатна иако Premium е купен.
     /// Во App Store (вистинско купување) нема ефект.
-    @Published private(set) var simulatesFree = UserDefaults.standard.bool(forKey: "testSimulateFree")
+    /// Тест-прекинувачот е тргнат за App Store — секогаш false (стара поставка се брише при старт).
+    @Published private(set) var simulatesFree = false
     /// Дали корисникот може да ја добие бесплатната проба (само еднаш по Apple ID).
     @Published private(set) var trialEligible = false
     /// false = претплатата е откажана и Premium трае само до `expirationDate`.
@@ -64,6 +65,7 @@ final class PremiumStore: ObservableObject {
 
     init() {
         isPremium = UserDefaults.standard.bool(forKey: Self.storageKey)
+        UserDefaults.standard.removeObject(forKey: "testSimulateFree")
         // Веднаш при старт, а не дури кога ќе се вчитаат производите — за тест-отклучувањето
         // никогаш да не се појави во App Store/TestFlight (пр. без интернет или пред да се направат претплатите).
         isStoreInstall = !Self.isSideloaded
