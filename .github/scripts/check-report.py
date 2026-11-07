@@ -19,11 +19,13 @@ NAMES = {
     "el": "Ελληνικά", "tr": "Türkçe", "de": "Deutsch", "fr": "Français", "es": "Español",
     "it": "Italiano", "pl": "Polski", "pt": "Português",
 }
-SCREENS = ["language", "name", "home", "trip", "packing", "outfits", "wardrobe", "looks", "settings", "new", "offer"]
+SCREENS = ["language", "name", "home", "trip", "friends", "weather", "packing", "exit", "outfits", "wardrobe", "looks",
+           "settings", "new", "dates", "edit-bags", "offer"]
 SCREEN_NAMES = {
     "language": "Јазик", "name": "Име", "home": "Почетна", "trip": "Патување", "packing": "Листа",
     "outfits": "Аутфити", "wardrobe": "Гардероба", "looks": "Аутфити (гардероба)", "settings": "Профил",
-    "new": "Ново патување", "offer": "Premium",
+    "new": "Ново патување", "offer": "Premium", "friends": "Сопатници", "weather": "Прогноза",
+    "exit": "Пред излез", "dates": "Датуми", "edit-bags": "Багаж",
 }
 
 

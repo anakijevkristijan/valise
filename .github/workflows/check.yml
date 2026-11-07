@@ -21,6 +21,14 @@ jobs:
       - name: Преземи код
         uses: actions/checkout@v4
 
+      - name: Провери ја верзијата на кодот
+        run: |
+          echo "Код: $(git rev-parse --short HEAD) — $(git log -1 --format=%s)"
+          if ! grep -q "value || ScreenshotMode.isOn" Sources/PremiumStore.swift; then
+            echo "::error::Стара верзија на кодот. Качи го новиот zip во КОРЕНОТ на репото."
+            exit 1
+          fi
+
       - name: Инсталирај XcodeGen
         run: brew install xcodegen
 
@@ -140,7 +148,7 @@ jobs:
           while read -r KEY UDID <&3; do
             [ -z "$UDID" ] && continue
             case "$KEY" in
-              pro) SCREENS="language name home trip packing outfits wardrobe looks settings new offer" ;;
+              pro) SCREENS="language name home trip friends weather packing exit outfits wardrobe looks settings new dates edit-bags offer" ;;
               *) SCREENS="language name home trip settings new" ;;
             esac
             echo "▶︎ $KEY ($UDID)"
@@ -168,7 +176,7 @@ jobs:
               for SCREEN in $SCREENS; do
                 xcrun simctl launch "$UDID" "$BUNDLE" -TripdrobeScreenshots -lang "$LANG" -screen "$SCREEN" > /dev/null || true
                 case "$SCREEN" in
-                  home|trip|packing|outfits) sleep 8 ;;
+                  home|trip|friends|weather|packing|exit|outfits|dates|edit-bags) sleep 8 ;;
                   *) sleep 6 ;;
                 esac
                 xcrun simctl io "$UDID" screenshot "shots/$KEY/$LANG/$SCREEN.png" > /dev/null || echo "  ✗ $LANG $SCREEN"
@@ -232,7 +240,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Tripdrobe-check
+          name: Tripdrobe-check-${{ github.run_number }}
           path: report
           retention-days: 30
 
