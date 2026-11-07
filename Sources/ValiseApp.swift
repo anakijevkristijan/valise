@@ -72,6 +72,10 @@ struct ValiseApp: App {
             _store = StateObject(wrappedValue: trips)
             _wardrobe = StateObject(wrappedValue: closet)
         }
+        #if DEBUG
+        // Автоматска проверка (workflow „Провери ја апликацијата“) — само Debug
+        if SelfTest.isOn { SelfTest.run() }
+        #endif
     }
 
     var body: some Scene {
@@ -115,7 +119,7 @@ struct RootView: View {
     /// 0 = јазик, 4 = возраст (пред да се внесе било што), 1 = име, 2 = акаунт (задолжителен),
     /// 5 = телефон (по најавата, може да се прескокне), 6 = се враќа акаунтот (број, име), 3 = почетна
     private var stage: Int {
-        if ScreenshotMode.isOn { return 3 }
+        if ScreenshotMode.isOn { return ScreenshotMode.stage }
         if !languageChosen { return 0 }
         if account.hasSession {
             // Најавен, но профилот (бројот, името) уште се враќа — да не се прашува за број/име без потреба
@@ -204,6 +208,10 @@ struct RootView: View {
                 .environmentObject(premium)
                 .preferredColorScheme(.light)
                 .tint(Theme.navy)
+        }
+        .onAppear {
+            // Демо-режим (само Debug): екранот со понудата за Premium
+            if ScreenshotMode.isOn && ScreenshotMode.screen == "offer" { showOffer = true }
         }
     }
 }

@@ -118,12 +118,17 @@ enum Translations {
         defer { lock.unlock() }
         if let hit = cache[language]?[english] { return hit }
         let table = tables[language] ?? load(language)
-        let result = lookup(english, in: table)
+        let found = lookup(english, in: table)
+        #if DEBUG
+        if found == nil { MissingTranslations.note(english, for: language) }
+        #endif
+        let result = found ?? english
         cache[language, default: [:]][english] = result
         return result
     }
 
-    private static func lookup(_ english: String, in table: Table) -> String {
+    /// nil = нема превод (се прикажува англискиот текст).
+    private static func lookup(_ english: String, in table: Table) -> String? {
         if let exact = table.exact[english] { return exact }
         let range = NSRange(english.startIndex..., in: english)
         for (regex, translation) in table.patterns {
@@ -135,7 +140,7 @@ enum Translations {
             }
             return output
         }
-        return english
+        return nil
     }
 
     private static func load(_ language: AppLanguage) -> Table {
@@ -196,3 +201,28 @@ enum Translations {
         }
     }
 }
+
+#if DEBUG
+/// Само Debug: текстовите без превод. Во демо-режимот се запишуваат и во
+/// Documents/missing-translations-<јазик>.txt — ги собира workflow-от „Провери ја апликацијата“.
+enum MissingTranslations {
+    /// „de|Some English text“
+    private(set) static var all: Set<String> = []
+
+    static func note(_ english: String, for language: AppLanguage) {
+        guard english.rangeOfCharacter(from: .letters) != nil,
+              all.insert("\(language.rawValue)|\(english)").inserted,
+              ScreenshotMode.isOn,
+              let folder = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
+        let url = folder.appendingPathComponent("missing-translations-\(language.rawValue).txt")
+        let line = english.replacingOccurrences(of: "\n", with: "\\n") + "\n"
+        if let handle = try? FileHandle(forWritingTo: url) {
+            handle.seekToEndOfFile()
+            handle.write(Data(line.utf8))
+            try? handle.close()
+        } else {
+            try? line.write(to: url, atomically: true, encoding: .utf8)
+        }
+    }
+}
+#endif

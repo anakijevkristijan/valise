@@ -57,6 +57,7 @@ struct HomeView: View {
         }
         .task { await store.refreshAllUpcoming() }
         .onAppear(perform: openScreenshotTrip)
+        .onAppear(perform: openScreenshotSheet)
         .onAppear(perform: openFromNotification)
         .onChange(of: router.openTripID) { _, _ in openFromNotification() }
         .fullScreenCover(isPresented: $showWizard, onDismiss: openPendingTrip) {
@@ -292,6 +293,16 @@ struct HomeView: View {
         showSettings = false
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             path = [id]
+        }
+    }
+
+    /// Демо-режим (само Debug): Профил или ново патување за сликање.
+    private func openScreenshotSheet() {
+        guard ScreenshotMode.isOn else { return }
+        switch ScreenshotMode.screen {
+        case "settings": showSettings = true
+        case "new": showWizard = true
+        default: break
         }
     }
 

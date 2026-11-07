@@ -13,10 +13,21 @@ enum ScreenshotMode {
     #endif
 
     /// Екранот што се слика:
-    /// home, trip, weather, outfits, bags, packing, day, story, wardrobe, looks.
+    /// home, trip, weather, outfits, bags, packing, day, story, wardrobe, looks,
+    /// language, name, age, settings, new (ново патување), offer (понуда за Premium).
     static var screen: String {
         guard isOn else { return "" }
         return argument("-screen") ?? "home"
+    }
+
+    /// Кој чекор од апликацијата: language → избор на јазик, name → име, age → возраст; инаку почетна.
+    static var stage: Int {
+        switch screen {
+        case "language": return 0
+        case "name": return 1
+        case "age": return 4
+        default: return 3
+        }
     }
 
     /// 0 = Патувања, 1 = Гардероба.
@@ -55,7 +66,9 @@ enum ScreenshotMode {
         guard isOn else { return }
         let defaults = UserDefaults.standard
         defaults.set(true, forKey: "languageChosen")
-        defaults.set(AppLanguage.en.rawValue, forKey: AppLanguage.storageKey)
+        // -lang de → апликацијата на тој јазик (проверка на преводите); стандардно англиски
+        let language = argument("-lang").flatMap { AppLanguage(rawValue: $0) } ?? .en
+        defaults.set(language.rawValue, forKey: AppLanguage.storageKey)
         defaults.set(argument("-name") ?? "Emma", forKey: "userName")
         defaults.set(true, forKey: AgeGateView.verifiedKey)
         defaults.set(true, forKey: PhoneStepView.askedKey)
