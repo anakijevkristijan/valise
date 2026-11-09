@@ -140,7 +140,7 @@ struct TripDetailView: View {
         }
         .task(priority: .background) { await PhotoService.prefetchStory(for: trip.destination) }
         .sensoryFeedback(.selection, trigger: trip.packedCount)
-        .sensoryFeedback(.success, trigger: trip.items.count > 0 && trip.packedCount == trip.items.count)
+        .sensoryFeedback(.success, trigger: trip.totalCount > 0 && trip.packedCount == trip.totalCount)
         .sheet(item: $addItemCategory) { category in
             AddItemSheet(initialCategory: category, isShared: addTogether) { item in
                 let shared = addTogether
@@ -542,7 +542,7 @@ struct TripDetailView: View {
 
     private func tabPicker(_ trip: Trip) -> some View {
         HStack(alignment: .bottom, spacing: 20) {
-            tabButton(.packing, title: L("Пакување", "Packing"), count: "\(trip.packedCount)/\(trip.items.count)")
+            tabButton(.packing, title: L("Пакување", "Packing"), count: "\(trip.packedCount)/\(trip.totalCount)")
             tabButton(.exit, title: L("Пред излез", "Before you leave"), count: "\(trip.exitChecklist.filter(\.isDone).count)/\(trip.exitChecklist.count)")
             Spacer()
         }
@@ -622,7 +622,7 @@ struct TripDetailView: View {
                 togetherBlock(trip)
             }
 
-            if trip.together != nil {
+            if trip.together != nil || (premium.isPremium && trip.hasFamily) {
                 Text(L("МОЈА ЛИСТА", "MY LIST"))
                     .font(.sans(11, .semibold))
                     .tracking(2.4)
@@ -649,6 +649,12 @@ struct TripDetailView: View {
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(SecondaryButtonStyle())
+
+            // Децата и миленичињата - секое со своја листа (Premium)
+            if premium.isPremium && trip.hasFamily {
+                FamilyPackingSections(trip: trip)
+                    .padding(.top, 8)
+            }
 
             Text(L("Допри за спакувано. Држи подолго за количина или бришење.",
                    "Tap to mark as packed. Long-press for quantity or removal."))
@@ -1404,6 +1410,8 @@ struct SuggestionsCard: View {
 struct AddItemSheet: View {
     let initialCategory: ItemCategory
     var isShared: Bool = false
+    /// Свој наслов (пр. „За Ана“).
+    var title: String?
     let onAdd: (PackingItem) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -1413,13 +1421,21 @@ struct AddItemSheet: View {
     @State private var didSetup = false
     @FocusState private var focused: Bool
 
+    init(initialCategory: ItemCategory, isShared: Bool = false, title: String? = nil,
+         onAdd: @escaping (PackingItem) -> Void) {
+        self.initialCategory = initialCategory
+        self.isShared = isShared
+        self.title = title
+        self.onAdd = onAdd
+    }
+
     var body: some View {
         ZStack {
             PaperBackground()
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
                     HStack {
-                        Eyebrow(isShared ? L("Заедничко", "Shared item") : L("Нов предмет", "New item"), color: Theme.gold)
+                        Eyebrow(title ?? (isShared ? L("Заедничко", "Shared item") : L("Нов предмет", "New item")), color: Theme.gold)
                         Spacer()
                         CircleIconButton(systemName: "xmark") { dismiss() }
                     }

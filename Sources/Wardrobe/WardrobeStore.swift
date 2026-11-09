@@ -43,8 +43,8 @@ struct OutfitLoad {
         switch level {
         case .over:
             if ratio > 1 {
-                return L("Облеката е околу \(volume) L, а во „\(bagName)“ има место за околу \(room) L облека. Повтори панталони, јакна или обувки — не мора секој ден ново парче.",
-                         "Your clothes take about \(volume) L, but “\(bagName)” fits about \(room) L of clothing. Repeat trousers, a jacket or shoes — you don't need a new piece every day.")
+                return L("Облеката е околу \(volume) L, а во „\(bagName)“ има место за околу \(room) L облека. Повтори панталони, јакна или обувки - не мора секој ден ново парче.",
+                         "Your clothes take about \(volume) L, but “\(bagName)” fits about \(room) L of clothing. Repeat trousers, a jacket or shoes - you don't need a new piece every day.")
             }
             return L("\(pieces) парчиња е многу за \(Fmt.days(days)). Препорака: до \(recommended). Комбинирај ги парчињата во повеќе аутфити.",
                      "\(pieces) pieces is a lot for \(Fmt.days(days)). Suggested: up to \(recommended). Mix pieces into more outfits.")
@@ -53,8 +53,8 @@ struct OutfitLoad {
                      "Almost full. A few more repeats and there's room for souvenirs.")
         case .ok:
             if repeated > 0 {
-                return L("\(repeated) парчиња се повторуваат — паметно спакувано.",
-                         "\(repeated) pieces are repeated — smart packing.")
+                return L("\(repeated) парчиња се повторуваат - паметно спакувано.",
+                         "\(repeated) pieces are repeated - smart packing.")
             }
             return L("Има место. Повторувај парчиња за уште полесен куфер.",
                      "Plenty of room. Repeat pieces for an even lighter bag.")
@@ -65,8 +65,8 @@ struct OutfitLoad {
     var travelNote: String? {
         guard !wornOnTravel.isEmpty else { return nil }
         let names = wornOnTravel.map(\.name).joined(separator: L(" и ", " and "))
-        return L("Не се бројат во куферот: \(names) — облечи ги на пат.",
-                 "Not counted in the bag: \(names) — wear them while travelling.")
+        return L("Не се бројат во куферот: \(names) - облечи ги на пат.",
+                 "Not counted in the bag: \(names) - wear them while travelling.")
     }
 }
 
@@ -115,7 +115,7 @@ final class WardrobeStore: ObservableObject {
         outfit.itemIDs.compactMap { item($0) }
     }
 
-    /// Мала верзија за мрежи, колажи и листи — многу побрзо од целата слика.
+    /// Мала верзија за мрежи, колажи и листи - многу побрзо од целата слика.
     func thumbnail(for item: WardrobeItem) -> UIImage? {
         let key = ("thumb-" + item.imageName) as NSString
         if let cached = cache.object(forKey: key) { return cached }
@@ -145,15 +145,16 @@ final class WardrobeStore: ObservableObject {
     }
 
     /// Парчињата од групата, подредени по вид (маици, па џемпери…), најновите први.
-    func items(in category: WardrobeCategory, season: Season?) -> [WardrobeItem] {
-        items.filter { $0.category == category && $0.fits(season) }
+    /// `owner`: nil = моите, инаку на детето.
+    func items(in category: WardrobeCategory, season: Season?, owner: UUID? = nil) -> [WardrobeItem] {
+        items.filter { $0.category == category && $0.fits(season) && $0.ownerID == owner }
             .sorted { lhs, rhs in
                 let a = Self.kindOrder(lhs), b = Self.kindOrder(rhs)
                 return a == b ? lhs.createdAt > rhs.createdAt : a < b
             }
     }
 
-    /// Редослед по вид (без вид — на крај).
+    /// Редослед по вид (без вид - на крај).
     static func kindOrder(_ item: WardrobeItem) -> Int {
         item.effectiveKind.flatMap { WardrobeKind.allCases.firstIndex(of: $0) } ?? WardrobeKind.allCases.count
     }
@@ -177,7 +178,7 @@ final class WardrobeStore: ObservableObject {
     // MARK: Колку пати е облечено на патувањето
 
     /// Колку пати парчето се облекува на патувањето (секој аутфит, секој ден = еднаш).
-    /// `excludingOutfit` — не ги брои појавувањата на тој аутфит (кога се уредува).
+    /// `excludingOutfit` - не ги брои појавувањата на тој аутфит (кога се уредува).
     func usage(of itemID: UUID, in trip: Trip, excludingOutfit: UUID? = nil) -> Int {
         trip.outfitSlots.reduce(0) { count, slot in
             guard slot.outfitID != excludingOutfit, let outfit = self.outfit(slot.outfitID) else { return count }
@@ -221,8 +222,8 @@ final class WardrobeStore: ObservableObject {
     // MARK: Листата за пакување наспроти аутфитите
 
     /// За секој ред од листата (маици 5, џемпер / дуксер 2…): колку предлага листата
-    /// и колку различни парчиња од аутфитите се бројат токму таму (џемперот — во џемпери, не во маици).
-    /// `extra` — парчиња избрани во составувачот (уште не зачувани).
+    /// и колку различни парчиња од аутфитите се бројат токму таму (џемперот - во џемпери, не во маици).
+    /// `extra` - парчиња избрани во составувачот (уште не зачувани).
     func targets(for trip: Trip, extra: [UUID] = [], excludingOutfit: UUID? = nil) -> [ClothingTarget] {
         var pieceIDs = Set(wearCounts(for: trip, excludingOutfit: excludingOutfit).keys)
         for id in extra where item(id) != nil { pieceIDs.insert(id) }
@@ -237,7 +238,7 @@ final class WardrobeStore: ObservableObject {
             need[key, default: 0] += row.quantity
         }
 
-        // Секое парче во својот ред; ако видот има два можни реда (панталони / долги панталони) — прво во оној што не е полн
+        // Секое парче во својот ред; ако видот има два можни реда (панталони / долги панталони) - прво во оној што не е полн
         var have: [String: Int] = [:]
         for piece in pieces {
             let candidates = piece.packingKeys.filter { need[$0] != nil }
@@ -272,7 +273,7 @@ final class WardrobeStore: ObservableObject {
     }
 
     /// Колку облека ќе носиш и дали собира во куферот.
-    /// `extra` — парчиња што уште не се зачувани (во составувачот).
+    /// `extra` - парчиња што уште не се зачувани (во составувачот).
     func load(for trip: Trip, extra: [UUID] = [], excludingOutfit: UUID? = nil) -> OutfitLoad {
         var counts = wearCounts(for: trip, excludingOutfit: excludingOutfit)
         for id in Set(extra) where item(id) != nil {
@@ -371,7 +372,7 @@ final class WardrobeStore: ObservableObject {
         return changed
     }
 
-    // MARK: Промени — парчиња
+    // MARK: Промени - парчиња
 
     func add(_ item: WardrobeItem, image: UIImage) {
         // Помал стикер = побрза мрежа и помалку место (провидноста останува).
@@ -408,7 +409,7 @@ final class WardrobeStore: ObservableObject {
         changed.forEach { cloud?.pushOutfit($0) }
     }
 
-    // MARK: Промени — аутфити
+    // MARK: Промени - аутфити
 
     func save(outfit: Outfit) {
         if let index = outfits.firstIndex(where: { $0.id == outfit.id }) {
@@ -426,13 +427,23 @@ final class WardrobeStore: ObservableObject {
         cloud?.deleteOutfit(id)
     }
 
+    /// Детето е избришано од „Моето семејство“: заминуваат и неговите парчиња и аутфити.
+    func deleteAll(ownedBy owner: UUID) {
+        for outfit in outfits where outfit.ownerID == owner {
+            deleteOutfit(outfit.id)
+        }
+        for item in items where item.ownerID == owner {
+            delete(item.id)
+        }
+    }
+
     // MARK: Облак (акаунт)
 
-    /// Поврзано кога си најавен — секоја промена се зачувува и на акаунтот.
+    /// Поврзано кога си најавен - секоја промена се зачувува и на акаунтот.
     weak var cloud: PersonalCloud?
 
     enum CloudState: Equatable {
-        case off        // не си најавен — само на телефонот
+        case off        // не си најавен - само на телефонот
         case syncing
         case synced
         case failed     // пр. правилата во Firebase не се ажурирани
@@ -514,7 +525,7 @@ final class WardrobeStore: ObservableObject {
         let migrated = saved.items.map { $0.migratedKind() }
         items = migrated
         outfits = saved.outfits
-        // (за секој случај — набљудувачите не секогаш се викаат за време на init)
+        // (за секој случај - набљудувачите не секогаш се викаат за време на init)
         itemIndex = Dictionary(items.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         outfitIndex = Dictionary(outfits.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         if migrated != saved.items { save() }
@@ -525,7 +536,7 @@ final class WardrobeStore: ObservableObject {
             let data = try JSONEncoder().encode(Saved(items: items, outfits: outfits))
             try data.write(to: fileURL, options: .atomic)
         } catch {
-            print("Valise: wardrobe save failed — \(error)")
+            print("Valise: wardrobe save failed - \(error)")
         }
     }
 }

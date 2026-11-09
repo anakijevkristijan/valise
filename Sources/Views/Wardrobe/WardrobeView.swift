@@ -10,13 +10,21 @@ struct WardrobeView: View {
 
     @State private var section: Pane = ScreenshotMode.screen == "looks" ? .outfits : .pieces
     @State private var season: Season?
-    /// Филтер по група во „Парчиња“ — nil = сите.
+    /// Филтер по група во „Парчиња“ - nil = сите.
     @State private var categoryFilter: WardrobeCategory?
     @State private var showAddItem = false
     @State private var editingItem: WardrobeItem?
     @State private var showNewOutfit = false
     @State private var editingOutfit: Outfit?
     @State private var showSortKinds = false
+    /// Чија гардероба: nil = моја, инаку дете од „Моето семејство“ (Premium).
+    @State private var owner: UUID?
+    @ObservedObject private var family = FamilyStore.shared
+
+    /// Парчињата и аутфитите на избраниот (јас или детето).
+    private var ownerItems: [WardrobeItem] { wardrobe.items.filter { $0.ownerID == owner } }
+    private var ownerOutfits: [Outfit] { wardrobe.outfits.filter { $0.ownerID == owner } }
+    private var ownerName: String? { family.member(owner)?.name }
 
     var body: some View {
         NavigationStack {
@@ -25,8 +33,11 @@ struct WardrobeView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 24) {
                         header
+                        if !family.children.isEmpty {
+                            personPicker
+                        }
                         sectionPicker
-                        if section == .pieces && !wardrobe.items.isEmpty {
+                        if section == .pieces && !ownerItems.isEmpty {
                             categoryPicker
                         }
                         SeasonFilter(season: $season)
@@ -43,12 +54,16 @@ struct WardrobeView: View {
             }
             .toolbar(.hidden, for: .navigationBar)
         }
+        .onChange(of: family.members) { _, members in
+            // Избришано дете → назад на мојата гардероба
+            if let owner, !members.contains(where: { $0.id == owner }) { self.owner = nil }
+        }
         .sheet(isPresented: $showAccount) {
             AccountView(startWith: .signIn)
                 .environmentObject(account)
         }
         .sheet(isPresented: $showAddItem) {
-            AddWardrobeItemView()
+            AddWardrobeItemView(ownerID: owner)
                 .environmentObject(wardrobe)
                 .presentationCornerRadius(28)
         }
@@ -58,7 +73,7 @@ struct WardrobeView: View {
                 .presentationCornerRadius(28)
         }
         .sheet(isPresented: $showNewOutfit) {
-            OutfitBuilderView(startSeason: season)
+            OutfitBuilderView(startSeason: season, ownerID: owner)
                 .environmentObject(wardrobe)
                 .presentationCornerRadius(28)
         }
@@ -99,8 +114,8 @@ struct WardrobeView: View {
                 Text(L("Гардероба", "Wardrobe"))
                     .font(.serif(36))
                     .foregroundStyle(Theme.ink)
-                Text(L("\(wardrobe.items.count) парчиња · \(wardrobe.outfits.count) аутфити",
-                       "\(wardrobe.items.count) pieces · \(wardrobe.outfits.count) outfits"))
+                Text(L("\(ownerItems.count) парчиња · \(ownerOutfits.count) аутфити",
+                       "\(ownerItems.count) pieces · \(ownerOutfits.count) outfits"))
                     .font(.sans(14))
                     .foregroundStyle(Theme.inkSoft)
                 cloudStatus
@@ -147,13 +162,34 @@ struct WardrobeView: View {
             HStack(alignment: .top, spacing: 6) {
                 Image(systemName: "exclamationmark.icloud")
                     .font(.system(size: 11))
-                Text(L("Не се зачувува на акаунтот — објави ги новите правила во Firebase (firestore.rules).",
-                       "Not saving to your account — publish the new Firebase rules (firestore.rules)."))
+                Text(L("Не се зачувува на акаунтот - објави ги новите правила во Firebase (firestore.rules).",
+                       "Not saving to your account - publish the new Firebase rules (firestore.rules)."))
                     .font(.sans(11, .medium))
                     .fixedSize(horizontal: false, vertical: true)
             }
             .foregroundStyle(Theme.terracotta)
         }
+    }
+
+    /// Јас · Ана · Лука - чија гардероба се гледа.
+    private var personPicker: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: 8) {
+                ChipButton(title: L("Јас", "Me"), isSelected: owner == nil) {
+                    withAnimation(.easeInOut(duration: 0.2)) { owner = nil }
+                }
+                ForEach(family.children) { child in
+                    ChipButton(title: child.name, isSelected: owner == child.id) {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            owner = child.id
+                            categoryFilter = nil
+                        }
+                    }
+                }
+            }
+            .padding(.vertical, 1)
+        }
+        .scrollIndicators(.hidden)
     }
 
     private var sectionPicker: some View {
@@ -187,19 +223,27 @@ struct WardrobeView: View {
 
     @ViewBuilder
     private var piecesContent: some View {
-        if wardrobe.items.isEmpty {
-            emptyState(icon: "hanger",
-                       title: L("Твојата гардероба", "Your wardrobe"),
-                       text: L("Сликај ја јакната, фармерките, омилените чевли — секое парче станува стикер со кој составуваш аутфити.",
-                               "Photograph your jacket, jeans, favourite shoes — each piece becomes a sticker you can style into outfits."),
-                       action: L("Додај прво парче", "Add your first piece")) { showAddItem = true }
+        if ownerItems.isEmpty {
+            if let ownerName {
+                emptyState(icon: "figure.child",
+                           title: L("Гардеробата на \(ownerName)", "\(ownerName)'s wardrobe"),
+                           text: L("Сликај ја облеката на \(ownerName) - секое парче станува стикер, па составуваш аутфити и за \(ownerName).",
+                                   "Photograph \(ownerName)'s clothes - each piece becomes a sticker, so you can style outfits for \(ownerName) too."),
+                           action: L("Додај прво парче", "Add your first piece")) { showAddItem = true }
+            } else {
+                emptyState(icon: "hanger",
+                           title: L("Твојата гардероба", "Your wardrobe"),
+                           text: L("Сликај ја јакната, фармерките, омилените чевли - секое парче станува стикер со кој составуваш аутфити.",
+                                   "Photograph your jacket, jeans, favourite shoes - each piece becomes a sticker you can style into outfits."),
+                           action: L("Додај прво парче", "Add your first piece")) { showAddItem = true }
+            }
         } else {
             let pending = wardrobe.itemsNeedingKind.count
             if pending > 0 {
                 sortKindsCard(pending)
             }
             let shown = WardrobeCategory.allCases.filter { categoryFilter == nil || $0 == categoryFilter }
-            if shown.allSatisfy({ wardrobe.items(in: $0, season: season).isEmpty }) {
+            if shown.allSatisfy({ wardrobe.items(in: $0, season: season, owner: owner).isEmpty }) {
                 Text(season == nil ? L("Нема парчиња во оваа група.", "No pieces in this group.")
                                    : L("Нема парчиња во оваа група за оваа сезона.", "No pieces in this group for this season."))
                     .font(.sans(14))
@@ -207,7 +251,7 @@ struct WardrobeView: View {
                     .padding(.top, 4)
             }
             ForEach(shown) { category in
-                let list = wardrobe.items(in: category, season: season)
+                let list = wardrobe.items(in: category, season: season, owner: owner)
                 if !list.isEmpty {
                     let groups = WardrobeKindGroup.groups(list)
                     VStack(alignment: .leading, spacing: 12) {
@@ -247,7 +291,7 @@ struct WardrobeView: View {
     /// Групи: Сите · Горни делови · Фустани и сукњи… (само групите што имаат парчиња).
     private var categoryPicker: some View {
         let present = WardrobeCategory.allCases.filter { category in
-            category == categoryFilter || wardrobe.items.contains { $0.category == category }
+            category == categoryFilter || ownerItems.contains { $0.category == category }
         }
         return ScrollView(.horizontal) {
             HStack(spacing: 8) {
@@ -255,7 +299,7 @@ struct WardrobeView: View {
                     withAnimation(.easeInOut(duration: 0.2)) { categoryFilter = nil }
                 }
                 ForEach(present) { category in
-                    let count = wardrobe.items.filter { $0.category == category }.count
+                    let count = ownerItems.filter { $0.category == category }.count
                     ChipButton(title: "\(category.title) \(count)", isSelected: categoryFilter == category) {
                         withAnimation(.easeInOut(duration: 0.2)) { categoryFilter = category }
                     }
@@ -279,7 +323,7 @@ struct WardrobeView: View {
             .onTapGesture { editingItem = item }
     }
 
-    /// Стара облека без вид — со еден допир по парче, за листата да брои точно.
+    /// Стара облека без вид - со еден допир по парче, за листата да брои точно.
     private func sortKindsCard(_ count: Int) -> some View {
         Button { showSortKinds = true } label: {
             HStack(spacing: 14) {
@@ -293,8 +337,8 @@ struct WardrobeView: View {
                                     : L("\(count) парчиња без вид", "\(count) pieces without a type"))
                         .font(.sans(15, .semibold))
                         .foregroundStyle(Theme.ink)
-                    Text(L("Подреди ги — маица, џемпер, дуксер… за точна листа",
-                           "Sort them — T-shirt, sweater, hoodie… for an accurate list"))
+                    Text(L("Подреди ги - маица, џемпер, дуксер… за точна листа",
+                           "Sort them - T-shirt, sweater, hoodie… for an accurate list"))
                         .font(.sans(12))
                         .foregroundStyle(Theme.inkSoft)
                         .fixedSize(horizontal: false, vertical: true)
@@ -313,12 +357,18 @@ struct WardrobeView: View {
 
     @ViewBuilder
     private var outfitsContent: some View {
-        let list = wardrobe.outfits.filter { wardrobe.outfitFits($0, season) }.sorted { $0.createdAt > $1.createdAt }
-        if wardrobe.outfits.isEmpty {
+        let list = ownerOutfits.filter { wardrobe.outfitFits($0, season) }.sorted { $0.createdAt > $1.createdAt }
+        if ownerOutfits.isEmpty, let ownerName {
             emptyState(icon: "sparkles",
                        title: L("Состави аутфит", "Style an outfit"),
-                       text: L("Избери парчиња од гардеробата и зачувај ги како аутфит — потоа планирај што носиш секој ден од патувањето.",
-                               "Pick pieces from your wardrobe and save them as an outfit — then plan what you'll wear each day of your trip."),
+                       text: L("Избери парчиња од гардеробата на \(ownerName) и зачувај ги како аутфит.",
+                               "Pick pieces from \(ownerName)'s wardrobe and save them as an outfit."),
+                       action: L("Нов аутфит", "New outfit")) { showNewOutfit = true }
+        } else if ownerOutfits.isEmpty {
+            emptyState(icon: "sparkles",
+                       title: L("Состави аутфит", "Style an outfit"),
+                       text: L("Избери парчиња од гардеробата и зачувај ги како аутфит - потоа планирај што носиш секој ден од патувањето.",
+                               "Pick pieces from your wardrobe and save them as an outfit - then plan what you'll wear each day of your trip."),
                        action: L("Нов аутфит", "New outfit")) { showNewOutfit = true }
         } else {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 14)], spacing: 18) {
@@ -394,7 +444,7 @@ struct MainTabView: View {
     }
 }
 
-/// На iOS 26+ таб-лентата е Liquid Glass (системска); на постарите — во бојата на хартијата.
+/// На iOS 26+ таб-лентата е Liquid Glass (системска); на постарите - во бојата на хартијата.
 struct TabBarLook: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 26, *) {

@@ -5,7 +5,8 @@ import FirebaseFirestore
 /// Лични податоци на акаунтот - само ги гледа сопственикот:
 /// users/{uid}/wardrobe   - парчиња (со сликата)
 /// users/{uid}/outfits    - аутфити
-/// users/{uid}/tripPlans  - по патување: аутфити по денови, спакувано, „пред излез“
+/// users/{uid}/tripPlans  - по патување: аутфити по денови, спакувано, „пред излез“, листите на децата и миленичињата
+/// users/{uid}/family     - „Моето семејство“: деца и миленичиња
 ///
 /// При најава: сè од облакот доаѓа на телефонот (а она што е само на телефонот се качува).
 /// При одјава телефонот се празни - податоците остануваат тука, на акаунтот.
@@ -19,6 +20,7 @@ final class PersonalCloud {
     private var mergedItems = false
     private var mergedOutfits = false
     private var mergedPlans = false
+    private var mergedFamily = false
 
     /// Лично за едно патување: аутфити по денови, што е спакувано, „пред излез“, скриени предлози.
     struct Plan: Equatable {
@@ -26,6 +28,8 @@ final class PersonalCloud {
         var packed: [UUID]
         var exit: [ChecklistItem]?
         var dismissed: [String]?
+        /// nil = постар запис (без делот за семејство) - тогаш не се менува.
+        var family: [TripFamilyMember]?
     }
 
     /// Последно познат план по патување (за патувања што ќе стигнат подоцна).
@@ -41,12 +45,14 @@ final class PersonalCloud {
     private var itemsRef: CollectionReference { home.collection("wardrobe") }
     private var outfitsRef: CollectionReference { home.collection("outfits") }
     private var plansRef: CollectionReference { home.collection("tripPlans") }
+    private var familyRef: CollectionReference { home.collection("family") }
 
     // MARK: Старт / стоп
 
     func start() {
         wardrobe?.cloud = self
         trips?.personal = self
+        FamilyStore.shared.cloud = self
         wardrobe?.cloudState = .syncing
 
         listeners.append(itemsRef.addSnapshotListener(includeMetadataChanges: true) { [weak self] snapshot, error in
@@ -64,6 +70,11 @@ final class PersonalCloud {
             guard let snapshot else { self.failed(error); return }
             self.handlePlans(snapshot)
         })
+        listeners.append(familyRef.addSnapshotListener(includeMetadataChanges: true) { [weak self] snapshot, error in
+            guard let self else { return }
+            guard let snapshot else { self.failed(error); return }
+            self.handleFamily(snapshot)
+        })
     }
 
     func stop() {
@@ -74,6 +85,7 @@ final class PersonalCloud {
             wardrobe?.cloudState = .off
         }
         if trips?.personal === self { trips?.personal = nil }
+        if FamilyStore.shared.cloud === self { FamilyStore.shared.cloud = nil }
     }
 
     private func failed(_ error: Error?) {
@@ -148,6 +160,7 @@ final class PersonalCloud {
         ]
         fields["isPhoto"] = item.isPhoto ?? false
         if let kindID = item.kindID { fields["kind"] = kindID }
+        if let owner = item.ownerID { fields["owner"] = owner.uuidString }
         return fields
     }
 
@@ -159,7 +172,8 @@ final class PersonalCloud {
         let created = (data["createdAt"] as? Double).map(Date.init(timeIntervalSince1970:)) ?? Date()
         let isPhoto = (data["isPhoto"] as? Bool) == true ? true : nil
         return WardrobeItem(id: id, name: name, category: category, seasons: seasons, createdAt: created,
-                            isPhoto: isPhoto, kindID: data["kind"] as? String)
+                            isPhoto: isPhoto, kindID: data["kind"] as? String,
+                            ownerID: (data["owner"] as? String).flatMap(UUID.init(uuidString:)))
     }
 
     // MARK: Аутфити
@@ -182,7 +196,9 @@ final class PersonalCloud {
                 guard let name = data["name"] as? String else { continue }
                 let ids = (data["itemIDs"] as? [String] ?? []).compactMap(UUID.init(uuidString:))
                 let created = (data["createdAt"] as? Double).map(Date.init(timeIntervalSince1970:)) ?? Date()
-                wardrobe.applyRemote(Outfit(id: id, name: name, itemIDs: ids, createdAt: created))
+                wardrobe.applyRemote(Outfit(id: id, name: name, itemIDs: ids, createdAt: created,
+                                            ownerID: (data["owner"] as? String).flatMap(UUID.init(uuidString:)),
+                                            layout: PieceLayout.layout(from: data["layout"])))
             case .removed:
                 wardrobe.removeRemoteOutfit(id)
             @unknown default:
@@ -194,11 +210,14 @@ final class PersonalCloud {
 
     func pushOutfit(_ outfit: Outfit) {
         wardrobe?.cloudState = .syncing
-        outfitsRef.document(outfit.id.uuidString).setData([
+        var fields: [String: Any] = [
             "name": outfit.name,
             "itemIDs": outfit.itemIDs.map(\.uuidString),
             "createdAt": outfit.createdAt.timeIntervalSince1970
-        ]) { [weak self] error in
+        ]
+        if let owner = outfit.ownerID { fields["owner"] = owner.uuidString }
+        if let layout = outfit.layout, !layout.isEmpty { fields["layout"] = PieceLayout.fields(for: layout) }
+        outfitsRef.document(outfit.id.uuidString).setData(fields) { [weak self] error in
             if let error { self?.failed(error) } else { self?.synced() }
         }
     }
@@ -259,6 +278,11 @@ final class PersonalCloud {
         if let dismissed = plan.dismissed {
             fields["dismissedSuggestions"] = dismissed
         }
+        // Децата и миленичињата - секогаш (и празно), за бришењето да стигне до другиот телефон
+        if let data = try? JSONEncoder().encode(plan.family ?? []),
+           let json = try? JSONSerialization.jsonObject(with: data) {
+            fields["family"] = json
+        }
         plansRef.document(trip.id.uuidString).setData(fields) { [weak self] error in
             if let error { self?.failed(error) }
         }
@@ -268,7 +292,7 @@ final class PersonalCloud {
 
     /// При бришење на акаунтот: сè лично од облакот.
     func deleteEverything() async {
-        for collection in [itemsRef, outfitsRef, plansRef] {
+        for collection in [itemsRef, outfitsRef, plansRef, familyRef] {
             guard let snapshot = try? await collection.getDocuments() else { continue }
             for document in snapshot.documents {
                 try? await document.reference.delete()
@@ -295,7 +319,8 @@ final class PersonalCloud {
         return Plan(days: days,
                     packed: trip.outfitPacked ?? [],
                     exit: trip.exitChecklist,
-                    dismissed: trip.dismissedSuggestions)
+                    dismissed: trip.dismissedSuggestions,
+                    family: trip.family ?? [])
     }
 
     private static func plan(from data: [String: Any]) -> Plan {
@@ -312,6 +337,71 @@ final class PersonalCloud {
             exit = try? JSONDecoder().decode([ChecklistItem].self, from: json)
         }
         let dismissed = data["dismissedSuggestions"] as? [String]
-        return Plan(days: days, packed: packed, exit: exit, dismissed: dismissed)
+        var family: [TripFamilyMember]?
+        if let raw = data["family"],
+           JSONSerialization.isValidJSONObject(raw),
+           let json = try? JSONSerialization.data(withJSONObject: raw) {
+            family = try? JSONDecoder().decode([TripFamilyMember].self, from: json)
+        }
+        return Plan(days: days, packed: packed, exit: exit, dismissed: dismissed, family: family)
+    }
+
+    // MARK: Моето семејство (деца и миленичиња)
+
+    private func handleFamily(_ snapshot: QuerySnapshot) {
+        let family = FamilyStore.shared
+        // Она што е само на телефонот (внесено пред најава) - горе, откако облакот навистина одговорил
+        if !mergedFamily && !snapshot.metadata.isFromCache {
+            mergedFamily = true
+            let remote = Set(snapshot.documents.map(\.documentID))
+            for member in family.members where !remote.contains(member.id.uuidString) {
+                pushFamily(member)
+            }
+        }
+        for change in snapshot.documentChanges {
+            if change.document.metadata.hasPendingWrites { continue }
+            guard let id = UUID(uuidString: change.document.documentID) else { continue }
+            switch change.type {
+            case .added, .modified:
+                if let member = Self.member(from: change.document.data(), id: id) {
+                    family.applyRemote(member)
+                }
+            case .removed:
+                family.removeRemote(id)
+            @unknown default:
+                break
+            }
+        }
+    }
+
+    func pushFamily(_ member: FamilyMember) {
+        var fields: [String: Any] = [
+            "kind": member.kind.rawValue,
+            "name": member.name,
+            "createdAt": member.createdAt.timeIntervalSince1970
+        ]
+        if let year = member.birthYear { fields["birthYear"] = year }
+        if let month = member.birthMonth { fields["birthMonth"] = month }
+        if let pet = member.petType { fields["petType"] = pet.rawValue }
+        familyRef.document(member.id.uuidString).setData(fields) { [weak self] error in
+            if let error { self?.failed(error) }
+        }
+    }
+
+    func deleteFamily(_ id: UUID) {
+        familyRef.document(id.uuidString).delete { [weak self] error in
+            if let error { self?.failed(error) }
+        }
+    }
+
+    private static func member(from data: [String: Any], id: UUID) -> FamilyMember? {
+        guard let kindRaw = data["kind"] as? String, let kind = FamilyKind(rawValue: kindRaw),
+              let name = data["name"] as? String else { return nil }
+        let created = (data["createdAt"] as? Double).map(Date.init(timeIntervalSince1970:)) ?? Date()
+        return FamilyMember(id: id, kind: kind, name: name,
+                            birthYear: (data["birthYear"] as? NSNumber)?.intValue,
+                            birthMonth: (data["birthMonth"] as? NSNumber)?.intValue,
+                            petType: (data["petType"] as? String).flatMap(PetType.init(rawValue:)),
+                            createdAt: created)
     }
 }

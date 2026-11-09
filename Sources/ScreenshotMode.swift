@@ -85,6 +85,7 @@ enum ScreenshotMode {
         guard isOn else { return }
         store.wipeLocal()
         wardrobe.wipeLocal()
+        FamilyStore.shared.wipeLocal()
 
         let looks = seedWardrobe(wardrobe)
 

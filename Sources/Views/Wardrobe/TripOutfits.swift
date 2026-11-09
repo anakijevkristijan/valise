@@ -123,7 +123,7 @@ struct TripOutfitsSection: View {
                             .rotationEffect(.degrees(5))
                             .padding(6)
                     }
-                    OutfitCollage(items: wardrobe.items(in: first))
+                    OutfitCollage(items: wardrobe.items(in: first), layout: first.layout)
                         .padding(6)
                         .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.surface))
                 } else {
@@ -364,8 +364,9 @@ struct DayOutfitsSheet: View {
         let todays = trip.outfitIDs(forKey: dayKey).compactMap { wardrobe.outfit($0) }
         let todayIDs = Set(todays.map(\.id))
         let weather = trip.weather.first { Calendar.current.isDate($0.date, inSameDayAs: date) }
+        // Само моите аутфити (децата немаат план по денови)
         let available = wardrobe.outfits
-            .filter { !todayIDs.contains($0.id) && wardrobe.outfitFits($0, season) }
+            .filter { $0.ownerID == nil && !todayIDs.contains($0.id) && wardrobe.outfitFits($0, season) }
             .sorted { $0.createdAt > $1.createdAt }
 
         return ScrollView {
@@ -425,7 +426,7 @@ struct DayOutfitsSheet: View {
                 }
                 .buttonStyle(SecondaryButtonStyle())
 
-                if !wardrobe.outfits.isEmpty {
+                if wardrobe.outfits.contains(where: { $0.ownerID == nil }) {
                     VStack(alignment: .leading, spacing: 12) {
                         Eyebrow(L("Додај од твоите аутфити", "Add from your outfits"))
                         SeasonFilter(season: $season)
@@ -497,7 +498,7 @@ struct DayOutfitsSheet: View {
                 editing = outfit
             } label: {
                 HStack(spacing: 14) {
-                    OutfitCollage(items: wardrobe.items(in: outfit))
+                    OutfitCollage(items: wardrobe.items(in: outfit), layout: outfit.layout)
                         .frame(width: 64, height: 64)
                         .padding(4)
                         .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.stone.opacity(0.5)))

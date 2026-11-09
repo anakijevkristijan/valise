@@ -1,6 +1,7 @@
 #if DEBUG
 import Foundation
 import CoreGraphics
+import SwiftUI
 
 /// Автоматска проверка на логиката - само Debug изградба, само со аргументот -TripdrobeSelfTest
 /// (workflow-от „Провери ја апликацијата“, во симулатор). Резултатот: Documents/selftest.json.
@@ -131,6 +132,10 @@ enum SelfTest {
         test("Пријатели: кога сте заедно (градови и датуми)", memberOverlap)
         test("Пријатели: нов член ги следи сопственикот", memberFollowsOwner)
         test("Пријатели: сменетите датуми на членот се само негови", memberOwnPlan)
+        test("Семејство: листа за дете (по возраст) и милениче", familyLists)
+        test("Семејство: спакуваното и рачното остануваат, лично е", familyKeepsPacked)
+        test("Аутфити: рачно наместени парчиња", outfitCustomLayout)
+        test("Новогодишни теми", festiveThemes)
 
         UserDefaults.standard.set(savedLanguage, forKey: AppLanguage.storageKey)
         write()
@@ -377,6 +382,113 @@ enum SelfTest {
         let memberPlan = try unwrap(asOwner.memberPlans?[member], "планот на членот кај сопственикот")
         check(sameDay(memberPlan.startDate, memberTrip.startDate), "сопственикот не ги гледа датумите на членот")
         check(memberPlan.origin?.id == thessaloniki.id, "сопственикот не го гледа поаѓањето на членот")
+    }
+
+    // MARK: Семејство (Premium)
+
+    private static func kidMember(age: Int) -> TripFamilyMember {
+        let year = Calendar(identifier: .gregorian).component(.year, from: Date()) - age
+        let profile = FamilyMember(kind: .child, name: "Ana", birthYear: year, birthMonth: 1)
+        var member = TripFamilyMember(member: profile, on: Date())
+        member.age = age
+        return member
+    }
+
+    private static func familyLists() throws {
+        var trip = sampleTrip()
+        trip.activities = [.beach]
+        for age in [0, 2, 5, 9, 15] {
+            let items = FamilyPacking.childItems(age: age, trip: trip)
+            check(!items.isEmpty, "\(age) г.: празна листа")
+            check(items.contains { $0.category == .clothing }, "\(age) г.: нема облека")
+            check(items.allSatisfy { item in item.key.flatMap { Catalog.name($0) } != nil }, "\(age) г.: предмет без име")
+            check(items.allSatisfy { $0.quantity > 0 }, "\(age) г.: бројка 0")
+            let hasNappies = items.contains { $0.key == "kid.nappies" }
+            check(hasNappies == (age < 3), "\(age) г.: пелени = \(hasNappies)")
+        }
+        let may = try unwrap(Calendar(identifier: .gregorian).date(from: DateComponents(year: 2026, month: 5, day: 1)), "датум")
+        check(FamilyText.age(birthYear: 2020, birthMonth: 6, on: may) == 5, "возраста пред роденденот")
+        for type in PetType.allCases {
+            let items = FamilyPacking.petItems(type, trip: trip)
+            check(items.contains { $0.key == "pet.food" }, "\(type.rawValue): нема храна")
+            check(items.allSatisfy { item in item.key.flatMap { Catalog.name($0) } != nil }, "\(type.rawValue): предмет без име")
+        }
+        check(FamilyPacking.petItems(.cat, trip: trip).contains { $0.key == "pet.litter" }, "мачка без песок")
+        check(FamilyPacking.petItems(.dog, trip: trip).contains { $0.key == "pet.leash" }, "куче без поводник")
+        for language in AppLanguage.allCases {
+            use(language)
+            for item in FamilyPacking.childItems(age: 1, trip: trip) + FamilyPacking.petItems(.dog, trip: trip) {
+                check(!item.displayName.trimmingCharacters(in: .whitespaces).isEmpty, "\(language.rawValue): празно име")
+            }
+        }
+        use(.en)
+    }
+
+    private static func familyKeepsPacked() throws {
+        var trip = sampleTrip()
+        var member = kidMember(age: 5)
+        member.items = FamilyPacking.items(for: member, trip: trip)
+        let first = try unwrap(member.items.first, "прв предмет")
+        member.items[0].isPacked = true
+        let custom = PackingItem(name: "Dinosaur", category: .accessories, quantity: 1, note: nil,
+                                 unitVolume: 0.5, unitWeight: 0.2, isCustom: true)
+        member.items.append(custom)
+        let toy = try unwrap(member.items.first { $0.key == "kid.toy" }, "играчка")
+        member.items.removeAll { $0.id == toy.id }
+        member.dismissed = [toy.identity]
+        trip.family = [member]
+        // Подолго патување - листата се менува, но спакуваното, рачното и тргнатото остануваат
+        trip.endDate = trip.endDate.adding(days: 5)
+        FamilyPacking.refresh(&trip.family![0], trip: trip, weatherOnly: false)
+        let after = try unwrap(trip.family?.first, "детето").items
+        check(after.contains { $0.id == first.id && $0.isPacked }, "спакуваното се изгуби")
+        check(after.contains { $0.name == "Dinosaur" }, "рачно додаденото се изгуби")
+        check(!after.contains { $0.key == "kid.toy" }, "тргнатото се врати")
+
+        let data = try JSONEncoder().encode(trip)
+        let decoded = try JSONDecoder().decode(Trip.self, from: data)
+        check(decoded.family == trip.family, "семејството не се зачувува на телефонот")
+        let shared = try unwrap(CloudCodec.encode(trip, myUID: "u1"), "кодирање за облак")
+        check(shared["family"] == nil, "листите на децата одат кај сопатниците")
+    }
+
+    // MARK: Аутфити - рачно
+
+    private static func outfitCustomLayout() throws {
+        let categories = WardrobeCategory.allCases
+        let items = (0..<4).map { WardrobeItem(name: "Piece \($0)", category: categories[$0 % categories.count], seasons: []) }
+        let auto = OutfitCollage.autoLayout(items)
+        check(auto.count == items.count, "автоматски почеток: \(auto.count) од \(items.count)")
+        check(auto.values.allSatisfy { (0...1).contains($0.x) && (0...1).contains($0.y) && $0.w > 0 && $0.h > 0 },
+              "почетокот излегува од колажот")
+        var layout: [String: PieceLayout] = [:]
+        layout[items[0].id.uuidString] = PieceLayout(x: 0.25, y: 0.25, w: 0.5, h: 0.5, r: 12, z: 9)
+        let size = CGSize(width: 200, height: 200)
+        let placed = OutfitCollage.placed(items, layout: layout, in: size)
+        check(placed.count == items.count, "не се нацртани сите: \(placed.count)")
+        let piece = try unwrap(placed[items[0].id], "наместеното парче")
+        check(abs(piece.box.midX - 50) < 0.5 && abs(piece.box.width - 100) < 0.5, "наместеното не е на место: \(piece.box)")
+        check(piece.angle == 12 && piece.z == 9, "аголот или слојот")
+        let back = try unwrap(PieceLayout.layout(from: PieceLayout.fields(for: layout)), "од облакот")
+        check(back == layout, "распоредот не се враќа од облакот")
+        let base = try unwrap(layout[items[0].id.uuidString], "парче")
+        let pushed = OutfitArrangeView.moved(base, drag: CGSize(width: 1000, height: 0), scale: 50, turn: .zero, in: size)
+        check(pushed.x <= 1 && max(pushed.w, pushed.h) <= 1.31, "без граници: \(pushed)")
+        let outfit = Outfit(name: "Test", itemIDs: items.map(\.id), layout: layout)
+        let decoded = try JSONDecoder().decode(Outfit.self, from: JSONEncoder().encode(outfit))
+        check(decoded.layout == layout, "аутфитот не го чува распоредот")
+    }
+
+    // MARK: Теми
+
+    private static func festiveThemes() throws {
+        for id in ["newyear", "christmas", "snowfall"] {
+            let palette = Palette.find(id)
+            check(palette.id == id, "\(id) ја нема")
+            check(palette.isPremium, "\(id) не е Premium")
+            check(palette.motif != .none, "\(id) без мотив")
+        }
+        check(Set(Palette.all.map(\.id)).count == Palette.all.count, "две теми со исто id")
     }
 }
 #endif

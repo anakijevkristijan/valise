@@ -8,12 +8,13 @@ enum Catalog {
             let type = String(key.dropFirst("adapter.".count))
             return L("Адаптер за штекер (тип \(type))", "Plug adapter (type \(type))")
         }
-        guard let pair = names[key] else { return nil }
+        // Децата и миленичињата (Premium) - FamilyCatalog
+        guard let pair = names[key] ?? FamilyCatalog.names[key] else { return nil }
         return L(pair.0, pair.1)
     }
 
     static func note(_ key: String) -> String? {
-        guard let pair = notes[key] else { return nil }
+        guard let pair = notes[key] ?? FamilyCatalog.notes[key] else { return nil }
         return L(pair.0, pair.1)
     }
 

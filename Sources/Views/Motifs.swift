@@ -3,6 +3,8 @@ import SwiftUI
 /// Украсен мотив на темата.
 enum Motif: String {
     case none, bows, flowers, hearts, sparkles, cherries, butterflies, pearls, daisies
+    // Новогодишни (FestiveMotifs.swift)
+    case snowflakes, ornaments, confetti
 
     /// Украсот стои на средината горе (машна, ѓердан), а не во аголот.
     var ornamentOnTop: Bool { self == .bows || self == .pearls }
@@ -287,6 +289,8 @@ enum MotifDrawing {
             context.fill(MotifShapes.daisyPetals(r), with: shading)
             cut.fill(MotifShapes.daisyCenter(r, radius: 0.17), with: hole)
             context.fill(MotifShapes.daisyCenter(r), with: shading)
+        case .snowflakes, .ornaments, .confetti:
+            FestiveDrawing.silhouette(motif, in: r, context: context, cut: cut, color: color)
         }
     }
 
@@ -327,6 +331,8 @@ enum MotifDrawing {
         case .daisies:
             fill(MotifShapes.daisyPetals(r), Color.white)
             fill(MotifShapes.daisyCenter(r, radius: 0.13), daisyYellow)
+        case .snowflakes, .ornaments, .confetti:
+            FestiveDrawing.colored(motif, in: r, context: context, palette: palette)
         }
     }
 }
@@ -454,7 +460,7 @@ struct TicketOrnament: View {
                 .frame(width: compact ? 96 : 150, height: compact ? 22 : 32)
                 .shadow(color: Theme.navy.opacity(0.18), radius: 2, x: 0, y: 1)
                 .offset(y: compact ? -9 : -13)
-        case .hearts, .sparkles, .cherries, .butterflies:
+        case .hearts, .sparkles, .cherries, .butterflies, .snowflakes, .ornaments, .confetti:
             ZStack {
                 MotifIcon(motif: motif)
                     .frame(width: compact ? 26 : 40, height: compact ? 26 : 40)

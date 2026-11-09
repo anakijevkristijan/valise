@@ -115,6 +115,7 @@ final class AccountService: ObservableObject {
             if previous != nil {
                 store?.wipeLocal()
                 wardrobe?.wipeLocal()
+                FamilyStore.shared.wipeLocal()
                 for key in Self.personalKeys {
                     UserDefaults.standard.removeObject(forKey: key)
                 }

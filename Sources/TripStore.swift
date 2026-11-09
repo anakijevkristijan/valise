@@ -96,6 +96,7 @@ final class TripStore: ObservableObject {
         trip.outfitPacked = plan.packed.isEmpty ? nil : plan.packed
         if let exit = plan.exit, !exit.isEmpty { trip.exitChecklist = exit }
         if let dismissed = plan.dismissed { trip.dismissedSuggestions = dismissed }
+        if let family = plan.family { trip.family = family.isEmpty ? nil : family }
     }
 
     func removeLocal(_ id: UUID) {
@@ -128,7 +129,7 @@ final class TripStore: ObservableObject {
         let after = trips[index]
         if before.outfitDays != after.outfitDays || before.outfitPlan != after.outfitPlan
             || before.outfitPacked != after.outfitPacked || before.exitChecklist != after.exitChecklist
-            || before.dismissedSuggestions != after.dismissedSuggestions {
+            || before.dismissedSuggestions != after.dismissedSuggestions || before.family != after.family {
             personal?.pushPlan(after)
         }
     }
@@ -255,6 +256,7 @@ final class TripStore: ObservableObject {
             $0.weatherUpdatedAt = gotData ? Date() : nil
             // Маиците, долгите ракави, џемперите и јакните се усогласуваат со новата прогноза
             PackingEngine.syncWithWeather(&$0)
+            FamilyPacking.syncWithWeather(&$0)
         }
     }
 

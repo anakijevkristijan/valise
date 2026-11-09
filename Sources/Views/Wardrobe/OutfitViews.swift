@@ -4,23 +4,24 @@ import SwiftUI
 
 struct OutfitCollage: View {
     let items: [WardrobeItem]
+    /// Рачно наместено (Premium); парчињата што ги нема тука - автоматски.
+    var layout: [String: PieceLayout]? = nil
     @EnvironmentObject private var wardrobe: WardrobeStore
 
     var body: some View {
         GeometryReader { geo in
-            let frames = Self.layout(items, in: geo.size)
+            let placed = Self.placed(items, layout: layout, in: geo.size)
             ZStack {
-                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                    if let frame = frames[item.id], let image = wardrobe.thumbnail(for: item) {
-                        let fill = Self.fill(for: item)
+                ForEach(items) { item in
+                    if let piece = placed[item.id], let image = wardrobe.thumbnail(for: item) {
                         Image(uiImage: image)
                             .resizable()
                             .scaledToFit()
-                            .frame(width: frame.width * fill, height: frame.height * fill)
+                            .frame(width: piece.box.width, height: piece.box.height)
                             .shadow(color: Theme.navy.opacity(0.14), radius: 6, x: 0, y: 4)
-                            .rotationEffect(.degrees(Self.tilt(for: item, index: index)))
-                            .position(x: frame.midX, y: frame.midY)
-                            .zIndex(item.layer)
+                            .rotationEffect(.degrees(piece.angle))
+                            .position(x: piece.box.midX, y: piece.box.midY)
+                            .zIndex(piece.z)
                     }
                 }
                 if items.isEmpty {
@@ -32,6 +33,55 @@ struct OutfitCollage: View {
             .frame(width: geo.size.width, height: geo.size.height)
             .animation(.spring(response: 0.4, dampingFraction: 0.85), value: items.map(\.id))
         }
+    }
+
+    /// Каде е нацртано парчето: рамка, агол и слој.
+    struct Placed {
+        let box: CGRect
+        let angle: Double
+        let z: Double
+    }
+
+    /// Рачниот распоред каде го има, а за другите - автоматскиот (flat lay).
+    static func placed(_ items: [WardrobeItem], layout: [String: PieceLayout]?, in size: CGSize) -> [UUID: Placed] {
+        let frames = Self.layout(items, in: size)
+        var result: [UUID: Placed] = [:]
+        for (index, item) in items.enumerated() {
+            if let custom = layout?[item.id.uuidString] {
+                result[item.id] = Placed(box: custom.frame(in: size), angle: custom.r, z: custom.z)
+            } else if let frame = frames[item.id] {
+                let fill = Self.fill(for: item)
+                let box = CGRect(x: frame.midX - frame.width * fill / 2, y: frame.midY - frame.height * fill / 2,
+                                 width: frame.width * fill, height: frame.height * fill)
+                result[item.id] = Placed(box: box, angle: Self.tilt(for: item, index: index), z: item.layer)
+            }
+        }
+        return result
+    }
+
+    /// Автоматскиот распоред како почеток за рачно местење (во делови од колажот).
+    static func autoLayout(_ items: [WardrobeItem]) -> [String: PieceLayout] {
+        let size = CGSize(width: 1000, height: 1000)
+        let placed = Self.placed(items, layout: nil, in: size)
+        // Слоевите по ред (0, 1, 2…) - за „напред“ и „назад“
+        let present = items.filter { placed[$0.id] != nil }
+        let order = present.indices.sorted { a, b in
+            let za = placed[present[a].id]?.z ?? 0
+            let zb = placed[present[b].id]?.z ?? 0
+            return za == zb ? a < b : za < zb
+        }
+        var result: [String: PieceLayout] = [:]
+        for (rank, index) in order.enumerated() {
+            let item = present[index]
+            guard let piece = placed[item.id] else { continue }
+            result[item.id.uuidString] = PieceLayout(x: Double(piece.box.midX / size.width),
+                                                     y: Double(piece.box.midY / size.height),
+                                                     w: Double(piece.box.width / size.width),
+                                                     h: Double(piece.box.height / size.height),
+                                                     r: piece.angle,
+                                                     z: Double(rank))
+        }
+        return result
     }
 
     /// Колкав дел од ќелијата зафаќа парчето.
@@ -173,7 +223,7 @@ struct OutfitCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            OutfitCollage(items: wardrobe.items(in: outfit))
+            OutfitCollage(items: wardrobe.items(in: outfit), layout: outfit.layout)
                 .aspectRatio(1, contentMode: .fit)
                 .padding(10)
                 .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Theme.surface))
@@ -394,6 +444,8 @@ struct OutfitBuilderView: View {
     /// Ако се составува за патување - брои колку пати е облечено секое парче.
     var trip: Trip?
     var onSave: (Outfit) -> Void = { _ in }
+    /// Чиј е аутфитот: nil = мој, инаку дете од „Моето семејство“.
+    let owner: UUID?
 
     @EnvironmentObject private var wardrobe: WardrobeStore
     @Environment(\.dismiss) private var dismiss
@@ -401,6 +453,9 @@ struct OutfitBuilderView: View {
     @State private var name: String
     @State private var selected: [UUID]
     @State private var season: Season?
+    /// Рачно наместените парчиња (nil = автоматски).
+    @State private var layout: [String: PieceLayout]?
+    @State private var showArrange = false
     @State private var showAddItem = false
     @State private var toast: String?
     @State private var toastToken = 0
@@ -408,16 +463,28 @@ struct OutfitBuilderView: View {
     /// Над ова - предупредување за еден аутфит.
     private let manyPieces = 7
 
-    init(existing: Outfit? = nil, startSeason: Season? = nil, trip: Trip? = nil,
+    init(existing: Outfit? = nil, startSeason: Season? = nil, trip: Trip? = nil, ownerID: UUID? = nil,
          onSave: @escaping (Outfit) -> Void = { _ in }) {
         self.existing = existing
         self.startSeason = startSeason
         self.trip = trip
         self.onSave = onSave
+        owner = existing?.ownerID ?? ownerID
         _name = State(initialValue: existing?.name ?? "")
         _selected = State(initialValue: existing?.itemIDs ?? [])
         _season = State(initialValue: existing == nil ? startSeason : nil)
+        _layout = State(initialValue: existing?.layout)
     }
+
+    /// Само за наместените парчиња што се уште во аутфитот.
+    private var currentLayout: [String: PieceLayout]? {
+        guard let layout else { return nil }
+        let keep = Set(selected.map(\.uuidString))
+        let kept = layout.filter { keep.contains($0.key) }
+        return kept.isEmpty ? nil : kept
+    }
+
+    private var ownerName: String? { FamilyStore.shared.member(owner)?.name }
 
     private var selectedItems: [WardrobeItem] {
         selected.compactMap { wardrobe.item($0) }
@@ -429,12 +496,12 @@ struct OutfitBuilderView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
                     HStack {
-                        Eyebrow(existing == nil ? L("Нов аутфит", "New outfit") : L("Аутфит", "Outfit"), color: Theme.gold)
+                        Eyebrow(eyebrow, color: Theme.gold)
                         Spacer()
                         CircleIconButton(systemName: "xmark") { dismiss() }
                     }
 
-                    OutfitCollage(items: selectedItems)
+                    OutfitCollage(items: selectedItems, layout: currentLayout)
                         .aspectRatio(1, contentMode: .fit)
                         .frame(maxWidth: 300)
                         .padding(16)
@@ -449,6 +516,9 @@ struct OutfitBuilderView: View {
                                 .padding(.vertical, 5)
                                 .background(Capsule().fill(selected.count > manyPieces ? Theme.terracotta : Theme.goldPale))
                                 .padding(12)
+                        }
+                        .overlay(alignment: .bottomTrailing) {
+                            if !selected.isEmpty { arrangeButton }
                         }
                         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: selected)
 
@@ -470,7 +540,7 @@ struct OutfitBuilderView: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
 
-                    if wardrobe.items.isEmpty {
+                    if !wardrobe.items.contains(where: { $0.ownerID == owner }) {
                         VStack(alignment: .leading, spacing: 12) {
                             Text(L("Гардеробата е празна. Прво додај неколку парчиња.", "Your wardrobe is empty. Add a few pieces first."))
                                 .font(.sans(14))
@@ -483,7 +553,7 @@ struct OutfitBuilderView: View {
                     }
 
                     ForEach(WardrobeCategory.allCases) { category in
-                        let list = wardrobe.items(in: category, season: season)
+                        let list = wardrobe.items(in: category, season: season, owner: owner)
                         if !list.isEmpty {
                             VStack(alignment: .leading, spacing: 10) {
                                 Eyebrow(category.title)
@@ -518,9 +588,43 @@ struct OutfitBuilderView: View {
             }
         }
         .sheet(isPresented: $showAddItem) {
-            AddWardrobeItemView()
+            AddWardrobeItemView(ownerID: owner)
                 .environmentObject(wardrobe)
         }
+        .fullScreenCover(isPresented: $showArrange) {
+            OutfitArrangeView(items: selectedItems, layout: currentLayout) { arranged in
+                layout = arranged
+            }
+            .environmentObject(wardrobe)
+        }
+    }
+
+    private var eyebrow: String {
+        if let ownerName {
+            return existing == nil ? L("Нов аутфит за \(ownerName)", "New outfit for \(ownerName)")
+                                   : L("Аутфит · \(ownerName)", "Outfit · \(ownerName)")
+        }
+        return existing == nil ? L("Нов аутфит", "New outfit") : L("Аутфит", "Outfit")
+    }
+
+    /// „Намести“ - парчињата сам ги местиш (Premium).
+    private var arrangeButton: some View {
+        Button {
+            showArrange = true
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "hand.draw")
+                    .font(.system(size: 12, weight: .regular))
+                Text(currentLayout == nil ? L("Намести", "Arrange") : L("Наместено", "Arranged"))
+                    .font(.sans(11, .semibold))
+            }
+            .foregroundStyle(Theme.goldLight)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(Capsule().fill(Theme.navy))
+        }
+        .buttonStyle(PressableStyle())
+        .padding(12)
     }
 
     // MARK: Долна лента: бројач + зачувај
@@ -664,6 +768,8 @@ struct OutfitBuilderView: View {
         var outfit = existing ?? Outfit(name: "", itemIDs: [])
         outfit.name = trimmed.isEmpty ? defaultName : trimmed
         outfit.itemIDs = selected
+        outfit.ownerID = owner
+        outfit.layout = currentLayout
         wardrobe.save(outfit: outfit)
         onSave(outfit)
         dismiss()

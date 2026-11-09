@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 
 // MARK: - Сезона
 
@@ -99,7 +100,7 @@ enum WardrobeCategory: String, Codable, CaseIterable, Identifiable {
         }
     }
 
-    /// Приближен волумен во куфер (литри, свиткано) — кога парчето нема вид.
+    /// Приближен волумен во куфер (литри, свиткано) - кога парчето нема вид.
     var volume: Double {
         switch self {
         case .outerwear: return 5.0
@@ -113,7 +114,7 @@ enum WardrobeCategory: String, Codable, CaseIterable, Identifiable {
         }
     }
 
-    /// Приближна тежина (kg) — кога парчето нема вид.
+    /// Приближна тежина (kg) - кога парчето нема вид.
     var weight: Double {
         switch self {
         case .outerwear: return 0.9
@@ -160,7 +161,7 @@ struct ClothingTarget: Identifiable {
 }
 
 extension WardrobeCategory {
-    /// Кратко, во множина — за ознаки „Горни дела 3/5“.
+    /// Кратко, во множина - за ознаки „Горни дела 3/5“.
     var shortPlural: String {
         switch self {
         case .outerwear: return L("Јакни", "Jackets")
@@ -185,8 +186,10 @@ struct WardrobeItem: Codable, Identifiable, Hashable {
     var createdAt: Date = Date()
     /// true = исечена слика (со позадина), не стикер.
     var isPhoto: Bool?
-    /// Видот (`WardrobeKind`) како текст — непознат вид од понова верзија не ја руши гардеробата.
+    /// Видот (`WardrobeKind`) како текст - непознат вид од понова верзија не ја руши гардеробата.
     var kindID: String?
+    /// Чие е парчето: nil = мое, инаку дете од „Моето семејство“ (Premium).
+    var ownerID: UUID?
 
     var imageName: String { id.uuidString + ".png" }
 
@@ -203,6 +206,59 @@ struct Outfit: Codable, Identifiable, Hashable {
     var name: String
     var itemIDs: [UUID]
     var createdAt: Date = Date()
+    /// Чиј е аутфитот: nil = мој, инаку дете од „Моето семејство“.
+    var ownerID: UUID? = nil
+    /// Парчињата наместени рачно (id на парче → место). nil = автоматски распоред.
+    var layout: [String: PieceLayout]? = nil
+}
+
+/// Рачно наместено парче во колажот. Сè е дел од колажот (0…1), па изгледа исто во секоја големина.
+struct PieceLayout: Codable, Hashable {
+    /// Центар.
+    var x: Double
+    var y: Double
+    /// Големина на рамката (сликата е вклопена во неа).
+    var w: Double
+    var h: Double
+    /// Свртено (степени).
+    var r: Double = 0
+    /// Слој - поголемото е понапред.
+    var z: Double = 0
+
+    func frame(in size: CGSize) -> CGRect {
+        CGRect(x: (x - w / 2) * size.width, y: (y - h / 2) * size.height,
+               width: w * size.width, height: h * size.height)
+    }
+
+    // MARK: Облак
+
+    var fields: [String: Double] { ["x": x, "y": y, "w": w, "h": h, "r": r, "z": z] }
+
+    init(x: Double, y: Double, w: Double, h: Double, r: Double = 0, z: Double = 0) {
+        self.x = x; self.y = y; self.w = w; self.h = h; self.r = r; self.z = z
+    }
+
+    init?(fields: [String: Any]) {
+        func number(_ key: String) -> Double? { (fields[key] as? NSNumber)?.doubleValue }
+        guard let x = number("x"), let y = number("y"), let w = number("w"), let h = number("h"),
+              w > 0, h > 0 else { return nil }
+        self.init(x: x, y: y, w: w, h: h, r: number("r") ?? 0, z: number("z") ?? 0)
+    }
+
+    static func fields(for layout: [String: PieceLayout]) -> [String: Any] {
+        layout.mapValues { $0.fields }
+    }
+
+    static func layout(from raw: Any?) -> [String: PieceLayout]? {
+        guard let map = raw as? [String: Any] else { return nil }
+        var result: [String: PieceLayout] = [:]
+        for (key, value) in map {
+            if let fields = value as? [String: Any], let piece = PieceLayout(fields: fields) {
+                result[key] = piece
+            }
+        }
+        return result.isEmpty ? nil : result
+    }
 }
 
 // MARK: - План по денови (во патувањето)

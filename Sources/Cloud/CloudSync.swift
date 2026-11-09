@@ -12,7 +12,7 @@ enum CloudCodec {
     /// Лични работи што воопшто не одат во облакот.
     static let personalKeys: Set<String> = [
         "exitChecklist", "dismissedSuggestions", "weather", "weatherSource", "weatherUpdatedAt",
-        "outfitPlan", "outfitDays", "outfitPacked", "ownBags", "ownPlan", "memberPlans"
+        "outfitPlan", "outfitDays", "outfitPacked", "ownBags", "ownPlan", "memberPlans", "family"
     ]
 
     /// Секој член има свои: багаж и стил (жена/маж). Во облакот: `personal.{uid}`.
@@ -145,6 +145,7 @@ enum CloudCodec {
             trip.outfitPlan = local.outfitPlan
             trip.outfitDays = local.outfitDays
             trip.outfitPacked = local.outfitPacked
+            trip.family = local.family
         } else {
             trip.exitChecklist = PackingEngine.defaultExitChecklist()
         }

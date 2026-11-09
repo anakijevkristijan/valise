@@ -4,6 +4,7 @@ struct HomeView: View {
     @EnvironmentObject private var store: TripStore
     @EnvironmentObject private var premium: PremiumStore
     @EnvironmentObject private var account: AccountService
+    @EnvironmentObject private var wardrobe: WardrobeStore
     @AppStorage("userName") private var userName: String = ""
 
     @State private var path: [UUID] = []
@@ -72,6 +73,7 @@ struct HomeView: View {
                 .environmentObject(store)
                 .environmentObject(premium)
                 .environmentObject(account)
+                .environmentObject(wardrobe)
         }
     }
 

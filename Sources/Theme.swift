@@ -234,8 +234,50 @@ extension Palette {
         motif: .sparkles
     )
 
+    // MARK: Новогодишни (Premium)
+
+    static let newYear = Palette(
+        id: "newyear", isPremium: true,
+        nameMK: "Новогодишна ноќ", nameEN: "New Year's Eve",
+        moodMK: "Полноќ, шампањ и конфети", moodEN: "Midnight, champagne and confetti",
+        paper: Color(hex: 0xF6F4EF), stone: Color(hex: 0xECE8DF), hairline: Color(hex: 0xDFDACF),
+        ink: Color(hex: 0x14161F), inkSoft: Color(hex: 0x4B4E5C), muted: Color(hex: 0x8F8A7F),
+        primary: Color(hex: 0x161A2E), ticketText: Color(hex: 0xF6EEDC),
+        gold: Color(hex: 0xB08D4A), goldLight: Color(hex: 0xE6CC8F), goldPale: Color(hex: 0xF0E6CF),
+        sage: Color(hex: 0x6C8770), terracotta: Color(hex: 0xB5525A), rain: Color(hex: 0x5B7891),
+        tickets: [Color(hex: 0x161A2E), Color(hex: 0x23263F), Color(hex: 0x2E2339), Color(hex: 0x10151F)],
+        motif: .confetti
+    )
+
+    static let christmas = Palette(
+        id: "christmas", isPremium: true,
+        nameMK: "Божиќна", nameEN: "Christmas",
+        moodMK: "Елка, брусница и злато", moodEN: "Pine, cranberry and gold",
+        paper: Color(hex: 0xF7F4ED), stone: Color(hex: 0xEDE8DD), hairline: Color(hex: 0xE0D9CB),
+        ink: Color(hex: 0x16201B), inkSoft: Color(hex: 0x4A5650), muted: Color(hex: 0x8F8B7E),
+        primary: Color(hex: 0x1F3A2E), ticketText: Color(hex: 0xF5EEDD),
+        gold: Color(hex: 0xA8874B), goldLight: Color(hex: 0xE0C487), goldPale: Color(hex: 0xEFE5CF),
+        sage: Color(hex: 0x5F7F62), terracotta: Color(hex: 0xA3303C), rain: Color(hex: 0x5B7891),
+        tickets: [Color(hex: 0x1F3A2E), Color(hex: 0x7A1E2B), Color(hex: 0x2A4A3A), Color(hex: 0x5E1622)],
+        motif: .ornaments
+    )
+
+    static let snowfall = Palette(
+        id: "snowfall", isPremium: true,
+        nameMK: "Снегулка", nameEN: "Snowfall",
+        moodMK: "Мраз, сребро и снег", moodEN: "Frost, silver and snow",
+        paper: Color(hex: 0xF4F7FA), stone: Color(hex: 0xE7EDF3), hairline: Color(hex: 0xD9E1E9),
+        ink: Color(hex: 0x15202C), inkSoft: Color(hex: 0x4A5868), muted: Color(hex: 0x8A95A2),
+        primary: Color(hex: 0x2E4A66), ticketText: Color(hex: 0xF3F6FA),
+        gold: Color(hex: 0x6F7D90), goldLight: Color(hex: 0xD6DEE8), goldPale: Color(hex: 0xE6ECF3),
+        sage: Color(hex: 0x6C8770), terracotta: Color(hex: 0xAE5A40), rain: Color(hex: 0x5B7891),
+        tickets: [Color(hex: 0x2E4A66), Color(hex: 0x3C5F7E), Color(hex: 0x26405A), Color(hex: 0x4A6A86)],
+        motif: .snowflakes
+    )
+
     static let all: [Palette] = [
         .classic,
+        .newYear, .christmas, .snowfall,
         .coquette, .ballet, .strawberry, .cherry, .blossom, .butterfly, .matcha, .vanilla, .celestial,
         .rose, .lavender, .emerald, .noir, .azur
     ]

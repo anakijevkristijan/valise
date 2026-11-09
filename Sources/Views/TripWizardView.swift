@@ -32,6 +32,8 @@ struct TripDraft {
     var extraStops: [DraftStop] = []
     /// Своето име на патувањето (по избор).
     var name = ""
+    /// Децата и миленичињата што патуваат (Premium) - од „Моето семејство“.
+    var familyIDs: [UUID] = []
 
     init() {
         resetBags()
@@ -50,6 +52,7 @@ struct TripDraft {
         hasLaundry = trip.hasLaundry
         companions = trip.travelers
         name = trip.name ?? ""
+        familyIDs = (trip.family ?? []).map(\.id)
         if trip.isMultiStop, let first = trip.allStops.first {
             destination = first.place
             startDate = first.startDate.startOfDay
@@ -824,11 +827,16 @@ struct TripWizardView: View {
 
             if premium.isPremium {
                 companionsEditor
+                FamilyTripPicker(selection: $draft.familyIDs, inTrip: editing?.family ?? [])
             } else {
                 PremiumLockRow(icon: "person.2",
                                title: L("Патувај со пријатели", "Travel with friends"),
                                detail: L("Заедничка листа и кој што носи - синхронизирано кај сите.",
                                          "A shared list and who brings what - synced for everyone."))
+                PremiumLockRow(icon: "figure.and.child.holdinghands",
+                               title: L("Деца и миленичиња", "Kids and pets"),
+                               detail: L("Своја листа за секое дете (според возраста) и за миленичето.",
+                                         "Their own list for each child (by age) and for your pet."))
             }
 
             VStack(alignment: .leading, spacing: 12) {
@@ -1080,6 +1088,9 @@ struct TripWizardView: View {
                 if !draft.companions.isEmpty {
                     summaryRow(icon: "person.2", text: draft.companions.map(\.name).joined(separator: ", "))
                 }
+                if premium.isPremium && !familyNames.isEmpty {
+                    summaryRow(icon: "figure.and.child.holdinghands", text: FamilyText.names(familyNames))
+                }
                 if !draft.activities.isEmpty {
                     summaryRow(icon: "sparkles", text: Activity.allCases.filter { draft.activities.contains($0) }.map(\.title).joined(separator: ", "))
                 }
@@ -1124,6 +1135,14 @@ struct TripWizardView: View {
             }
         }
         .task(id: reviewWeatherKey) { await loadWeather() }
+    }
+
+    /// Имињата на избраните деца и миленичиња.
+    private var familyNames: [String] {
+        let family = FamilyStore.shared
+        return draft.familyIDs.compactMap { id in
+            family.member(id)?.name ?? editing?.family?.first { $0.id == id }?.name
+        }
     }
 
     private func summaryRow(icon: String, text: String) -> some View {
@@ -1288,6 +1307,10 @@ struct TripWizardView: View {
         PackingEngine.ensureTogether(&updated)
         PackingEngine.dissolveTogether(&updated)
         PackingEngine.rebuild(&updated)
+        // Децата и миленичињата: новите добиваат листа, постоечките ја задржуваат спакуваното
+        updated.family = premium.isPremium
+            ? FamilyPacking.family(for: draft.familyIDs, trip: updated, previous: original.family)
+            : original.family
 
         let finalTrip = updated
         store.mutate(original.id) { $0 = finalTrip }
@@ -1304,6 +1327,9 @@ struct TripWizardView: View {
         trip.items = PackingEngine.generate(for: trip)
         PackingEngine.ensureTogether(&trip)
         trip.exitChecklist = PackingEngine.defaultExitChecklist()
+        if premium.isPremium {
+            trip.family = FamilyPacking.family(for: draft.familyIDs, trip: trip, previous: nil)
+        }
 
         LastOrigin.save(draft.origin)
         store.add(trip)

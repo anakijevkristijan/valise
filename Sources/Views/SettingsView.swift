@@ -83,6 +83,8 @@ struct SettingsView: View {
                         }
                     }
 
+                    familySection
+
                     themesSection
 
                     remindersSection
@@ -113,7 +115,7 @@ struct SettingsView: View {
                         .buttonStyle(SecondaryButtonStyle())
                     }
 
-                    Text("TRIPDROBE 2.6")
+                    Text("TRIPDROBE 2.7")
                         .font(.sans(10, .semibold))
                         .tracking(3)
                         .foregroundStyle(Theme.muted)
@@ -357,6 +359,31 @@ struct SettingsView: View {
     }
 
     /// Само во TestFlight (тест-купување): да се види апликацијата без Premium.
+    // MARK: Моето семејство (Premium)
+
+    private var familySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Eyebrow(L("Моето семејство", "My family"))
+                Spacer()
+                if premium.isPremium {
+                    Text("PREMIUM")
+                        .font(.sans(9, .bold))
+                        .tracking(1.6)
+                        .foregroundStyle(Theme.gold)
+                }
+            }
+            if premium.isPremium {
+                FamilyProfileSection()
+            } else {
+                PremiumLockRow(icon: "figure.and.child.holdinghands",
+                               title: L("Патувај со деца и миленичиња", "Travel with kids and pets"),
+                               detail: L("Внеси ги еднаш - секое патување им прави своја листа, а децата имаат и своја гардероба.",
+                                         "Add them once - every trip makes them their own list, and kids get their own wardrobe too."))
+            }
+        }
+    }
+
     // MARK: Теми
 
     private var themesSection: some View {

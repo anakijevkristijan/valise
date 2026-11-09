@@ -530,6 +530,8 @@ struct Trip: Codable, Identifiable, Hashable {
     var ownPlan: Bool?
     /// Градовите и датумите на другите во заедничкото патување (uid → план). Само за приказ, од облакот.
     var memberPlans: [String: MemberPlan]?
+    /// Децата и миленичињата на патувањето, секое со своја листа (Premium). Лично - не го гледаат сопатниците.
+    var family: [TripFamilyMember]?
 
     // MARK: Градови и име
 
@@ -651,8 +653,8 @@ struct Trip: Codable, Identifiable, Hashable {
         return item.assignee == nil
     }
 
-    /// Мојата листа + заедничкото што го носам јас.
-    var myItems: [PackingItem] { items + togetherItems.filter { isMine($0) } }
+    /// Мојата листа + заедничкото што го носам јас + листите на децата и миленичињата.
+    var myItems: [PackingItem] { items + togetherItems.filter { isMine($0) } + familyItems }
 
     /// Заеднички работи за кои уште не е одлучено кој носи.
     var undecidedCount: Int {
@@ -789,6 +791,15 @@ struct Trip: Codable, Identifiable, Hashable {
             lines.append("")
             lines.append(category.title.uppercased())
             for item in group {
+                let box = item.isPacked ? "☑︎" : "☐"
+                let qty = item.quantity > 1 ? " ×\(item.quantity)" : ""
+                lines.append("\(box) \(item.displayName)\(qty)")
+            }
+        }
+        for member in family ?? [] where !member.items.isEmpty && PremiumStore.cachedIsPremium {
+            lines.append("")
+            lines.append(member.name.uppercased())
+            for item in member.sortedItems {
                 let box = item.isPacked ? "☑︎" : "☐"
                 let qty = item.quantity > 1 ? " ×\(item.quantity)" : ""
                 lines.append("\(box) \(item.displayName)\(qty)")

@@ -40,7 +40,7 @@ enum LegalTexts {
     static let privacyMK = #"""
     # Политика за приватност
 
-    Важи од: 6 ноември 2026
+    Важи од: 9 ноември 2026
 
     Tripdrobe („апликацијата“) ја развива и одржува Кристијан Анакијев, ул. Христо Татарчев 47ј 1/22, 1000 Скопје, Северна Македонија („ние“). Ние сме одговорни за обработката на твоите лични податоци. За сè што е поврзано со приватноста пиши на tripdrobe@gmail.com.
 
@@ -57,6 +57,8 @@ enum LegalTexts {
     **Заеднички патувања.** Деталите на патувањето и делот „Заедно“ (што се носи и кој го носи) ги гледаат сите членови на тоа патување. Твојата лична листа ја гледаш само ти.
 
     **Гардероба и аутфити.** Фотографии од облека што ги правиш или избираш, категории, сезони, аутфити и план по денови. Пред да се зачува сликата, апликацијата го отстранува лицето, а слика на која останува лице не се зачувува. Гардеробата ја гледаш само ти.
+
+    **Моето семејство (по избор).** Ако додадеш деца или миленичиња: име (може и прекар), месец и година на раѓање на детето, видот на миленичето, нивните листи за пакување и облеката во гардеробата. Тоа го внесуваш ти како родител или старател, го гледаш само ти и не им се покажува на сопатниците. Не собираме податоци директно од деца.
 
     **Известувања.** Потсетниците за пакување ги закажува самиот телефон и ништо не се праќа. За известувањата од пријателите (на пример, кога некој те додава во патување или те означува да понесеш нешто) чуваме технички токен за известувања на твојот уред, поврзан со акаунтот, и јазикот на апликацијата. Ги исклучуваш во Профил или во Поставки на iPhone; токенот се брише кога ќе се одјавиш.
 
@@ -90,7 +92,7 @@ enum LegalTexts {
 
     ## Колку долго ги чуваме
 
-    Додека го имаш акаунтот. Од телефонот податоците се бришат при одјава. Кога ќе го избришеш акаунтот (Поставки → Избриши акаунт), веднаш се бришат профилот (со телефонскиот број), гардеробата, аутфитите, патувањата чиј сопственик си, како и твојата листа и членство во туѓите патувања. Тоа што си го додал во делот „Заедно“ на туѓо патување останува кај другите членови.
+    Додека го имаш акаунтот. Од телефонот податоците се бришат при одјава. Кога ќе го избришеш акаунтот (Поставки → Избриши акаунт), веднаш се бришат профилот (со телефонскиот број), гардеробата, аутфитите, „Моето семејство“, патувањата чиј сопственик си, како и твојата листа и членство во туѓите патувања. Тоа што си го додал во делот „Заедно“ на туѓо патување останува кај другите членови.
 
     ## Твоите права
 
@@ -114,7 +116,7 @@ enum LegalTexts {
     static let privacyEN = #"""
     # Privacy Policy
 
-    Effective: November 6, 2026
+    Effective: November 9, 2026
 
     Tripdrobe (“the app”) is developed and run by Kristijan Anakijev, Hristo Tatarchev 47j 1/22, 1000 Skopje, North Macedonia (“we”). We are responsible for processing your personal data. For anything about privacy, write to tripdrobe@gmail.com.
 
@@ -131,6 +133,8 @@ enum LegalTexts {
     **Shared trips.** Trip details and the “Together” section (what is brought and by whom) are visible to every member of that trip. Your personal list is visible only to you.
 
     **Wardrobe and outfits.** Photos of clothes you take or choose, categories, seasons, outfits and your day-by-day plan. Before a photo is saved, the app removes any face, and a photo that still shows a face is not saved. Your wardrobe is visible only to you.
+
+    **My family (optional).** If you add children or pets: a name (a nickname is fine), the child's month and year of birth, the type of pet, their packing lists and their clothes in the wardrobe. You enter this as the parent or guardian; it is visible only to you and is not shown to travel companions. We do not collect data directly from children.
 
     **Notifications.** Packing reminders are scheduled by your phone itself and nothing is sent anywhere. For notifications from friends (for example, when someone adds you to a trip or asks you to bring something) we store a technical notification token for your device, linked to your account, together with the app language. You can turn them off in Profile or in iPhone Settings; the token is removed when you sign out.
 
@@ -164,7 +168,7 @@ enum LegalTexts {
 
     ## How long we keep it
 
-    For as long as you have an account. Data on your phone is removed when you sign out. When you delete your account (Settings → Delete account), we immediately delete your profile (including your phone number), wardrobe, outfits, the trips you own, and your list and membership in other people's trips. Items you added to the “Together” section of someone else's trip stay with the other members.
+    For as long as you have an account. Data on your phone is removed when you sign out. When you delete your account (Settings → Delete account), we immediately delete your profile (including your phone number), wardrobe, outfits, your family (children and pets), the trips you own, and your list and membership in other people's trips. Items you added to the “Together” section of someone else's trip stay with the other members.
 
     ## Your rights
 
@@ -188,7 +192,7 @@ enum LegalTexts {
     static let termsMK = #"""
     # Услови за користење
 
-    Важи од: 6 ноември 2026
+    Важи од: 9 ноември 2026
 
     Овие услови важат за апликацијата Tripdrobe што ја нуди Кристијан Анакијев, ул. Христо Татарчев 47ј 1/22, 1000 Скопје, Северна Македонија („ние“). Кога создаваш акаунт или ја користиш апликацијата, се согласуваш со нив и со Политиката за приватност.
 
@@ -202,7 +206,7 @@ enum LegalTexts {
 
     ## 3. Premium
 
-    Бесплатно можеш да направиш колку сакаш патувања со листа за пакување. Premium (прогноза, авиокомпании и багаж, гардероба и аутфити, пријатели, Story, „Пред излез“ и теми) се купува преку App Store како месечна или годишна претплата. Цената, периодот и условите на пробата се прикажани пред плаќањето.
+    Бесплатно можеш да направиш колку сакаш патувања со листа за пакување. Premium (прогноза, авиокомпании и багаж, гардероба и аутфити, деца и миленичиња, пријатели, Story, „Пред излез“ и теми) се купува преку App Store како месечна или годишна претплата. Цената, периодот и условите на пробата се прикажани пред плаќањето.
 
     - **Претплатата се обновува автоматски** и се наплаќа преку твојот Apple ID на крајот на секој период, сè додека не ја откажеш најмалку 24 часа пред крајот на тековниот период.
     - **Бесплатна проба:** ако ја има, на крајот на пробата се наплаќа првиот период, освен ако не ја откажеш барем 24 часа пред тоа. Пробата се нуди еднаш по Apple ID.
@@ -244,7 +248,7 @@ enum LegalTexts {
     static let termsEN = #"""
     # Terms of Use
 
-    Effective: November 6, 2026
+    Effective: November 9, 2026
 
     These terms apply to the Tripdrobe app offered by Kristijan Anakijev, Hristo Tatarchev 47j 1/22, 1000 Skopje, North Macedonia (“we”). By creating an account or using the app you agree to them and to the Privacy Policy.
 
@@ -258,7 +262,7 @@ enum LegalTexts {
 
     ## 3. Premium
 
-    You can create as many trips with a packing list as you like for free. Premium (forecast, airlines and baggage, wardrobe and outfits, friends, Story, “Before you leave” and themes) is bought through the App Store as a monthly or yearly subscription. The price, the billing period and any trial terms are shown before you pay.
+    You can create as many trips with a packing list as you like for free. Premium (forecast, airlines and baggage, wardrobe and outfits, kids and pets, friends, Story, “Before you leave” and themes) is bought through the App Store as a monthly or yearly subscription. The price, the billing period and any trial terms are shown before you pay.
 
     - **Subscriptions renew automatically** and are charged to your Apple ID at the end of each period until you cancel at least 24 hours before the end of the current period.
     - **Free trial:** if offered, the first period is charged when the trial ends unless you cancel at least 24 hours before. A trial is offered once per Apple ID.

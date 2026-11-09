@@ -162,7 +162,7 @@ enum WardrobeKind: String, Codable, CaseIterable, Identifiable {
         }
     }
 
-    /// Ако листата го нема редот, а парчето е во аутфитите — кој ред сам се додава.
+    /// Ако листата го нема редот, а парчето е во аутфитите - кој ред сам се додава.
     /// nil = не се додава (пр. шал во лето не значи „капа, шал и ракавици“).
     var newRowKey: String? {
         switch self {
@@ -186,7 +186,7 @@ enum WardrobeKind: String, Codable, CaseIterable, Identifiable {
     static let coveredKeys: Set<String> = Set(allCases.flatMap(\.packingKeys))
         .union(WardrobeCategory.allCases.flatMap(\.legacyKeys))
 
-    /// Облека и обувки — секогаш се споредуваат со аутфитите (останатото само ако е во некој аутфит).
+    /// Облека и обувки - секогаш се споредуваат со аутфитите (останатото само ако е во некој аутфит).
     static let coreKeys: Set<String> = [
         "tshirts", "longSleeves", "shirt", "sweater",
         "trousers", "longTrousers", "smartTrousers", "shorts",
@@ -423,7 +423,7 @@ extension WardrobeItem {
     /// Треба да се избере вид (маица, џемпер…), за листата да знае каде да го брои.
     var needsKind: Bool { effectiveKind == nil }
 
-    /// Редовите од листата во кои се брои. Без вид — како порано, по групата.
+    /// Редовите од листата во кои се брои. Без вид - како порано, по групата.
     var packingKeys: [String] { effectiveKind?.packingKeys ?? category.legacyKeys }
 
     var volume: Double { effectiveKind?.volume ?? category.volume }
@@ -431,7 +431,7 @@ extension WardrobeItem {
     var layer: Double { effectiveKind?.layer ?? 2 }
 
     /// Постоечка облека (пред видовите): видот се погодува од името; сукња, костим и спортска облека
-    /// се селат во новите групи. Што не може да се погоди — останува „Без вид“ за да се подреди со допир.
+    /// се селат во новите групи. Што не може да се погоди - останува „Без вид“ за да се подреди со допир.
     func migratedKind() -> WardrobeItem {
         guard kind == nil else { return self }
         var copy = self

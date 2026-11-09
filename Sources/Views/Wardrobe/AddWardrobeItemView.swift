@@ -5,6 +5,12 @@ import PhotosUI
 struct AddWardrobeItemView: View {
     @EnvironmentObject private var wardrobe: WardrobeStore
     @Environment(\.dismiss) private var dismiss
+    /// Чие е парчето: nil = мое, инаку дете од „Моето семејство“.
+    let ownerID: UUID?
+
+    init(ownerID: UUID? = nil) {
+        self.ownerID = ownerID
+    }
 
     private enum Step {
         case source
@@ -28,12 +34,18 @@ struct AddWardrobeItemView: View {
     @State private var kind: WardrobeKind?
     @State private var seasons: Set<Season> = [Season.current]
 
+    /// „Ново парче“ / „Ново парче за Ана“
+    private var eyebrow: String {
+        guard let name = FamilyStore.shared.member(ownerID)?.name else { return L("Ново парче", "New piece") }
+        return L("Ново парче за \(name)", "New piece for \(name)")
+    }
+
     var body: some View {
         ZStack {
             PaperBackground()
             VStack(alignment: .leading, spacing: 18) {
                 HStack {
-                    Eyebrow(L("Ново парче", "New piece"), color: Theme.gold)
+                    Eyebrow(eyebrow, color: Theme.gold)
                     Spacer()
                     CircleIconButton(systemName: "xmark") { dismiss() }
                 }
@@ -273,7 +285,8 @@ struct AddWardrobeItemView: View {
                                             category: kind?.category ?? category,
                                             seasons: Season.allCases.filter { seasons.contains($0) },
                                             isPhoto: style == .photo ? true : nil,
-                                            kindID: kind?.rawValue)
+                                            kindID: kind?.rawValue,
+                                            ownerID: ownerID)
                     wardrobe.add(item, image: sticker)
                     dismiss()
                 } label: {
