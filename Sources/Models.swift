@@ -95,11 +95,19 @@ struct BagSpec: Codable, Hashable {
     var isFree: Bool = false
     /// Стабилен клуч (пр. „wizz.cabin“) за превод на насловот.
     var key: String?
+    /// Свој багаж: куфер или ранец (за иконата и тежината на празниот багаж).
+    var shape: BagKind?
+
+    var icon: String { (kind == .custom ? shape : nil)?.icon ?? kind.icon }
+    var tare: Double { (kind == .custom ? shape : nil)?.tare ?? kind.tare }
 
     var volume: Double { height * width * depth / 1000 }
     var usableVolume: Double { volume * 0.88 }
 
     var displayTitle: String {
+        if kind == .custom, let shape {
+            return shape == .backpack ? L("Мој ранец", "My backpack") : L("Мој куфер", "My suitcase")
+        }
         if let key, let spec = Airlines.spec(forKey: key) { return spec.title }
         return title
     }
@@ -530,8 +538,14 @@ struct Trip: Codable, Identifiable, Hashable {
     var ownPlan: Bool?
     /// Градовите и датумите на другите во заедничкото патување (uid → план). Само за приказ, од облакот.
     var memberPlans: [String: MemberPlan]?
-    /// Децата и миленичињата на патувањето, секое со своја листа (Premium). Лично - не го гледаат сопатниците.
+    /// Децата и миленичињата на патувањето, секое со своја листа (Premium). Лично - го гледа само тој што ќе го избереш.
     var family: [TripFamilyMember]?
+    /// Аутфити по денови за децата и миленичињата (id на член → ден → аутфити). Лично.
+    var familyOutfitDays: [String: [String: [UUID]]]?
+    /// Спакувани парчиња од нивните аутфити (id на член → парчиња). Лично.
+    var familyOutfitPacked: [String: [UUID]]?
+    /// План по денови: места за посета, сликање, пазарење, сместување (Premium). Кај заедничко патување го гледаат сите.
+    var places: [TripPlace]?
 
     // MARK: Градови и име
 
@@ -741,7 +755,7 @@ struct Trip: Codable, Identifiable, Hashable {
     }
 
     var packedWeight: Double {
-        let tare = allBags.reduce(0) { $0 + $1.kind.tare }
+        let tare = allBags.reduce(0) { $0 + $1.tare }
         return myItems.reduce(tare) { $0 + Double($1.bagUnits) * $1.unitWeight }
     }
 

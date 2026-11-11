@@ -96,7 +96,16 @@ final class TripStore: ObservableObject {
         trip.outfitPacked = plan.packed.isEmpty ? nil : plan.packed
         if let exit = plan.exit, !exit.isEmpty { trip.exitChecklist = exit }
         if let dismissed = plan.dismissed { trip.dismissedSuggestions = dismissed }
-        if let family = plan.family { trip.family = family.isEmpty ? nil : family }
+        if let family = plan.family {
+            // Моите несподелени листи се од акаунтот; споделените (мои или нечии со мене) се во патувањето
+            let shared = (trip.family ?? []).filter { $0.isShared || !$0.isMine }
+            let merged = family.filter { mine in !shared.contains { $0.id == mine.id } } + shared
+            trip.family = merged.isEmpty ? nil : merged
+        }
+        if let kids = plan.kids {
+            trip.familyOutfitDays = kids.days.isEmpty ? nil : kids.days
+            trip.familyOutfitPacked = kids.packed.isEmpty ? nil : kids.packed
+        }
     }
 
     func removeLocal(_ id: UUID) {
@@ -129,7 +138,8 @@ final class TripStore: ObservableObject {
         let after = trips[index]
         if before.outfitDays != after.outfitDays || before.outfitPlan != after.outfitPlan
             || before.outfitPacked != after.outfitPacked || before.exitChecklist != after.exitChecklist
-            || before.dismissedSuggestions != after.dismissedSuggestions || before.family != after.family {
+            || before.dismissedSuggestions != after.dismissedSuggestions || before.family != after.family
+            || before.familyOutfitDays != after.familyOutfitDays || before.familyOutfitPacked != after.familyOutfitPacked {
             personal?.pushPlan(after)
         }
     }

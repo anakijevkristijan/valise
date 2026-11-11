@@ -23,7 +23,8 @@ struct TripDraft {
     /// Колку од секој багаж (клуч → број). Може повеќе багажи.
     var bagCounts: [String: Int] = [:]
     var customCount = 0
-    var customBag: BagSpec = Airlines.customBag()
+    /// Свој багаж (свои мерки) - се памти од последниот пат.
+    var customBag: BagSpec = OwnBagMemory.load() ?? Airlines.customBag()
     var activities: Set<Activity> = [.walking]
     var style: TravelerStyle = .neutral
     var hasLaundry = false
@@ -52,7 +53,7 @@ struct TripDraft {
         hasLaundry = trip.hasLaundry
         companions = trip.travelers
         name = trip.name ?? ""
-        familyIDs = (trip.family ?? []).map(\.id)
+        familyIDs = trip.myFamily.map(\.id)
         if trip.isMultiStop, let first = trip.allStops.first {
             destination = first.place
             startDate = first.startDate.startOfDay
@@ -745,6 +746,10 @@ struct TripWizardView: View {
     private var customBagEditor: some View {
         VStack(alignment: .leading, spacing: 14) {
             Eyebrow(L("Мерки на твојот багаж", "Your bag's size"))
+            HStack(spacing: 8) {
+                shapeChip(.suitcase, title: L("Куфер", "Suitcase"))
+                shapeChip(.backpack, title: L("Ранец", "Backpack"))
+            }
             HStack(spacing: 10) {
                 numberField(L("Висина", "Height"), value: $draft.customBag.height, unit: "cm")
                 numberField(L("Ширина", "Width"), value: $draft.customBag.width, unit: "cm")
@@ -765,8 +770,56 @@ struct TripWizardView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+            if let check = ownBagCheck {
+                ownBagNote(check.result, airline: check.airline)
+            }
         }
         .luxCard(padding: 18)
+    }
+
+    private func shapeChip(_ shape: BagKind, title: String) -> some View {
+        let isOn = draft.customBag.shape == shape
+        return Button {
+            withAnimation(.easeInOut(duration: 0.2)) { draft.customBag.shape = shape }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: shape.icon)
+                    .font(.system(size: 13, weight: .regular))
+                Text(title)
+                    .font(.sans(13, isOn ? .semibold : .medium))
+            }
+            .foregroundStyle(isOn ? Theme.goldLight : Theme.ink)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity)
+            .background(Capsule().fill(isOn ? Theme.navy : Theme.paper))
+            .overlay(Capsule().strokeBorder(isOn ? Theme.navy : Theme.hairline, lineWidth: 0.75))
+        }
+        .buttonStyle(PressableStyle())
+    }
+
+    /// Својот багаж спореден со правилата на избраната авиокомпанија (само за лет, Premium).
+    private var ownBagCheck: (result: OwnBagCheck, airline: String)? {
+        guard draft.transport == .plane, premium.isPremium, draft.customBag.volume > 0,
+              let airline = Airlines.find(draft.airlineID),
+              let result = OwnBagCheck.check(draft.customBag, airline: airline) else { return nil }
+        return (result, airline.name)
+    }
+
+    private func ownBagNote(_ check: OwnBagCheck, airline: String) -> some View {
+        let color = check.isWarning ? Theme.terracotta : Theme.sage
+        return HStack(alignment: .top, spacing: 10) {
+            Image(systemName: check.isWarning ? "exclamationmark.triangle.fill" : "checkmark.circle")
+                .font(.system(size: 13))
+                .padding(.top, 1)
+            Text(check.text(airline: airline))
+                .font(.sans(13, check.isWarning ? .semibold : .regular))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .foregroundStyle(color)
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(color.opacity(0.09)))
     }
 
     private func numberField(_ label: String, value: Binding<Double>, unit: String) -> some View {
@@ -827,7 +880,7 @@ struct TripWizardView: View {
 
             if premium.isPremium {
                 companionsEditor
-                FamilyTripPicker(selection: $draft.familyIDs, inTrip: editing?.family ?? [])
+                FamilyTripPicker(selection: $draft.familyIDs, inTrip: editing?.myFamily ?? [])
             } else {
                 PremiumLockRow(icon: "person.2",
                                title: L("Патувај со пријатели", "Travel with friends"),
@@ -1084,7 +1137,7 @@ struct TripWizardView: View {
                     summaryRow(icon: "map", text: trip.stopsText)
                 }
                 summaryRow(icon: draft.transport.icon, text: transportText)
-                summaryRow(icon: draft.primaryBag.kind.icon, text: draft.bagsSummary)
+                summaryRow(icon: draft.primaryBag.icon, text: draft.bagsSummary)
                 if !draft.companions.isEmpty {
                     summaryRow(icon: "person.2", text: draft.companions.map(\.name).joined(separator: ", "))
                 }
@@ -1253,6 +1306,9 @@ struct TripWizardView: View {
         updated.outfitPlan = original.outfitPlan
         updated.outfitDays = original.outfitDays
         updated.outfitPacked = original.outfitPacked
+        updated.familyOutfitDays = original.familyOutfitDays
+        updated.familyOutfitPacked = original.familyOutfitPacked
+        updated.places = original.places
         // Багажот и стилот сега се мои (кај заедничко патување - само за мене)
         updated.ownBags = true
         // Член на заедничко патување: сменетите градови и датуми се само мои,
@@ -1308,9 +1364,16 @@ struct TripWizardView: View {
         PackingEngine.dissolveTogether(&updated)
         PackingEngine.rebuild(&updated)
         // Децата и миленичињата: новите добиваат листа, постоечките ја задржуваат спакуваното
-        updated.family = premium.isPremium
-            ? FamilyPacking.family(for: draft.familyIDs, trip: updated, previous: original.family)
-            : original.family
+        // Листите што некој ми ги споделил остануваат како што се (ги уредува сопственикот).
+        if premium.isPremium {
+            let mine = FamilyPacking.family(for: draft.familyIDs, trip: updated, previous: original.family) ?? []
+            let all = mine + original.sharedWithMe
+            updated.family = all.isEmpty ? nil : all
+        } else {
+            updated.family = original.family
+        }
+        updated.pruneFamilyShares()
+        if draft.customCount > 0 { OwnBagMemory.save(draft.customBag) }
 
         let finalTrip = updated
         store.mutate(original.id) { $0 = finalTrip }
@@ -1332,6 +1395,7 @@ struct TripWizardView: View {
         }
 
         LastOrigin.save(draft.origin)
+        if draft.customCount > 0 { OwnBagMemory.save(draft.customBag) }
         store.add(trip)
         sendInvites(to: trip.id)
         onCreate(trip.id)
@@ -1664,7 +1728,7 @@ struct BagOptionRow: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 14) {
-                Image(systemName: bag.kind.icon)
+                Image(systemName: bag.icon)
                     .font(.system(size: 16, weight: .light))
                     .foregroundStyle(Theme.navy)
                     .frame(width: 34)
@@ -1725,7 +1789,7 @@ struct BagCountRow: View {
                 if count == 0 { onChange(1) }
             } label: {
                 HStack(spacing: 14) {
-                    Image(systemName: bag.kind.icon)
+                    Image(systemName: bag.icon)
                         .font(.system(size: 16, weight: .light))
                         .foregroundStyle(Theme.navy)
                         .frame(width: 34)
@@ -1742,7 +1806,7 @@ struct BagCountRow: View {
                                     .foregroundStyle(Theme.sage)
                             }
                         }
-                        Text(bag.kind == .custom ? (bag.displayDetail ?? "") : bag.limitText)
+                        Text(bag.kind == .custom && count == 0 ? (bag.displayDetail ?? "") : bag.limitText)
                             .font(.sans(13))
                             .foregroundStyle(Theme.inkSoft)
                         if bag.kind != .custom, let detail = bag.displayDetail {

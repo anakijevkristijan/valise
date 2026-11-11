@@ -40,7 +40,7 @@ enum LegalTexts {
     static let privacyMK = #"""
     # Политика за приватност
 
-    Важи од: 9 ноември 2026
+    Важи од: 11 ноември 2026
 
     Tripdrobe („апликацијата“) ја развива и одржува Кристијан Анакијев, ул. Христо Татарчев 47ј 1/22, 1000 Скопје, Северна Македонија („ние“). Ние сме одговорни за обработката на твоите лични податоци. За сè што е поврзано со приватноста пиши на tripdrobe@gmail.com.
 
@@ -52,13 +52,13 @@ enum LegalTexts {
 
     **Телефонски број (по избор).** Ако го внесеш, го чуваме во твојот акаунт, за да остане и кога ќе се одјавиш и пак ќе се најавиш. Го гледаш само ти - правилата на базата не дозволуваат никој друг да го чита. За пријателите да можат да те најдат кога те канат на патување, во посебна листа за пребарување се чува само шифриран отпечаток (SHA-256) од бројот и од е-поштата; од него бројот не може да се прочита и не им се покажува на другите.
 
-    **Патувања.** Дестинација, датуми, превоз, авиокомпанија и багаж, листи за пакување, листата „Пред излез“ и имињата на сопатниците што ги додаваш.
+    **Патувања.** Дестинација, датуми, превоз, авиокомпанија и багаж, листи за пакување, листата „Пред излез“, планот по денови (местата што ги запишуваш, со час, адреса и белешка по избор) и имињата на сопатниците што ги додаваш. Кај заедничко патување планот по денови го гледаат членовите на патувањето.
 
     **Заеднички патувања.** Деталите на патувањето и делот „Заедно“ (што се носи и кој го носи) ги гледаат сите членови на тоа патување. Твојата лична листа ја гледаш само ти.
 
     **Гардероба и аутфити.** Фотографии од облека што ги правиш или избираш, категории, сезони, аутфити и план по денови. Пред да се зачува сликата, апликацијата го отстранува лицето, а слика на која останува лице не се зачувува. Гардеробата ја гледаш само ти.
 
-    **Моето семејство (по избор).** Ако додадеш деца или миленичиња: име (може и прекар), месец и година на раѓање на детето, видот на миленичето, нивните листи за пакување и облеката во гардеробата. Тоа го внесуваш ти како родител или старател, го гледаш само ти и не им се покажува на сопатниците. Не собираме податоци директно од деца.
+    **Моето семејство (по избор).** Ако додадеш деца или миленичиња: име (може и прекар), месец и година на раѓање на детето, видот на миленичето, нивните листи за пакување и облеката во гардеробата. Тоа го внесуваш ти како родител или старател, го гледаш само ти и не им се покажува на сопатниците. Не собираме податоци директно од деца. Единствен исклучок е листата за пакување на детето што самиот ќе избереш да ја споделиш со одреден сопатник (на пример другиот родител): тогаш таа листа се чува во патувањето за да се синхронизира меѓу вас. Апликацијата ја покажува само на тебе и на избраните, а споделувањето можеш да го прекинеш во секое време. Гардеробата и аутфитите никогаш не се споделуваат.
 
     **Известувања.** Потсетниците за пакување ги закажува самиот телефон и ништо не се праќа. За известувањата од пријателите (на пример, кога некој те додава во патување или те означува да понесеш нешто) чуваме технички токен за известувања на твојот уред, поврзан со акаунтот, и јазикот на апликацијата. Ги исклучуваш во Профил или во Поставки на iPhone; токенот се брише кога ќе се одјавиш.
 
@@ -116,7 +116,7 @@ enum LegalTexts {
     static let privacyEN = #"""
     # Privacy Policy
 
-    Effective: November 9, 2026
+    Effective: November 11, 2026
 
     Tripdrobe (“the app”) is developed and run by Kristijan Anakijev, Hristo Tatarchev 47j 1/22, 1000 Skopje, North Macedonia (“we”). We are responsible for processing your personal data. For anything about privacy, write to tripdrobe@gmail.com.
 
@@ -128,13 +128,13 @@ enum LegalTexts {
 
     **Phone number (optional).** If you enter it, we keep it in your account so it's still there when you sign out and back in. Only you can see it - the database rules don't let anyone else read it. So that friends can find you when they invite you to a trip, a separate lookup list stores only a one-way fingerprint (SHA-256) of your number and email; the number can't be read from it and is never shown to others.
 
-    **Trips.** Destination, dates, transport, airline and bags, packing lists, the “Before you leave” checklist and the names of companions you add.
+    **Trips.** Destination, dates, transport, airline and bags, packing lists, the “Before you leave” checklist, the day plan (places you note, with an optional time, address and note) and the names of companions you add. On a shared trip the day plan is visible to the trip's members.
 
     **Shared trips.** Trip details and the “Together” section (what is brought and by whom) are visible to every member of that trip. Your personal list is visible only to you.
 
     **Wardrobe and outfits.** Photos of clothes you take or choose, categories, seasons, outfits and your day-by-day plan. Before a photo is saved, the app removes any face, and a photo that still shows a face is not saved. Your wardrobe is visible only to you.
 
-    **My family (optional).** If you add children or pets: a name (a nickname is fine), the child's month and year of birth, the type of pet, their packing lists and their clothes in the wardrobe. You enter this as the parent or guardian; it is visible only to you and is not shown to travel companions. We do not collect data directly from children.
+    **My family (optional).** If you add children or pets: a name (a nickname is fine), the child's month and year of birth, the type of pet, their packing lists and their clothes in the wardrobe. You enter this as the parent or guardian; it is visible only to you and is not shown to travel companions. The one exception is a child's packing list that you choose to share with a specific travel companion (for example the other parent): that list is then stored inside the trip so it can sync between you. The app shows it only to you and the people you picked, and you can stop sharing at any time. The wardrobe and outfits are never shared. We do not collect data directly from children.
 
     **Notifications.** Packing reminders are scheduled by your phone itself and nothing is sent anywhere. For notifications from friends (for example, when someone adds you to a trip or asks you to bring something) we store a technical notification token for your device, linked to your account, together with the app language. You can turn them off in Profile or in iPhone Settings; the token is removed when you sign out.
 
@@ -192,7 +192,7 @@ enum LegalTexts {
     static let termsMK = #"""
     # Услови за користење
 
-    Важи од: 9 ноември 2026
+    Важи од: 11 ноември 2026
 
     Овие услови важат за апликацијата Tripdrobe што ја нуди Кристијан Анакијев, ул. Христо Татарчев 47ј 1/22, 1000 Скопје, Северна Македонија („ние“). Кога создаваш акаунт или ја користиш апликацијата, се согласуваш со нив и со Политиката за приватност.
 
@@ -248,7 +248,7 @@ enum LegalTexts {
     static let termsEN = #"""
     # Terms of Use
 
-    Effective: November 9, 2026
+    Effective: November 11, 2026
 
     These terms apply to the Tripdrobe app offered by Kristijan Anakijev, Hristo Tatarchev 47j 1/22, 1000 Skopje, North Macedonia (“we”). By creating an account or using the app you agree to them and to the Privacy Policy.
 

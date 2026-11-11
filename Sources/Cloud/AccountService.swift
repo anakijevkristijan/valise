@@ -36,7 +36,7 @@ final class AccountService: ObservableObject {
     /// јазик, возраст, име, телефон, тема, филтри. Остануваат само купениот Premium
     /// (врзан за Apple ID, не за акаунтот) и блокадата за возраст под 13 години.
     private static let personalKeys = [
-        "userName", PhoneID.phoneStorageKey, "lastOrigin", PhoneStepView.askedKey,
+        "userName", PhoneID.phoneStorageKey, "lastOrigin", "ownBag", PhoneStepView.askedKey,
         Theme.storageKey, "homeFilter", "accountStepDone",
         "languageChosen", AppLanguage.storageKey, AgeGateView.verifiedKey,
         PremiumOfferView.shownKey, TripReminders.enabledKey, TripReminders.askedKey,

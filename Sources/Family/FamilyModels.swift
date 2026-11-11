@@ -67,6 +67,30 @@ enum AgeGroup: Int, CaseIterable {
     }
 }
 
+/// Со кого се споделува листата на детето: избран сопатник.
+enum FamilyRole: String, Codable, CaseIterable, Identifiable {
+    case mother, father, other
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .mother: return L("Мајка", "Mother")
+        case .father: return L("Татко", "Father")
+        case .other: return L("Друг", "Someone else")
+        }
+    }
+}
+
+struct FamilyShare: Codable, Hashable, Identifiable {
+    /// Акаунтот на сопатникот.
+    var uid: String
+    var name: String
+    var role: FamilyRole
+
+    var id: String { uid }
+}
+
 /// Член од „Моето семејство“ - се внесува еднаш, во Профил.
 struct FamilyMember: Codable, Identifiable, Hashable {
     var id: UUID = UUID()
@@ -109,6 +133,15 @@ struct TripFamilyMember: Codable, Identifiable, Hashable {
     var items: [PackingItem] = []
     /// Тргнатите предмети - не се враќаат при нова прогноза или уредување.
     var dismissed: [String]?
+    /// Со кого е споделена листата (мајка, татко или друг сопатник што ќе го избереш). Празно = само јас.
+    var shares: [FamilyShare]?
+    /// Кога листата ми е споделена мене: чие е детето (nil = мое).
+    var ownerUID: String?
+    var ownerName: String?
+
+    var isShared: Bool { !(shares ?? []).isEmpty }
+    /// Мое дете/милениче (не споделено од друг).
+    var isMine: Bool { ownerUID == nil || ownerUID == Session.uid }
 
     init(member: FamilyMember, on date: Date) {
         id = member.id
@@ -173,10 +206,89 @@ enum FamilyText {
 
 extension Trip {
     /// Предметите на децата и миленичињата (Premium) - се бројат во багажот и во „спакувано“.
+    /// Само моите - листа што некој ми ја споделил не оди во мојот багаж.
     var familyItems: [PackingItem] {
         guard PremiumStore.cachedIsPremium else { return [] }
-        return (family ?? []).flatMap(\.items)
+        return myFamily.flatMap(\.items)
     }
 
     var hasFamily: Bool { !(family ?? []).isEmpty }
+
+    /// Моите деца и миленичиња во патувањето (без тие што некој ми ги споделил).
+    var myFamily: [TripFamilyMember] { (family ?? []).filter(\.isMine) }
+
+    /// Листи што некој друг (пр. другиот родител) ми ги споделил мене.
+    var sharedWithMe: [TripFamilyMember] { (family ?? []).filter { !$0.isMine } }
+
+    /// Сопатникот е тргнат од патувањето → повеќе не ја гледа ниту листата на детето.
+    mutating func dropFamilyShares(with uid: String) {
+        guard var list = family else { return }
+        for index in list.indices where list[index].isMine {
+            let kept = (list[index].shares ?? []).filter { $0.uid != uid }
+            list[index].shares = kept.isEmpty ? nil : kept
+        }
+        family = list
+    }
+
+    /// Споделувањето важи само за сопатници што се уште во патувањето.
+    mutating func pruneFamilyShares() {
+        guard var list = family else { return }
+        let valid = Set((companions ?? []).compactMap(\.uid))
+        for index in list.indices where list[index].isMine {
+            let kept = (list[index].shares ?? []).filter { valid.contains($0.uid) }
+            list[index].shares = kept.isEmpty ? nil : kept
+        }
+        family = list
+    }
+
+    // MARK: Аутфити по денови за дете или милениче
+
+    /// Патувањето „низ очите“ на член од семејството: неговите аутфити по денови и неговите спакувани парчиња.
+    /// Така истите екрани (денови, аутфити за ден) работат и за мене и за децата. nil = јас.
+    func projected(for person: UUID?) -> Trip {
+        guard let person else { return self }
+        var copy = self
+        copy.outfitPlan = nil
+        copy.outfitDays = familyOutfitDays?[person.uuidString]
+        copy.outfitPacked = familyOutfitPacked?[person.uuidString]
+        // Неговата листа, не мојата (за „листата наспроти аутфитите“ да не ги меша)
+        copy.items = family?.first { $0.id == person }?.items ?? []
+        copy.together = nil
+        return copy
+    }
+
+    mutating func addOutfit(_ id: UUID, forKey key: String, person: UUID?) {
+        guard let person else { addOutfit(id, forKey: key); return }
+        var all = familyOutfitDays ?? [:]
+        var days = all[person.uuidString] ?? [:]
+        var list = days[key] ?? []
+        if !list.contains(id) { list.append(id) }
+        days[key] = list
+        all[person.uuidString] = days
+        familyOutfitDays = all
+    }
+
+    mutating func removeOutfit(_ id: UUID, forKey key: String, person: UUID?) {
+        guard let person else { removeOutfit(id, forKey: key); return }
+        var all = familyOutfitDays ?? [:]
+        var days = all[person.uuidString] ?? [:]
+        var list = days[key] ?? []
+        list.removeAll { $0 == id }
+        days[key] = list.isEmpty ? nil : list
+        all[person.uuidString] = days.isEmpty ? nil : days
+        familyOutfitDays = all.isEmpty ? nil : all
+    }
+
+    /// Парче од аутфитите на детето: спакувано / не.
+    mutating func toggleOutfitPacked(_ item: UUID, person: UUID) {
+        var all = familyOutfitPacked ?? [:]
+        var list = all[person.uuidString] ?? []
+        if list.contains(item) {
+            list.removeAll { $0 == item }
+        } else {
+            list.append(item)
+        }
+        all[person.uuidString] = list.isEmpty ? nil : list
+        familyOutfitPacked = all.isEmpty ? nil : all
+    }
 }

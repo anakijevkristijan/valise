@@ -379,6 +379,8 @@ enum FamilyPacking {
         var result: [TripFamilyMember] = []
         for id in ids {
             if var existing = previous?.first(where: { $0.id == id }) {
+                // Листа што ми е споделена: ја уредува само нејзиниот сопственик
+                guard existing.isMine else { result.append(existing); continue }
                 if let profile = store.member(id) { existing.update(from: profile, on: trip.startDate) }
                 refresh(&existing, trip: trip, weatherOnly: false)
                 result.append(existing)
@@ -396,8 +398,8 @@ enum FamilyPacking {
     static func syncWithWeather(_ trip: inout Trip) -> Bool {
         guard var family = trip.family, !family.isEmpty else { return false }
         var changed = false
-        for index in family.indices where refresh(&family[index], trip: trip, weatherOnly: true) {
-            changed = true
+        for index in family.indices where family[index].isMine {
+            if refresh(&family[index], trip: trip, weatherOnly: true) { changed = true }
         }
         if changed { trip.family = family }
         return changed

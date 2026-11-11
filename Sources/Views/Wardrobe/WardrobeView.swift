@@ -33,7 +33,7 @@ struct WardrobeView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 24) {
                         header
-                        if !family.children.isEmpty {
+                        if !family.members.isEmpty {
                             personPicker
                         }
                         sectionPicker
@@ -178,7 +178,7 @@ struct WardrobeView: View {
                 ChipButton(title: L("Јас", "Me"), isSelected: owner == nil) {
                     withAnimation(.easeInOut(duration: 0.2)) { owner = nil }
                 }
-                ForEach(family.children) { child in
+                ForEach(family.members) { child in
                     ChipButton(title: child.name, isSelected: owner == child.id) {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             owner = child.id

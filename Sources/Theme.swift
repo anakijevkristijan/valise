@@ -363,8 +363,14 @@ struct PaperBackground: View {
         ZStack {
             Theme.paper
             if Theme.current.motif != .none {
-                MotifPattern(motif: Theme.current.motif, color: Theme.gold, opacity: 0.14, spacing: 66, size: 17)
+                // Празничните теми се „накитени“: погуста и поизразена шара, плус гирланда и снег/конфети
+                let festive = Theme.current.isFestive
+                MotifPattern(motif: Theme.current.motif, color: Theme.gold,
+                             opacity: festive ? 0.24 : 0.14, spacing: festive ? 58 : 66, size: festive ? 20 : 17)
                     .equatable()
+                if festive {
+                    FestiveBackdrop(palette: Theme.current)
+                }
             }
         }
         .ignoresSafeArea()

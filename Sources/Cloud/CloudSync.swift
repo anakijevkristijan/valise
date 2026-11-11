@@ -7,12 +7,15 @@ import FirebaseFirestore
 /// • заеднички податоци (дестинација, датуми, сопатници…)
 /// • `together` - заедничките работи, синхронизирани кај сите (кој носи + спакувано)
 /// • `lists.{uid}` - личната листа на секој патник; секој ја гледа само својата
+/// • `kids.{id}` - листа на дете/милениче што сопственикот ја споделил со избран сопатник (мајка, татко, друг);
+///   ја гледаат само сопственикот и избраните
 enum CloudCodec {
 
     /// Лични работи што воопшто не одат во облакот.
     static let personalKeys: Set<String> = [
         "exitChecklist", "dismissedSuggestions", "weather", "weatherSource", "weatherUpdatedAt",
-        "outfitPlan", "outfitDays", "outfitPacked", "ownBags", "ownPlan", "memberPlans", "family"
+        "outfitPlan", "outfitDays", "outfitPacked", "ownBags", "ownPlan", "memberPlans", "family",
+        "familyOutfitDays", "familyOutfitPacked"
     ]
 
     /// Секој член има свои: багаж и стил (жена/маж). Во облакот: `personal.{uid}`.
@@ -54,7 +57,78 @@ enum CloudCodec {
         if let together = dict["together"] as? [[String: Any]] {
             dict["together"] = itemMap(together)
         }
+        let kids = kidsMap(trip, myUID: myUID)
+        if !kids.isEmpty { dict["kids"] = kids }
         return dict
+    }
+
+    // MARK: Споделени листи на деца и миленичиња
+
+    /// Листите што се споделени (мои со некого, или нечии со мене): `kids.{id}` = сопственик, со кого, членот и предметите.
+    private static func kidsMap(_ trip: Trip, myUID: String) -> [String: Any] {
+        var map: [String: Any] = [:]
+        for member in trip.family ?? [] where member.isShared {
+            var meta = member
+            meta.items = []
+            meta.ownerUID = nil
+            meta.ownerName = nil
+            guard let data = try? JSONEncoder().encode(meta),
+                  let json = try? JSONSerialization.jsonObject(with: data) else { continue }
+            var entry: [String: Any] = [
+                "owner": member.ownerUID ?? myUID,
+                "with": (member.shares ?? []).map(\.uid),
+                "member": json,
+                "items": listMap(member.items)
+            ]
+            if let name = member.ownerName ?? (member.ownerUID == nil ? UserDefaults.standard.string(forKey: "userName") : nil) {
+                entry["ownerName"] = name
+            }
+            map[member.id.uuidString] = entry
+        }
+        return map
+    }
+
+    /// Од облакот: листите што се мои или ми се споделени мене.
+    private static func kids(from raw: Any?, myUID: String) -> [TripFamilyMember] {
+        guard let map = raw as? [String: Any] else { return [] }
+        var result: [TripFamilyMember] = []
+        for (_, value) in map {
+            guard let entry = value as? [String: Any], let owner = entry["owner"] as? String,
+                  let meta = entry["member"], JSONSerialization.isValidJSONObject(meta),
+                  let metaJSON = try? JSONSerialization.data(withJSONObject: meta),
+                  var member = try? JSONDecoder().decode(TripFamilyMember.self, from: metaJSON) else { continue }
+            let with = (entry["with"] as? [String]) ?? []
+            guard owner == myUID || with.contains(myUID) else { continue }
+            let list = itemList(entry["items"])
+            if JSONSerialization.isValidJSONObject(list),
+               let json = try? JSONSerialization.data(withJSONObject: list),
+               let items = try? JSONDecoder().decode([PackingItem].self, from: json) {
+                member.items = items
+            }
+            if owner != myUID {
+                member.ownerUID = owner
+                member.ownerName = entry["ownerName"] as? String
+            }
+            result.append(member)
+        }
+        return result.sorted { $0.name < $1.name }
+    }
+
+    /// Семејството по промена од облакот: моите несподелени (од телефонот) + споделените (од облакот).
+    /// Моја споделена листа што уште не стигнала горе останува од телефонот (да не се изгуби).
+    static func mergeFamily(local: [TripFamilyMember]?, cloud: [TripFamilyMember]) -> [TripFamilyMember]? {
+        var result: [TripFamilyMember] = []
+        for member in local ?? [] {
+            if let fresh = cloud.first(where: { $0.id == member.id }) {
+                result.append(fresh)
+            } else if member.isMine {
+                result.append(member)
+            }
+        }
+        for member in cloud where !result.contains(where: { $0.id == member.id }) {
+            result.append(member)
+        }
+        return result.isEmpty ? nil : result
     }
 
     private static func itemMap(_ items: [[String: Any]]) -> [String: Any] {
@@ -125,6 +199,8 @@ enum CloudCodec {
         if dict["together"] != nil {
             dict["together"] = itemList(dict["together"])
         }
+        let sharedKids = kids(from: dict["kids"], myUID: myUID)
+        dict.removeValue(forKey: "kids")
 
         // Задолжителни полиња што не се во облакот
         dict["exitChecklist"] = [Any]()
@@ -145,10 +221,12 @@ enum CloudCodec {
             trip.outfitPlan = local.outfitPlan
             trip.outfitDays = local.outfitDays
             trip.outfitPacked = local.outfitPacked
-            trip.family = local.family
+            trip.familyOutfitDays = local.familyOutfitDays
+            trip.familyOutfitPacked = local.familyOutfitPacked
         } else {
             trip.exitChecklist = PackingEngine.defaultExitChecklist()
         }
+        trip.family = mergeFamily(local: local?.family, cloud: sharedKids)
         trip.ownBags = isOwner || hasOwnBags
         trip.ownPlan = hasOwnPlan ? true : nil
         trip.memberPlans = plans.isEmpty ? nil : plans
@@ -189,7 +267,7 @@ enum CloudCodec {
         guard let o = encode(old, myUID: myUID), let n = encode(new, myUID: myUID) else { return [:] }
         var result: [AnyHashable: Any] = [:]
 
-        let topKeys = Set(o.keys).union(n.keys).subtracting(["lists", "together", "personal"])
+        let topKeys = Set(o.keys).union(n.keys).subtracting(["lists", "together", "personal", "kids"])
         for key in topKeys where !same(o[key], n[key]) {
             result[key] = n[key] ?? FieldValue.delete()
         }
@@ -214,6 +292,26 @@ enum CloudCodec {
             result["together"] = FieldValue.delete()
         case (nil, nil):
             break
+        }
+
+        // Споделени листи на деца: само промените; целата листа ја брише само сопственикот
+        let oldKids = (o["kids"] as? [String: Any]) ?? [:]
+        let newKids = (n["kids"] as? [String: Any]) ?? [:]
+        for id in Set(oldKids.keys).union(newKids.keys) {
+            let old = oldKids[id] as? [String: Any]
+            guard let new = newKids[id] as? [String: Any] else {
+                if (old?["owner"] as? String) == myUID { result["kids.\(id)"] = FieldValue.delete() }
+                continue
+            }
+            guard let old else {
+                result["kids.\(id)"] = new
+                continue
+            }
+            for field in ["owner", "ownerName", "with", "member"] where !same(old[field], new[field]) {
+                result["kids.\(id).\(field)"] = new[field] ?? FieldValue.delete()
+            }
+            diffMap(prefix: "kids.\(id).items", old: (old["items"] as? [String: Any]) ?? [:],
+                    new: (new["items"] as? [String: Any]) ?? [:], into: &result)
         }
 
         if !result.isEmpty {

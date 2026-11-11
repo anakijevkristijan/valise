@@ -637,7 +637,7 @@ struct OutfitBuilderView: View {
                             color: Theme.terracotta)
             }
 
-            if let trip {
+            if let trip, owner == nil {
                 let targets = wardrobe.targets(for: trip, extra: selected, excludingOutfit: existing?.id)
                 if !targets.isEmpty {
                     TargetChips(targets: targets)

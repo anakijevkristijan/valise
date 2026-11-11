@@ -11,7 +11,7 @@ struct TripDetailView: View {
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("userName") private var userName: String = ""
 
-    enum Tab: String, CaseIterable { case packing, exit }
+    enum Tab: String, CaseIterable { case packing, plan, exit }
 
     @State private var tab: Tab = .packing
     @State private var addItemCategory: ItemCategory?
@@ -68,6 +68,7 @@ struct TripDetailView: View {
         switch ScreenshotMode.screen {
         case "story": showStory = true
         case "exit": tab = .exit
+        case "plan": tab = .plan
         case "dates":
             editStartStep = 1
             showEdit = true
@@ -113,19 +114,8 @@ struct TripDetailView: View {
                         tabPicker(trip)
                             .id("shot-packing")
 
-                        Group {
-                            if tab == .packing {
-                                packingSection(trip)
-                            } else if premium.isPremium {
-                                exitSection(trip)
-                            } else {
-                                PremiumLockRow(icon: "house",
-                                               title: L("Последен круг низ домот", "One last walk through home"),
-                                               detail: L("Шпорет, прозорци, полнач, клучеви - листа за мирен излез од дома.",
-                                                         "Stove, windows, charger, keys - a checklist for leaving home calmly."))
-                            }
-                        }
-                        .transition(.opacity)
+                        tabContent(trip)
+                            .transition(.opacity)
                     }
                     .padding(.horizontal, 20)
                     .padding(.bottom, 60)
@@ -356,6 +346,7 @@ struct TripDetailView: View {
                                             t.companions = (t.companions ?? []).filter { $0.id != companion.id }
                                             if let uid = companion.uid {
                                                 t.memberUIDs = (t.memberUIDs ?? []).filter { $0 != uid }
+                                                t.dropFamilyShares(with: uid)
                                             }
                                             if var together = t.together {
                                                 for i in together.indices where together[i].assignee == companion.id {
@@ -540,13 +531,48 @@ struct TripDetailView: View {
 
     // MARK: Табови
 
+    /// Пакување · План (места по денови) · Пред излез. Ако не собираат во ширина (долги преводи) - лентата се лизга.
     private func tabPicker(_ trip: Trip) -> some View {
-        HStack(alignment: .bottom, spacing: 20) {
-            tabButton(.packing, title: L("Пакување", "Packing"), count: "\(trip.packedCount)/\(trip.totalCount)")
-            tabButton(.exit, title: L("Пред излез", "Before you leave"), count: "\(trip.exitChecklist.filter(\.isDone).count)/\(trip.exitChecklist.count)")
-            Spacer()
+        ViewThatFits(in: .horizontal) {
+            tabRow(trip)
+            ScrollView(.horizontal) { tabRow(trip) }
+                .scrollIndicators(.hidden)
         }
         .overlay(alignment: .bottom) { Hairline() }
+    }
+
+    private func tabRow(_ trip: Trip) -> some View {
+        let places = trip.allPlaces
+        return HStack(alignment: .bottom, spacing: 18) {
+            tabButton(.packing, title: L("Пакување", "Packing"), count: "\(trip.packedCount)/\(trip.totalCount)")
+            tabButton(.plan, title: L("План", "Plan"),
+                      count: places.isEmpty ? "" : "\(places.filter(\.isDone).count)/\(places.count)")
+            tabButton(.exit, title: L("Пред излез", "Before you leave"), count: "\(trip.exitChecklist.filter(\.isDone).count)/\(trip.exitChecklist.count)")
+            Spacer(minLength: 0)
+        }
+    }
+
+    @ViewBuilder
+    private func tabContent(_ trip: Trip) -> some View {
+        if tab == .packing {
+            packingSection(trip)
+        } else if tab == .plan {
+            if premium.isPremium {
+                TripPlanSection(trip: trip)
+            } else {
+                PremiumLockRow(icon: "mappin.and.ellipse",
+                               title: L("План по денови", "Day-by-day plan"),
+                               detail: L("Места за посета, сликање и пазарење, ресторани и каде спиеш - ден по ден, со час и адреса.",
+                                         "Sights, photo spots, shopping, restaurants and where you're staying - day by day, with a time and an address."))
+            }
+        } else if premium.isPremium {
+            exitSection(trip)
+        } else {
+            PremiumLockRow(icon: "house",
+                           title: L("Последен круг низ домот", "One last walk through home"),
+                           detail: L("Шпорет, прозорци, полнач, клучеви - листа за мирен излез од дома.",
+                                     "Stove, windows, charger, keys - a checklist for leaving home calmly."))
+        }
     }
 
     private func tabButton(_ value: Tab, title: String, count: String) -> some View {
@@ -559,11 +585,14 @@ struct TripDetailView: View {
                     .tracking(1.4)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
-                Text(count)
-                    .font(.codes(14))
-                    .opacity(0.6)
-                    .lineLimit(1)
+                if !count.isEmpty {
+                    Text(count)
+                        .font(.codes(14))
+                        .opacity(0.6)
+                        .lineLimit(1)
+                }
             }
+            .fixedSize()
             .foregroundStyle(tab == value ? Theme.navy : Theme.muted)
             .padding(.bottom, 11)
             .overlay(alignment: .bottom) {
@@ -622,7 +651,8 @@ struct TripDetailView: View {
                 togetherBlock(trip)
             }
 
-            if trip.together != nil || (premium.isPremium && trip.hasFamily) {
+            let showsFamily = (premium.isPremium && trip.hasFamily) || !trip.sharedWithMe.isEmpty
+            if trip.together != nil || showsFamily {
                 Text(L("МОЈА ЛИСТА", "MY LIST"))
                     .font(.sans(11, .semibold))
                     .tracking(2.4)
@@ -650,8 +680,8 @@ struct TripDetailView: View {
             }
             .buttonStyle(SecondaryButtonStyle())
 
-            // Децата и миленичињата - секое со своја листа (Premium)
-            if premium.isPremium && trip.hasFamily {
+            // Децата и миленичињата - секое со своја листа (Premium); листа споделена со мене ја гледам секогаш
+            if showsFamily {
                 FamilyPackingSections(trip: trip)
                     .padding(.top, 8)
             }
@@ -1296,7 +1326,7 @@ struct BagFitCard: View {
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(Array(trip.allBags.enumerated()), id: \.offset) { _, spec in
                     HStack(spacing: 14) {
-                        Image(systemName: spec.kind.icon)
+                        Image(systemName: spec.icon)
                             .font(.system(size: 18, weight: .light))
                             .foregroundStyle(Theme.navy)
                             .frame(width: 30)
@@ -1336,8 +1366,28 @@ struct BagFitCard: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.top, 2)
+
+            // Свои мерки поголеми од дозволеното кај авиокомпанијата
+            ForEach(trip.ownBagWarnings, id: \.self) { warning in
+                ownBagWarning(warning)
+            }
         }
         .luxCard(padding: 20, radius: 18)
+    }
+
+    private func ownBagWarning(_ text: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 13))
+                .padding(.top, 1)
+            Text(text)
+                .font(.sans(13, .semibold))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .foregroundStyle(Theme.terracotta)
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.terracotta.opacity(0.09)))
     }
 
     private func meter(label: String, value: String, ratio: Double, color: Color) -> some View {

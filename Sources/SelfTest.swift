@@ -136,6 +136,10 @@ enum SelfTest {
         test("Семејство: спакуваното и рачното остануваат, лично е", familyKeepsPacked)
         test("Аутфити: рачно наместени парчиња", outfitCustomLayout)
         test("Новогодишни теми", festiveThemes)
+        test("План по денови: места", dayPlanPlaces)
+        test("Свој багаж наспроти авиокомпанијата", ownBagAgainstAirline)
+        test("Листа на дете: само со избраниот", kidListSharedOnlyWithChosen)
+        test("Аутфити по денови за дете", kidOutfitsByDay)
 
         UserDefaults.standard.set(savedLanguage, forKey: AppLanguage.storageKey)
         write()
@@ -489,6 +493,138 @@ enum SelfTest {
             check(palette.motif != .none, "\(id) без мотив")
         }
         check(Set(Palette.all.map(\.id)).count == Palette.all.count, "две теми со исто id")
+        check(Palette.find("snowfall").isFestive && !Palette.classic.isFestive, "празнична позадина")
+        let size = CGSize(width: 390, height: 844)
+        for index in 0..<FestiveBackdrop.particleCount {
+            let a = FestiveBackdrop.particle(index, size: size, time: 12.5)
+            let b = FestiveBackdrop.particle(index, size: size, time: 12.5)
+            check(a.point == b.point, "честичката не е на исто место")
+            check(a.point.y >= -31 && a.point.y <= size.height + 31, "честичката е надвор: \(a.point)")
+        }
+    }
+
+    // MARK: План по денови
+
+    private static func dayPlanPlaces() throws {
+        var trip = sampleTrip()
+        let first = Trip.dayKey(trip.days[0])
+        trip.save(place: TripPlace(kind: .food, title: "Dinner", dayKey: first, minutes: 20 * 60))
+        trip.save(place: TripPlace(kind: .sight, title: "Museum", dayKey: first, minutes: 10 * 60 + 30))
+        trip.save(place: TripPlace(kind: .stay, title: "Hotel", dayKey: first))
+        trip.save(place: TripPlace(kind: .shopping, title: "Market"))
+        trip.save(place: TripPlace(kind: .photo, title: "Old date", dayKey: "1999-01-01"))
+        let day = trip.places(forKey: first)
+        check(day.map(\.title) == ["Museum", "Dinner", "Hotel"], "редослед по час: \(day.map(\.title))")
+        check(day.first?.timeText == "10:30", "часот: \(day.first?.timeText ?? "-")")
+        check(Set(trip.unscheduledPlaces.map(\.title)) == ["Market", "Old date"], "„кога било“: \(trip.unscheduledPlaces.map(\.title))")
+        var museum = try unwrap(day.first, "музејот")
+        museum.isDone = true
+        trip.save(place: museum)
+        check(trip.allPlaces.count == 5 && trip.allPlaces.filter(\.isDone).count == 1, "измената додава наместо да менува")
+        trip.removePlace(museum.id)
+        check(trip.allPlaces.count == 4, "бришење")
+        check(museum.mapsURL(city: "Rome")?.absoluteString.contains("maps.apple.com") == true, "линк за Мапи")
+        let decoded = try JSONDecoder().decode(Trip.self, from: JSONEncoder().encode(trip))
+        check(decoded.places == trip.places, "местата не се зачувуваат")
+        let shared = try unwrap(CloudCodec.encode(trip, myUID: "u1"), "кодирање за облак")
+        check(shared["places"] != nil, "планот не оди кај сопатниците")
+    }
+
+    // MARK: Свој багаж
+
+    private static func ownBagAgainstAirline() throws {
+        let airline = try unwrap(Airlines.find("ryanair"), "Ryanair")
+        var bag = Airlines.customBag()
+        bag.height = 40; bag.width = 30; bag.depth = 20
+        let small = try unwrap(OwnBagCheck.check(bag, airline: airline), "мал багаж")
+        check(!small.isWarning, "мал багаж дава предупредување")
+        // Свртен (20 × 40 × 55) пак собира
+        bag.height = 20; bag.width = 55; bag.depth = 40
+        check(OwnBagCheck.check(bag, airline: airline)?.isWarning == false, "свртен кабински не собира")
+        bag.height = 70; bag.width = 45; bag.depth = 28
+        let big = try unwrap(OwnBagCheck.check(bag, airline: airline), "голем багаж")
+        check(big.isWarning, "голем куфер без предупредување")
+        bag.height = 120; bag.width = 80; bag.depth = 60
+        if case .oversize = try unwrap(OwnBagCheck.check(bag, airline: airline), "огромен багаж") {} else {
+            check(false, "огромен багаж не е вонгабаритен")
+        }
+
+        var trip = sampleTrip()
+        trip.transport = .plane
+        trip.airlineID = "ryanair"
+        bag.height = 70; bag.width = 45; bag.depth = 28
+        bag.shape = .backpack
+        trip.bag = bag
+        trip.bags = [bag]
+        check(trip.ownBagWarnings.count == 1, "предупредување во патувањето: \(trip.ownBagWarnings.count)")
+        check(bag.icon == BagKind.backpack.icon && bag.tare == BagKind.backpack.tare, "ранецот нема своја икона/тежина")
+        check(abs(trip.totalUsableVolume - bag.usableVolume) < 0.01 && bag.volume > 80, "волуменот не ги следи мерките: \(bag.volume)")
+        trip.transport = .car
+        check(trip.ownBagWarnings.isEmpty, "предупредување и без лет")
+    }
+
+    // MARK: Листа на дете - споделување
+
+    private static func kidListSharedOnlyWithChosen() throws {
+        let owner = "u-owner", parent = "u-parent", friend = "u-friend"
+        var trip = sampleTrip()
+        trip.ownerUID = owner
+        trip.memberUIDs = [owner, parent, friend]
+        trip.companions = [Companion(name: "Me", uid: owner), Companion(name: "Marko", uid: parent), Companion(name: "Eva", uid: friend)]
+        var kid = kidMember(age: 5)
+        kid.items = FamilyPacking.items(for: kid, trip: trip)
+        trip.family = [kid]
+
+        // Без споделување: ништо во документот на патувањето
+        let privateDoc = try unwrap(CloudCodec.encode(trip, myUID: owner), "документ")
+        check((privateDoc["kids"] as? [String: Any] ?? [:]).isEmpty, "листата оди во облакот без споделување")
+
+        kid.shares = [FamilyShare(uid: parent, name: "Marko", role: .father)]
+        trip.family = [kid]
+        let document = try unwrap(CloudCodec.encode(trip, myUID: owner), "документ со споделување")
+        check((document["kids"] as? [String: Any])?.count == 1, "споделената листа ја нема во документот")
+
+        let asParent = try unwrap(CloudCodec.decode(document, local: nil, myUID: parent), "за родителот").trip
+        let seen = try unwrap(asParent.family?.first, "родителот не ја гледа листата")
+        check(seen.items.count == kid.items.count, "предметите: \(seen.items.count) од \(kid.items.count)")
+        check(seen.ownerUID == owner, "чие е детето: \(seen.ownerUID ?? "-")")
+
+        let asFriend = try unwrap(CloudCodec.decode(document, local: nil, myUID: friend), "за пријателот").trip
+        check((asFriend.family ?? []).isEmpty, "и неизбраниот ја гледа листата")
+
+        // Сопатникот тргнат → споделувањето го нема
+        var removed = trip
+        removed.dropFamilyShares(with: parent)
+        check(removed.family?.first?.isShared == false, "споделувањето останува")
+        var pruned = trip
+        pruned.companions = [Companion(name: "Me", uid: owner)]
+        pruned.pruneFamilyShares()
+        check(pruned.family?.first?.isShared == false, "споделување со некој што не е во патувањето")
+    }
+
+    // MARK: Аутфити на дете
+
+    private static func kidOutfitsByDay() throws {
+        var trip = sampleTrip()
+        let kid = kidMember(age: 5)
+        trip.family = [kid]
+        let key = Trip.dayKey(trip.days[0])
+        let mine = UUID(), theirs = UUID(), piece = UUID()
+        trip.addOutfit(mine, forKey: key, person: nil)
+        trip.addOutfit(theirs, forKey: key, person: kid.id)
+        trip.addOutfit(theirs, forKey: key, person: kid.id)
+        check(trip.outfitIDs(forKey: key) == [mine], "моите аутфити: \(trip.outfitIDs(forKey: key).count)")
+        let view = trip.projected(for: kid.id)
+        check(view.outfitIDs(forKey: key) == [theirs], "аутфитите на детето: \(view.outfitIDs(forKey: key).count)")
+        trip.toggleOutfitPacked(piece, person: kid.id)
+        check(trip.projected(for: kid.id).outfitPacked == [piece] && (trip.outfitPacked ?? []).isEmpty, "спакувано парче на детето")
+        let decoded = try JSONDecoder().decode(Trip.self, from: JSONEncoder().encode(trip))
+        check(decoded.familyOutfitDays == trip.familyOutfitDays, "аутфитите на детето не се зачувуваат")
+        let shared = try unwrap(CloudCodec.encode(trip, myUID: "u1"), "кодирање за облак")
+        check(shared["familyOutfitDays"] == nil && shared["familyOutfitPacked"] == nil, "аутфитите на детето одат кај сопатниците")
+        trip.removeOutfit(theirs, forKey: key, person: kid.id)
+        trip.toggleOutfitPacked(piece, person: kid.id)
+        check(trip.familyOutfitDays == nil && trip.familyOutfitPacked == nil, "празното останува")
     }
 }
 #endif

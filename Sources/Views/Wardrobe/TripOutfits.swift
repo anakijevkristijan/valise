@@ -24,16 +24,27 @@ struct TripOutfitsSection: View {
     @EnvironmentObject private var store: TripStore
     @EnvironmentObject private var wardrobe: WardrobeStore
     @State private var pickingDay: PickDay?
+    /// За кого се планира: nil = јас, инаку дете или милениче од патувањето.
+    @State private var person: UUID?
 
     struct PickDay: Identifiable {
         let date: Date
-        var id: String { Trip.dayKey(date) }
+        var person: UUID? = nil
+        var id: String { Trip.dayKey(date) + (person?.uuidString ?? "") }
+    }
+
+    init(trip: Trip) {
+        self.trip = trip
     }
 
     var body: some View {
+        let people = trip.myFamily
+        let who = people.contains { $0.id == person } ? person : nil
+        // Патувањето „низ очите“ на избраниот: неговите аутфити по денови
+        let view = trip.projected(for: who)
         let days = trip.days
-        let planned = days.filter { date in trip.outfitIDs(on: date).contains { wardrobe.outfit($0) != nil } }.count
-        let wear = wardrobe.wearCounts(for: trip)
+        let planned = days.filter { date in view.outfitIDs(on: date).contains { wardrobe.outfit($0) != nil } }.count
+        let wear = wardrobe.wearCounts(for: view)
 
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -44,13 +55,17 @@ struct TripOutfitsSection: View {
                     .foregroundStyle(Theme.muted)
             }
 
+            if !people.isEmpty {
+                personPicker(people, selected: who)
+            }
+
             ScrollView(.horizontal) {
                 HStack(spacing: 10) {
                     ForEach(days, id: \.self) { date in
                         Button {
-                            pickingDay = PickDay(date: date)
+                            pickingDay = PickDay(date: date, person: who)
                         } label: {
-                            dayCard(date, wear: wear)
+                            dayCard(date, wear: wear, view: view)
                         }
                         .buttonStyle(PressableStyle())
                     }
@@ -60,7 +75,9 @@ struct TripOutfitsSection: View {
             }
             .scrollIndicators(.hidden)
 
-            if planned > 0 {
+            if let member = people.first(where: { $0.id == who }) {
+                familyNote(member, planned: planned, view: view)
+            } else if planned > 0 {
                 TripClosetSummary(trip: trip)
             } else {
                 Text(wardrobe.items.isEmpty
@@ -74,7 +91,7 @@ struct TripOutfitsSection: View {
             }
         }
         .sheet(item: $pickingDay) { day in
-            DayOutfitsSheet(tripID: trip.id, date: day.date)
+            DayOutfitsSheet(tripID: trip.id, date: day.date, person: day.person)
                 .environmentObject(store)
                 .environmentObject(wardrobe)
                 .presentationCornerRadius(28)
@@ -88,8 +105,48 @@ struct TripOutfitsSection: View {
         }
     }
 
-    private func dayCard(_ date: Date, wear: [UUID: Int]) -> some View {
-        let outfits = trip.outfitIDs(on: date).compactMap { wardrobe.outfit($0) }
+    /// „Јас · Ана · Макс“ - аутфитите се планираат за секого посебно.
+    private func personPicker(_ people: [TripFamilyMember], selected: UUID?) -> some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: 8) {
+                ChipButton(title: L("Јас", "Me"), isSelected: selected == nil) {
+                    withAnimation(.easeInOut(duration: 0.2)) { person = nil }
+                }
+                ForEach(people) { member in
+                    ChipButton(title: member.name, isSelected: selected == member.id) {
+                        withAnimation(.easeInOut(duration: 0.2)) { person = member.id }
+                    }
+                }
+            }
+            .padding(.vertical, 1)
+            .padding(.horizontal, 1)
+        }
+        .scrollIndicators(.hidden)
+    }
+
+    /// Под деновите на детето/миленичето: колку парчиња, или што да се направи прво.
+    private func familyNote(_ member: TripFamilyMember, planned: Int, view: Trip) -> some View {
+        let pieces = wardrobe.plannedItems(for: view).count
+        let hasClothes = wardrobe.items.contains { $0.ownerID == member.id }
+        let text: String
+        if planned > 0 {
+            text = L("\(PieceText.pieces(pieces)) за пакување - штиклирај ги долу, во листата „\(member.name)“.",
+                     "\(PieceText.pieces(pieces)) to pack - tick them off below, in the “\(member.name)” list.")
+        } else if hasClothes {
+            text = L("Допри ден за да додадеш еден или повеќе аутфити.",
+                     "Tap a day to add one or more outfits.")
+        } else {
+            text = L("Во „Гардероба“ избери „\(member.name)“ и сликај ја облеката, па испланирај ги деновите тука.",
+                     "In “Wardrobe”, choose “\(member.name)” and photograph the clothes, then plan the days here.")
+        }
+        return Text(text)
+            .font(.sans(12))
+            .foregroundStyle(Theme.muted)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func dayCard(_ date: Date, wear: [UUID: Int], view: Trip) -> some View {
+        let outfits = view.outfitIDs(on: date).compactMap { wardrobe.outfit($0) }
         let weather = trip.weather.first { Calendar.current.isDate($0.date, inSameDayAs: date) }
         let dayPieces = Set(outfits.flatMap(\.itemIDs))
         let repeated = dayPieces.filter { (wear[$0] ?? 0) > 1 }.count
@@ -305,6 +362,8 @@ struct TripClosetSummary: View {
 struct DayOutfitsSheet: View {
     let tripID: UUID
     let date: Date
+    /// За кого: nil = јас, инаку дете или милениче.
+    var person: UUID? = nil
 
     @EnvironmentObject private var store: TripStore
     @EnvironmentObject private var wardrobe: WardrobeStore
@@ -321,10 +380,23 @@ struct DayOutfitsSheet: View {
 
     private var dayKey: String { Trip.dayKey(date) }
 
+    init(tripID: UUID, date: Date, person: UUID? = nil) {
+        self.tripID = tripID
+        self.date = date
+        self.person = person
+    }
+
+    /// Патувањето со аутфитите на тој за кого се планира.
+    private var planTrip: Trip? { store.trip(tripID)?.projected(for: person) }
+    private var personName: String? {
+        guard let person else { return nil }
+        return store.trip(tripID)?.family?.first { $0.id == person }?.name
+    }
+
     var body: some View {
         ZStack(alignment: .top) {
             PaperBackground()
-            if let trip = store.trip(tripID) {
+            if let trip = planTrip {
                 content(trip)
             }
             if let toast {
@@ -339,14 +411,14 @@ struct DayOutfitsSheet: View {
             season = store.trip(tripID)?.season
         }
         .sheet(isPresented: $showBuilder) {
-            OutfitBuilderView(startSeason: season, trip: store.trip(tripID)) { outfit in
+            OutfitBuilderView(startSeason: season, trip: planTrip, ownerID: person) { outfit in
                 add(outfit)
             }
             .environmentObject(wardrobe)
             .presentationCornerRadius(28)
         }
         .sheet(item: $editing) { outfit in
-            OutfitBuilderView(existing: outfit, trip: store.trip(tripID))
+            OutfitBuilderView(existing: outfit, trip: planTrip)
                 .environmentObject(wardrobe)
                 .presentationCornerRadius(28)
         }
@@ -364,15 +436,15 @@ struct DayOutfitsSheet: View {
         let todays = trip.outfitIDs(forKey: dayKey).compactMap { wardrobe.outfit($0) }
         let todayIDs = Set(todays.map(\.id))
         let weather = trip.weather.first { Calendar.current.isDate($0.date, inSameDayAs: date) }
-        // Само моите аутфити (децата немаат план по денови)
+        // Само аутфитите на тој за кого се планира (мои, или на детето/миленичето)
         let available = wardrobe.outfits
-            .filter { $0.ownerID == nil && !todayIDs.contains($0.id) && wardrobe.outfitFits($0, season) }
+            .filter { $0.ownerID == person && !todayIDs.contains($0.id) && wardrobe.outfitFits($0, season) }
             .sorted { $0.createdAt > $1.createdAt }
 
         return ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 HStack {
-                    Eyebrow(Fmt.weekdayLong(date), color: Theme.gold)
+                    Eyebrow(personName.map { "\(Fmt.weekdayLong(date)) · \($0)" } ?? Fmt.weekdayLong(date), color: Theme.gold)
                     Spacer()
                     CircleIconButton(systemName: "xmark") { dismiss() }
                 }
@@ -426,9 +498,10 @@ struct DayOutfitsSheet: View {
                 }
                 .buttonStyle(SecondaryButtonStyle())
 
-                if wardrobe.outfits.contains(where: { $0.ownerID == nil }) {
+                if wardrobe.outfits.contains(where: { $0.ownerID == person }) {
                     VStack(alignment: .leading, spacing: 12) {
-                        Eyebrow(L("Додај од твоите аутфити", "Add from your outfits"))
+                        Eyebrow(person == nil ? L("Додај од твоите аутфити", "Add from your outfits")
+                                              : L("Додај од зачуваните аутфити", "Add from saved outfits"))
                         SeasonFilter(season: $season)
                     }
 
@@ -556,7 +629,7 @@ struct DayOutfitsSheet: View {
     }
 
     private func repeatMessage(_ outfit: Outfit) -> String {
-        guard let trip = store.trip(tripID) else { return "" }
+        guard let trip = planTrip else { return "" }
         var lines: [String] = []
         let days = otherDays(outfit, trip: trip)
         if !days.isEmpty {
@@ -566,7 +639,8 @@ struct DayOutfitsSheet: View {
         }
         let repeats = wardrobe.repeats(in: outfit, trip: trip)
         if !repeats.isEmpty {
-            lines.append(L("Ова ти е веќе искористено на патувањето:", "You already wear these on the trip:"))
+            lines.append(person == nil ? L("Ова ти е веќе искористено на патувањето:", "You already wear these on the trip:")
+                                       : L("Ова е веќе искористено на патувањето:", "Already worn on this trip:"))
             for entry in repeats {
                 lines.append("• \(entry.item.name) - \(RepeatText.times(entry.times))")
             }
@@ -588,11 +662,12 @@ struct DayOutfitsSheet: View {
 
     private func add(_ outfit: Outfit) {
         let key = dayKey
+        let who = person
         withAnimation(.easeInOut(duration: 0.25)) {
-            store.mutate(tripID) { $0.addOutfit(outfit.id, forKey: key) }
+            store.mutate(tripID) { $0.addOutfit(outfit.id, forKey: key, person: who) }
         }
-        // Дали сега аутфитите го надминуваат планираното во листата?
-        if let trip = store.trip(tripID), let over = TargetText.over(wardrobe.targets(for: trip)) {
+        // Дали сега аутфитите го надминуваат планираното во листата? (само за мојата листа)
+        if who == nil, let trip = store.trip(tripID), let over = TargetText.over(wardrobe.targets(for: trip)) {
             show(L("Додадено, но го надминуваш планираното: \(over).", "Added, but over the plan: \(over)."), warning: true)
         } else {
             show(L("Додадено: \(outfit.name)", "Added: \(outfit.name)"), warning: false)
@@ -601,8 +676,9 @@ struct DayOutfitsSheet: View {
 
     private func remove(_ outfit: Outfit) {
         let key = dayKey
+        let who = person
         withAnimation(.easeInOut(duration: 0.25)) {
-            store.mutate(tripID) { $0.removeOutfit(outfit.id, forKey: key) }
+            store.mutate(tripID) { $0.removeOutfit(outfit.id, forKey: key, person: who) }
         }
     }
 

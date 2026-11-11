@@ -30,6 +30,13 @@ final class PersonalCloud {
         var dismissed: [String]?
         /// nil = постар запис (без делот за семејство) - тогаш не се менува.
         var family: [TripFamilyMember]?
+        /// Аутфити по денови и спакувани парчиња за децата и миленичињата. nil = постар запис.
+        var kids: KidsOutfits?
+    }
+
+    struct KidsOutfits: Codable, Equatable {
+        var days: [String: [String: [UUID]]]
+        var packed: [String: [UUID]]
     }
 
     /// Последно познат план по патување (за патувања што ќе стигнат подоцна).
@@ -283,6 +290,11 @@ final class PersonalCloud {
            let json = try? JSONSerialization.jsonObject(with: data) {
             fields["family"] = json
         }
+        if let kids = plan.kids,
+           let data = try? JSONEncoder().encode(kids),
+           let json = try? JSONSerialization.jsonObject(with: data) {
+            fields["kidsOutfits"] = json
+        }
         plansRef.document(trip.id.uuidString).setData(fields) { [weak self] error in
             if let error { self?.failed(error) }
         }
@@ -320,7 +332,9 @@ final class PersonalCloud {
                     packed: trip.outfitPacked ?? [],
                     exit: trip.exitChecklist,
                     dismissed: trip.dismissedSuggestions,
-                    family: trip.family ?? [])
+                    // Споделените листи живеат во патувањето (`kids`), не тука
+                    family: (trip.family ?? []).filter { $0.isMine && !$0.isShared },
+                    kids: KidsOutfits(days: trip.familyOutfitDays ?? [:], packed: trip.familyOutfitPacked ?? [:]))
     }
 
     private static func plan(from data: [String: Any]) -> Plan {
@@ -343,7 +357,13 @@ final class PersonalCloud {
            let json = try? JSONSerialization.data(withJSONObject: raw) {
             family = try? JSONDecoder().decode([TripFamilyMember].self, from: json)
         }
-        return Plan(days: days, packed: packed, exit: exit, dismissed: dismissed, family: family)
+        var kids: KidsOutfits?
+        if let raw = data["kidsOutfits"],
+           JSONSerialization.isValidJSONObject(raw),
+           let json = try? JSONSerialization.data(withJSONObject: raw) {
+            kids = try? JSONDecoder().decode(KidsOutfits.self, from: json)
+        }
+        return Plan(days: days, packed: packed, exit: exit, dismissed: dismissed, family: family, kids: kids)
     }
 
     // MARK: Моето семејство (деца и миленичиња)

@@ -378,8 +378,8 @@ struct SettingsView: View {
             } else {
                 PremiumLockRow(icon: "figure.and.child.holdinghands",
                                title: L("Патувај со деца и миленичиња", "Travel with kids and pets"),
-                               detail: L("Внеси ги еднаш - секое патување им прави своја листа, а децата имаат и своја гардероба.",
-                                         "Add them once - every trip makes them their own list, and kids get their own wardrobe too."))
+                               detail: L("Внеси ги еднаш - секое патување им прави своја листа, а имаат и своја гардероба и аутфити.",
+                                         "Add them once - every trip makes them their own list, and they get their own wardrobe and outfits too."))
             }
         }
     }
