@@ -37,6 +37,9 @@ struct TripPlace: Codable, Identifiable, Hashable {
     var title: String
     /// Адреса, кварт или што било што помага да се најде.
     var address: String?
+    /// Избрано на мапа.
+    var latitude: Double?
+    var longitude: Double?
     /// Ден ("yyyy-MM-dd"); nil = кога било.
     var dayKey: String?
     /// Час (минути од полноќ); nil = без час.
@@ -52,9 +55,15 @@ struct TripPlace: Codable, Identifiable, Hashable {
 
     /// За „Отвори во Мапи“.
     func mapsURL(city: String) -> URL? {
-        let query = [title, address ?? "", city].filter { !$0.isEmpty }.joined(separator: ", ")
         var parts = URLComponents(string: "https://maps.apple.com/")
-        parts?.queryItems = [URLQueryItem(name: "q", value: query)]
+        if let latitude, let longitude {
+            // Точно избраното место, со името како ознака
+            parts?.queryItems = [URLQueryItem(name: "ll", value: "\(latitude),\(longitude)"),
+                                 URLQueryItem(name: "q", value: title.isEmpty ? (address ?? "") : title)]
+        } else {
+            let query = [title, address ?? "", city].filter { !$0.isEmpty }.joined(separator: ", ")
+            parts?.queryItems = [URLQueryItem(name: "q", value: query)]
+        }
         return parts?.url
     }
 }

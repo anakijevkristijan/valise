@@ -524,6 +524,10 @@ enum SelfTest {
         trip.removePlace(museum.id)
         check(trip.allPlaces.count == 4, "бришење")
         check(museum.mapsURL(city: "Rome")?.absoluteString.contains("maps.apple.com") == true, "линк за Мапи")
+        var pinned = museum
+        pinned.latitude = 41.8986; pinned.longitude = 12.4769
+        check(pinned.mapsURL(city: "Rome")?.absoluteString.contains("ll=41.8986,12.4769") == true, "линк за Мапи со избрано место")
+        check(TripDetailView.Tab.allCases == [.packing, .exit, .plan], "редослед на табовите")
         let decoded = try JSONDecoder().decode(Trip.self, from: JSONEncoder().encode(trip))
         check(decoded.places == trip.places, "местата не се зачувуваат")
         let shared = try unwrap(CloudCodec.encode(trip, myUID: "u1"), "кодирање за облак")

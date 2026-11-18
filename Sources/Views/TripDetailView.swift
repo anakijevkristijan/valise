@@ -11,7 +11,7 @@ struct TripDetailView: View {
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("userName") private var userName: String = ""
 
-    enum Tab: String, CaseIterable { case packing, plan, exit }
+    enum Tab: String, CaseIterable { case packing, exit, plan }
 
     @State private var tab: Tab = .packing
     @State private var addItemCategory: ItemCategory?
@@ -545,9 +545,9 @@ struct TripDetailView: View {
         let places = trip.allPlaces
         return HStack(alignment: .bottom, spacing: 18) {
             tabButton(.packing, title: L("Пакување", "Packing"), count: "\(trip.packedCount)/\(trip.totalCount)")
+            tabButton(.exit, title: L("Пред излез", "Before you leave"), count: "\(trip.exitChecklist.filter(\.isDone).count)/\(trip.exitChecklist.count)")
             tabButton(.plan, title: L("План", "Plan"),
                       count: places.isEmpty ? "" : "\(places.filter(\.isDone).count)/\(places.count)")
-            tabButton(.exit, title: L("Пред излез", "Before you leave"), count: "\(trip.exitChecklist.filter(\.isDone).count)/\(trip.exitChecklist.count)")
             Spacer(minLength: 0)
         }
     }

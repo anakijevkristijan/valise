@@ -1,4 +1,5 @@
 import SwiftUI
+import MapKit
 
 // MARK: - Таб „План“ во патувањето: места по денови
 
@@ -197,6 +198,8 @@ struct PlaceEditor: View {
     @Environment(\.openURL) private var openURL
     @State private var place: TripPlace
     @State private var address: String
+    @State private var spot: PickedSpot?
+    @State private var pickingMap = false
     @State private var note: String
     @State private var hasTime: Bool
     @State private var time: Date
@@ -209,6 +212,9 @@ struct PlaceEditor: View {
         self.onDelete = onDelete
         _place = State(initialValue: place)
         _address = State(initialValue: place.address ?? "")
+        if let latitude = place.latitude, let longitude = place.longitude {
+            _spot = State(initialValue: PickedSpot(name: nil, address: place.address ?? "", latitude: latitude, longitude: longitude))
+        }
         _note = State(initialValue: place.note ?? "")
         _hasTime = State(initialValue: place.minutes != nil)
         let minutes = place.minutes ?? 10 * 60
@@ -243,8 +249,7 @@ struct PlaceEditor: View {
                     dayPicker
                     timePicker
 
-                    field(L("Адреса или кварт", "Address or area"), text: $address,
-                          prompt: L("по избор", "optional"))
+                    addressRow
                     field(L("Белешка", "Note"), text: $note,
                           prompt: L("пр. билети однапред, најдобро на зајдисонце", "e.g. book ahead, best at sunset"))
 
@@ -284,6 +289,76 @@ struct PlaceEditor: View {
         }
         .onAppear {
             if isNew { titleFocused = true }
+        }
+        .fullScreenCover(isPresented: $pickingMap) {
+            PlaceMapPicker(center: mapCenter, initial: spot) { picked in
+                spot = picked
+                address = picked.address
+                if trimmedTitle.isEmpty, let name = picked.name { place.title = name }
+            }
+        }
+    }
+
+    /// Градот во кој си тој ден (или главната дестинација).
+    private var mapCenter: CLLocationCoordinate2D {
+        let date = trip.days.first { Trip.dayKey($0) == place.dayKey }
+        let city = date.map { trip.stop(on: $0).place } ?? trip.destination
+        return CLLocationCoordinate2D(latitude: city.latitude, longitude: city.longitude)
+    }
+
+    /// Адресата се бира на мапа (пребарување или допир), не се пишува рачно.
+    private var addressRow: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Eyebrow(L("Каде", "Where"))
+            Button { pickingMap = true } label: {
+                VStack(spacing: 0) {
+                    if let spot {
+                        Map(initialPosition: .region(MKCoordinateRegion(center: spot.coordinate, latitudinalMeters: 700, longitudinalMeters: 700)),
+                            interactionModes: []) {
+                            Marker("", systemImage: "mappin", coordinate: spot.coordinate)
+                                .tint(Theme.navy)
+                        }
+                        .frame(height: 150)
+                        .allowsHitTesting(false)
+                        .id("\(spot.latitude),\(spot.longitude)")
+                    }
+                    HStack(spacing: 12) {
+                        Image(systemName: spot == nil ? "map" : "mappin.and.ellipse")
+                            .font(.system(size: 16))
+                            .foregroundStyle(Theme.navy)
+                        Text(spot == nil ? L("Избери на мапа", "Choose on the map")
+                                         : (address.isEmpty ? L("Избрано место на мапата", "Pinned on the map") : address))
+                            .font(.sans(15, spot == nil ? .medium : .regular))
+                            .foregroundStyle(Theme.ink)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                        Spacer(minLength: 4)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Theme.muted)
+                    }
+                    .padding(16)
+                }
+                .background(Theme.surface)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 0.75))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if spot != nil || !address.isEmpty {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        spot = nil
+                        address = ""
+                    }
+                } label: {
+                    Text(L("Отстрани го местото", "Remove the location"))
+                        .font(.sans(13, .medium))
+                        .foregroundStyle(Theme.terracotta)
+                }
+                .buttonStyle(.plain)
+            }
         }
     }
 
@@ -384,6 +459,8 @@ struct PlaceEditor: View {
         let cleanAddress = address.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
         copy.address = cleanAddress.isEmpty ? nil : cleanAddress
+        copy.latitude = spot?.latitude
+        copy.longitude = spot?.longitude
         copy.note = cleanNote.isEmpty ? nil : cleanNote
         if hasTime {
             let parts = Calendar.current.dateComponents([.hour, .minute], from: time)
