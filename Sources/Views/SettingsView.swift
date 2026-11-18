@@ -619,6 +619,8 @@ struct PremiumSheet: View {
                         benefit("airplane", L("Багаж за 140+ авиокомпании и дали сè ќе собере", "Baggage rules for 140+ airlines and whether it all fits"))
                         benefit("map", L("Повеќе градови во едно патување, со перална каде ја има", "Several cities in one trip, with laundry where you have it"))
                         benefit("hanger", L("Гардероба и аутфити по денови", "Your wardrobe and outfits for every day"))
+                        benefit("figure.and.child.holdinghands", L("Деца и миленичиња - свои листи, гардероба и аутфити", "Kids and pets - their own lists, wardrobe and outfits"))
+                        benefit("mappin.and.ellipse", L("План по денови: што ќе видиш, каде јадеш, каде спиеш - на мапа", "A day-by-day plan: sights, food, where you stay - on the map"))
                         benefit("person.2", L("Патувања со пријатели - кој што носи", "Trips with friends - who brings what"))
                         benefit("camera.aperture", L("Story за Instagram", "Stories for Instagram"))
                         benefit("house", L("„Пред излез“ - мирен излез од дома", "“Before you leave” checklist"))

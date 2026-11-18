@@ -178,8 +178,8 @@ struct PremiumOfferView: View {
             step(icon: "lock.open", filled: true,
                  label: L("ДЕНЕС", "TODAY"),
                  title: L("Сè е отклучено", "Everything is unlocked"),
-                 detail: L("Прогноза, авиокомпании, повеќе градови, гардероба, пријатели и теми.",
-                           "Forecast, airlines, multi-city trips, wardrobe, friends and themes."),
+                 detail: L("Прогноза, авиокомпании, повеќе градови, гардероба, деца и миленичиња, план по денови, пријатели и теми.",
+                           "Forecast, airlines, multi-city trips, wardrobe, kids and pets, a day plan, friends and themes."),
                  isLast: false)
             step(icon: "calendar.badge.checkmark", filled: false,
                  label: L("ДЕН \(days)", "DAY \(days)"),
@@ -239,6 +239,8 @@ struct PremiumOfferView: View {
             benefit("airplane", L("Багаж за 140+ авиокомпании", "Baggage rules for 140+ airlines"))
             benefit("map", L("Повеќе градови во едно патување", "Several cities in one trip"))
             benefit("hanger", L("Гардероба и аутфити по денови", "Wardrobe and outfits for every day"))
+            benefit("figure.and.child.holdinghands", L("Деца и миленичиња - секое со своја листа", "Kids and pets, each with their own list"))
+            benefit("mappin.and.ellipse", L("План по денови - места на мапа", "A day-by-day plan, places on the map"))
             benefit("person.2", L("Пријатели, Story и премиум теми", "Friends, Stories and premium themes"))
         }
     }
