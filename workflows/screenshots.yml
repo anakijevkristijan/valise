@@ -127,7 +127,7 @@ jobs:
         run: |
           BUNDLE=com.valise.packing
           # Сите екрани (Premium е секогаш отклучен во демо-режимот)
-          SCREENS="home trip friends weather outfits day bags packing exit story wardrobe looks new dates edit-bags settings offer language"
+          SCREENS="home trip friends weather outfits day bags packing exit plan place family share story wardrobe looks new dates edit-bags settings offer language"
           mkdir -p shots
           while read -r KEY UDID <&3; do
             [ -z "$UDID" ] && continue
@@ -173,7 +173,7 @@ jobs:
               case "$SCREEN" in
                 story) sleep 20 ;;
                 home|offer) sleep 15 ;;
-                dates|edit-bags|new|settings) sleep 12 ;;
+                dates|edit-bags|new|settings|place|share) sleep 12 ;;
                 *) sleep 10 ;;
               esac
               xcrun simctl io "$UDID" screenshot "shots/$KEY/$SCREEN.png" > /dev/null
@@ -187,6 +187,15 @@ jobs:
             sleep 15
             xcrun simctl io "$UDID" screenshot "shots/$KEY/home-rose.png" > /dev/null
             xcrun simctl terminate "$UDID" "$BUNDLE" || true
+
+            # Празнични теми (новогодишната верзија)
+            for PAIR in "home:christmas" "plan:snowfall" "family:newyear"; do
+              SCREEN="${PAIR%%:*}"; THEME="${PAIR##*:}"
+              xcrun simctl launch "$UDID" "$BUNDLE" -TripdrobeScreenshots -screen "$SCREEN" -theme "$THEME" > /dev/null
+              sleep 15
+              xcrun simctl io "$UDID" screenshot "shots/$KEY/$SCREEN-$THEME.png" > /dev/null
+              xcrun simctl terminate "$UDID" "$BUNDLE" || true
+            done
 
             xcrun simctl shutdown "$UDID" || true
           done 3< devices.txt
