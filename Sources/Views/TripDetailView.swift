@@ -68,7 +68,7 @@ struct TripDetailView: View {
         switch ScreenshotMode.screen {
         case "story": showStory = true
         case "exit": tab = .exit
-        case "plan": tab = .plan
+        case "plan", "place": tab = .plan
         case "dates":
             editStartStep = 1
             showEdit = true
@@ -684,6 +684,7 @@ struct TripDetailView: View {
             if showsFamily {
                 FamilyPackingSections(trip: trip)
                     .padding(.top, 8)
+                    .id("shot-family")
             }
 
             Text(L("Допри за спакувано. Држи подолго за количина или бришење.",

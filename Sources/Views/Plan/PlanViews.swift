@@ -36,6 +36,14 @@ struct TripPlanSection: View {
 
             anytimeBlock
         }
+        .task {
+            // Слики за App Store: отвори место со мапа
+            guard ScreenshotMode.isOn, ScreenshotMode.screen == "place", editing == nil else { return }
+            try? await Task.sleep(nanoseconds: 900_000_000)
+            if let place = trip.allPlaces.first(where: { $0.latitude != nil && $0.note != nil }) {
+                editing = Draft(place: place, isNew: false)
+            }
+        }
         .sheet(item: $editing) { draft in
             PlaceEditor(trip: trip, place: draft.place, isNew: draft.isNew,
                         onSave: { place in store.mutate(trip.id) { $0.save(place: place) } },

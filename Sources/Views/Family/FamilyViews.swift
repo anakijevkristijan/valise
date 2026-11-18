@@ -501,6 +501,12 @@ struct FamilyPackingSections: View {
                                 onShare: shareAction(for: member))
             }
         }
+        .task {
+            // Слики за App Store: споделување на листата на детето
+            guard ScreenshotMode.isOn, ScreenshotMode.screen == "share", sharing == nil else { return }
+            try? await Task.sleep(nanoseconds: 1_200_000_000)
+            sharing = members.first { $0.isMine && $0.kind == .child }
+        }
         .sheet(item: $sharing) { member in
             FamilyShareSheet(trip: trip, member: member) { shares in
                 mutateMember(member.id) { $0.shares = shares.isEmpty ? nil : shares }

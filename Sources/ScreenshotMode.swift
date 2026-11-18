@@ -15,7 +15,8 @@ enum ScreenshotMode {
     /// Екранот што се слика:
     /// home, trip, weather, outfits, bags, packing, day, story, wardrobe, looks,
     /// language, name, age, settings, new (ново патување), offer (понуда за Premium),
-    /// friends (сопатници со свои датуми), exit („Пред излез“), dates (календар), edit-bags (багаж).
+    /// friends (сопатници со свои датуми), exit („Пред излез“), dates (календар), edit-bags (багаж),
+    /// plan (план по денови), place (место на мапа), family (деца и милениче), share (сподели листа на дете).
     static var screen: String {
         guard isOn else { return "" }
         return argument("-screen") ?? "home"
@@ -38,7 +39,8 @@ enum ScreenshotMode {
 
     /// Дали веднаш се отвора главното демо-патување.
     static var opensTrip: Bool {
-        ["trip", "friends", "weather", "outfits", "bags", "packing", "exit", "day", "story", "dates", "edit-bags"].contains(screen)
+        ["trip", "friends", "weather", "outfits", "bags", "packing", "exit", "day", "story", "dates", "edit-bags",
+         "plan", "place", "family", "share"].contains(screen)
     }
 
     /// До кој дел од патувањето се лизга екранот.
@@ -48,12 +50,13 @@ enum ScreenshotMode {
         case "weather": return "shot-weather"
         case "outfits", "day": return "shot-outfits"
         case "bags": return "shot-bags"
-        case "packing", "exit": return "shot-packing"
+        case "packing", "exit", "plan", "place": return "shot-packing"
+        case "family", "share": return "shot-family"
         default: return nil
         }
     }
 
-    /// Главното демо-патување (Париз).
+    /// Главното демо-патување (Рим).
     private(set) static var heroTripID: UUID?
 
     private static func argument(_ name: String) -> String? {
@@ -91,8 +94,8 @@ enum ScreenshotMode {
 
         let newYork = Place(id: 5128581, name: "New York", region: "New York", country: "United States",
                             countryCode: "US", latitude: 40.7143, longitude: -74.006, timezone: "America/New_York")
-        let paris = Place(id: 2988507, name: "Paris", region: "Île-de-France", country: "France",
-                          countryCode: "FR", latitude: 48.8534, longitude: 2.3488, timezone: "Europe/Paris")
+        let barcelona = Place(id: 3128760, name: "Barcelona", region: "Catalonia", country: "Spain",
+                              countryCode: "ES", latitude: 41.3888, longitude: 2.159, timezone: "Europe/Madrid")
         let lisbon = Place(id: 2267057, name: "Lisbon", region: "Lisbon", country: "Portugal",
                            countryCode: "PT", latitude: 38.7167, longitude: -9.1333, timezone: "Europe/Lisbon")
         let tokyo = Place(id: 1850147, name: "Tokyo", region: "Tokyo", country: "Japan",
@@ -100,19 +103,20 @@ enum ScreenshotMode {
         let rome = Place(id: 3169070, name: "Rome", region: "Lazio", country: "Italy",
                          countryCode: "IT", latitude: 41.8919, longitude: 12.5113, timezone: "Europe/Rome")
 
-        // Париз: 6 дена, со пријатели, свежо време (повеќе слоеви, помалку маици)
-        var hero = makeTrip(from: newYork, to: paris, startIn: 6, days: 6, airline: "airfrance",
+        // Рим: 6 дена, со пријатели, свежо време (повеќе слоеви, помалку маици)
+        var hero = makeTrip(from: newYork, to: rome, startIn: 6, days: 6, airline: "ita",
                             activities: [.photo, .walking, .dining, .nightlife], tint: 0,
                             highs: [14, 15, 12, 11, 13, 15], lows: [7, 8, 7, 5, 6, 8],
                             codes: [1, 0, 61, 3, 2, 0], rain: [10, 5, 70, 35, 15, 5], lastYear: false)
         hero.companions = [Companion(name: "Mia Laurent", uid: "demo-mia"),
+                           Companion(name: "Daniel Brooks", uid: "demo-daniel"),
                            Companion(name: "Leo Brooks", inviteKey: "p_demo")]
         // Мија доаѓа два дена подоцна, од Лондон - свои градови и датуми
         let london = Place(id: 2643743, name: "London", region: "England", country: "United Kingdom",
                            countryCode: "GB", latitude: 51.5085, longitude: -0.1257, timezone: "Europe/London")
         let miaStart = hero.startDate.adding(days: 2)
         hero.memberPlans = ["demo-mia": MemberPlan(origin: london,
-                                                   stops: [TripStop(place: paris, startDate: miaStart, endDate: hero.endDate)],
+                                                   stops: [TripStop(place: rome, startDate: miaStart, endDate: hero.endDate)],
                                                    startDate: miaStart, endDate: hero.endDate)]
         PackingEngine.ensureTogether(&hero)
         if var together = hero.together, let companions = hero.companions {
@@ -141,6 +145,12 @@ enum ScreenshotMode {
             }
             hero.outfitDays = plan
         }
+        seedPlan(&hero)
+        seedFamily(&hero)
+        // Свој багаж поголем од кабинскиот кај авиокомпанијата - предупредувањето
+        var own = Airlines.customBag()
+        own.height = 68; own.width = 45; own.depth = 28; own.weightLimit = 12; own.shape = .suitcase
+        hero.bags = (hero.bags ?? [hero.bag]) + [own]
         heroTripID = hero.id
 
         let lisbonTrip = makeTrip(from: newYork, to: lisbon, startIn: 24, days: 5, airline: "tap",
@@ -152,14 +162,53 @@ enum ScreenshotMode {
                                  highs: [11, 12, 10, 9, 12, 11, 10, 9, 11], lows: [3, 4, 3, 2, 4, 3, 3, 2, 3],
                                  codes: [1, 2, 3, 61, 0, 1, 2, 3, 1], rain: [10, 20, 30, 60, 5, 10, 20, 30, 10],
                                  lastYear: true)
-        let romeTrip = makeTrip(from: newYork, to: rome, startIn: 80, days: 5, airline: "ita",
+        let barcelonaTrip = makeTrip(from: newYork, to: barcelona, startIn: 80, days: 5, airline: "iberia",
                                 activities: [.walking, .dining, .photo], tint: 3,
                                 highs: [13, 14, 12, 13, 14], lows: [4, 5, 4, 3, 5],
                                 codes: [0, 0, 1, 0, 0], rain: [0, 0, 5, 0, 0], lastYear: true)
 
-        for trip in [hero, lisbonTrip, tokyoTrip, romeTrip] {
+        for trip in [hero, lisbonTrip, tokyoTrip, barcelonaTrip] {
             store.add(trip)
         }
+    }
+
+    /// План по денови со вистински места во Рим (со координати - како избрани на мапа).
+    private static func seedPlan(_ trip: inout Trip) {
+        let days = trip.days.map { Trip.dayKey($0) }
+        guard days.count >= 3 else { return }
+        func spot(_ kind: PlaceKind, _ title: String, _ address: String, _ day: String?, _ minutes: Int?,
+                  _ lat: Double, _ lon: Double, note: String? = nil, done: Bool = false) -> TripPlace {
+            var place = TripPlace(kind: kind, title: title, address: address, dayKey: day, minutes: minutes, note: note)
+            place.latitude = lat; place.longitude = lon; place.isDone = done
+            return place
+        }
+        trip.places = [
+            spot(.sight, "Pantheon", "Piazza della Rotonda", days[0], 10 * 60, 41.8986, 12.4769, done: true),
+            spot(.food, "Dinner in Trastevere", "Via della Lungaretta", days[0], 20 * 60, 41.8893, 12.4704, note: "Book a table"),
+            spot(.sight, "Colosseum", "Piazza del Colosseo", days[1], 9 * 60 + 30, 41.8902, 12.4922, note: "Tickets online"),
+            spot(.shopping, "Via del Corso", "Via del Corso", days[1], 16 * 60, 41.9015, 12.4808),
+            spot(.photo, "Trevi Fountain at sunrise", "Piazza di Trevi", days[2], 7 * 60, 41.9009, 12.4833, note: "Before the crowds"),
+            spot(.stay, "Hotel Artemide", "Via Nazionale 22", nil, nil, 41.9008, 12.4937),
+        ]
+    }
+
+    /// Дете и куче со свои листи; листата на детето е споделена со таткото.
+    private static func seedFamily(_ trip: inout Trip) {
+        let year = Calendar.current.component(.year, from: Date())
+        let lily = FamilyMember(kind: .child, name: "Lily", birthYear: year - 5, birthMonth: 3)
+        let dog = FamilyMember(kind: .pet, name: "Max", petType: .dog)
+        FamilyStore.shared.save(lily)
+        FamilyStore.shared.save(dog)
+        var family = FamilyPacking.family(for: [lily.id, dog.id], trip: trip, previous: nil) ?? []
+        for index in family.indices {
+            for item in family[index].items.indices where item % 3 == 0 {
+                family[index].items[item].isPacked = true
+            }
+            if family[index].kind == .child {
+                family[index].shares = [FamilyShare(uid: "demo-daniel", name: "Daniel", role: .father)]
+            }
+        }
+        trip.family = family
     }
 
     private static func makeTrip(from origin: Place, to destination: Place, startIn: Int, days: Int,
