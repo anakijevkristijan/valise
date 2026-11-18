@@ -224,7 +224,13 @@ struct WardrobeView: View {
     @ViewBuilder
     private var piecesContent: some View {
         if ownerItems.isEmpty {
-            if let ownerName {
+            if let ownerName, WardrobeAudience.of(owner) == .pet {
+                emptyState(icon: "pawprint",
+                           title: L("Работите на \(ownerName)", "\(ownerName)'s things"),
+                           text: L("Сликај го поводникот, оглавникот, палтенцето, играчката и креветчето на \(ownerName) - така ништо нема да остане дома.",
+                                   "Photograph \(ownerName)'s lead, collar, coat, favourite toy and bed - so nothing gets left at home."),
+                           action: L("Додај прво нешто", "Add the first thing")) { showAddItem = true }
+            } else if let ownerName {
                 emptyState(icon: "figure.child",
                            title: L("Гардеробата на \(ownerName)", "\(ownerName)'s wardrobe"),
                            text: L("Сликај ја облеката на \(ownerName) - секое парче станува стикер, па составуваш аутфити и за \(ownerName).",
@@ -242,7 +248,7 @@ struct WardrobeView: View {
             if pending > 0 {
                 sortKindsCard(pending)
             }
-            let shown = WardrobeCategory.allCases.filter { categoryFilter == nil || $0 == categoryFilter }
+            let shown = WardrobeCategory.ordered(for: WardrobeAudience.of(owner)).filter { categoryFilter == nil || $0 == categoryFilter }
             if shown.allSatisfy({ wardrobe.items(in: $0, season: season, owner: owner).isEmpty }) {
                 Text(season == nil ? L("Нема парчиња во оваа група.", "No pieces in this group.")
                                    : L("Нема парчиња во оваа група за оваа сезона.", "No pieces in this group for this season."))
@@ -290,7 +296,7 @@ struct WardrobeView: View {
 
     /// Групи: Сите · Горни делови · Фустани и сукњи… (само групите што имаат парчиња).
     private var categoryPicker: some View {
-        let present = WardrobeCategory.allCases.filter { category in
+        let present = WardrobeCategory.ordered(for: WardrobeAudience.of(owner)).filter { category in
             category == categoryFilter || ownerItems.contains { $0.category == category }
         }
         return ScrollView(.horizontal) {

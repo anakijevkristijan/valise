@@ -43,8 +43,29 @@ enum Season: String, Codable, CaseIterable, Identifiable {
 /// Група во гардеробата. Точниот вид (маица, џемпер, сукња…) е `WardrobeKind`.
 enum WardrobeCategory: String, Codable, CaseIterable, Identifiable {
     case outerwear, top, dress, bottom, shoes, active, bag, accessory
+    // Деца
+    case onesie, sleep
+    // Миленичиња
+    case petWear, petWalk, petToys, petFood, petBed, petCare
 
     var id: String { rawValue }
+
+    /// Групите во гардеробата за возрасен, дете или милениче (по редослед).
+    static func categories(for audience: WardrobeAudience) -> [WardrobeCategory] {
+        switch audience {
+        case .adult: return [.outerwear, .top, .dress, .bottom, .shoes, .active, .bag, .accessory]
+        case .child: return [.outerwear, .top, .onesie, .dress, .bottom, .sleep, .shoes, .active, .bag, .accessory]
+        case .pet: return [.petWear, .petWalk, .petToys, .petFood, .petBed, .petCare]
+        }
+    }
+
+    /// Групите на тој член прво, па сите останати (за постари парчиња што се во друга група).
+    static func ordered(for audience: WardrobeAudience) -> [WardrobeCategory] {
+        let own = categories(for: audience)
+        return own + allCases.filter { !own.contains($0) }
+    }
+
+    var isPet: Bool { [.petWear, .petWalk, .petToys, .petFood, .petBed, .petCare].contains(self) }
 
     var title: String {
         switch self {
@@ -56,6 +77,14 @@ enum WardrobeCategory: String, Codable, CaseIterable, Identifiable {
         case .active: return L("Плажа и спорт", "Beach and sport")
         case .bag: return L("Торби", "Bags")
         case .accessory: return L("Додатоци", "Accessories")
+        case .onesie: return L("Бодиња и комбинезончиња", "Bodysuits and rompers")
+        case .sleep: return L("Пижами и спиење", "Pyjamas and sleep")
+        case .petWear: return L("Облека за милениче", "Pet clothes")
+        case .petWalk: return L("Оглавник и поводник", "Collar and lead")
+        case .petToys: return L("Играчки", "Toys")
+        case .petFood: return L("Храна и чинии", "Food and bowls")
+        case .petBed: return L("Креветче и превоз", "Bed and carrier")
+        case .petCare: return L("Нега и хигиена", "Grooming and care")
         }
     }
 
@@ -69,6 +98,14 @@ enum WardrobeCategory: String, Codable, CaseIterable, Identifiable {
         case .active: return L("Плажа / спорт", "Beach / sport")
         case .bag: return L("Торба", "Bag")
         case .accessory: return L("Додаток", "Accessory")
+        case .onesie: return L("Боди", "Bodysuit")
+        case .sleep: return L("Пижама", "Pyjamas")
+        case .petWear: return L("Облека", "Clothes")
+        case .petWalk: return L("За прошетка", "For walks")
+        case .petToys: return L("Играчка", "Toy")
+        case .petFood: return L("Храна", "Food")
+        case .petBed: return L("Креветче", "Bed")
+        case .petCare: return L("Нега", "Care")
         }
     }
 
@@ -84,6 +121,10 @@ enum WardrobeCategory: String, Codable, CaseIterable, Identifiable {
         case .active: return one ? L("1 парче за плажа и спорт", "1 beach or sport piece") : L("\(n) парчиња за плажа и спорт", "\(n) beach and sport pieces")
         case .bag: return one ? L("1 торба", "1 bag") : L("\(n) торби", "\(n) bags")
         case .accessory: return one ? L("1 додаток", "1 accessory") : L("\(n) додатоци", "\(n) accessories")
+        case .onesie: return one ? L("1 боди или комбинезонче", "1 bodysuit or romper") : L("\(n) бодиња и комбинезончиња", "\(n) bodysuits and rompers")
+        case .sleep: return one ? L("1 пижама", "1 pair of pyjamas") : L("\(n) пижами", "\(n) pairs of pyjamas")
+        case .petWear, .petWalk, .petToys, .petFood, .petBed, .petCare:
+            return one ? L("1 парче", "1 piece") : L("\(n) парчиња", "\(n) pieces")
         }
     }
 
@@ -111,6 +152,14 @@ enum WardrobeCategory: String, Codable, CaseIterable, Identifiable {
         case .active: return 0.6
         case .bag: return 2.5
         case .accessory: return 0.3
+        case .onesie: return 0.4
+        case .sleep: return 0.6
+        case .petWear: return 0.8
+        case .petWalk: return 0.4
+        case .petToys: return 0.6
+        case .petFood: return 2.0
+        case .petBed: return 6.0
+        case .petCare: return 0.5
         }
     }
 
@@ -125,7 +174,26 @@ enum WardrobeCategory: String, Codable, CaseIterable, Identifiable {
         case .active: return 0.2
         case .bag: return 0.5
         case .accessory: return 0.1
+        case .onesie: return 0.1
+        case .sleep: return 0.2
+        case .petWear: return 0.2
+        case .petWalk: return 0.15
+        case .petToys: return 0.15
+        case .petFood: return 1.0
+        case .petBed: return 1.0
+        case .petCare: return 0.2
         }
+    }
+}
+
+/// За кого е гардеробата: за мене, за дете или за милениче - од тоа зависат групите и видовите.
+enum WardrobeAudience {
+    case adult, child, pet
+
+    /// nil = моја гардероба; инаку член од „Моето семејство“.
+    static func of(_ owner: UUID?) -> WardrobeAudience {
+        guard let member = FamilyStore.shared.member(owner) else { return .adult }
+        return member.kind == .pet ? .pet : .child
     }
 }
 
@@ -172,6 +240,7 @@ extension WardrobeCategory {
         case .active: return L("Плажа и спорт", "Beach and sport")
         case .bag: return L("Торби", "Bags")
         case .accessory: return L("Додатоци", "Accessories")
+        case .onesie, .sleep, .petWear, .petWalk, .petToys, .petFood, .petBed, .petCare: return title
         }
     }
 }

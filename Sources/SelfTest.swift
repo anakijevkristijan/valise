@@ -140,6 +140,7 @@ enum SelfTest {
         test("Свој багаж наспроти авиокомпанијата", ownBagAgainstAirline)
         test("Листа на дете: само со избраниот", kidListSharedOnlyWithChosen)
         test("Аутфити по денови за дете", kidOutfitsByDay)
+        test("Гардероба: групи за дете и за милениче", wardrobeAudiences)
 
         UserDefaults.standard.set(savedLanguage, forKey: AppLanguage.storageKey)
         write()
@@ -607,6 +608,34 @@ enum SelfTest {
     }
 
     // MARK: Аутфити на дете
+
+    private static func wardrobeAudiences() throws {
+        let pet = WardrobeCategory.categories(for: .pet)
+        check(!pet.contains(.top) && !pet.contains(.dress) && pet.contains(.petWalk), "миленичето има облека за луѓе")
+        for category in pet {
+            check(!WardrobeKind.kinds(in: category, for: .pet).isEmpty, "празна група за милениче: \(category)")
+        }
+        check(!WardrobeKind.kinds(in: .top, for: .pet).contains(.tshirt), "маица за милениче")
+        let child = WardrobeCategory.categories(for: .child)
+        check(child.contains(.onesie) && child.contains(.sleep) && !child.contains(.petWalk), "детските групи")
+        check(!WardrobeKind.kinds(in: .shoes, for: .child).contains(.heels), "штикли за дете")
+        check(WardrobeKind.kinds(in: .shoes, for: .child).contains(.rainBoots), "нема гумени чизми за дете")
+        check(WardrobeCategory.categories(for: .adult) == [.outerwear, .top, .dress, .bottom, .shoes, .active, .bag, .accessory],
+              "моите групи се сменија")
+        check(!WardrobeKind.kinds(in: .accessory, for: .adult).contains(.mittens), "детски видови кај мене")
+        // Погодување од името, според тоа за кого е
+        check(WardrobeKind.guess("Црвен поводник", in: nil, for: .pet) == .leash, "поводник")
+        check(WardrobeKind.guess("Red collar", in: nil, for: .pet) == .collar, "оглавник")
+        check(WardrobeKind.guess("Златна огрлица", in: nil, for: .adult) == .jewellery, "огрлицата кај мене е накит")
+        check(WardrobeKind.guess("Пижама со мечиња", in: nil, for: .child) == .pyjamas, "пижама")
+        check(WardrobeKind.guess("Rain jacket", in: nil, for: .pet)?.category == .petWear, "кабаница за милениче")
+        // Пред секоја нова група: името и бројот постојат, а редоследот е сите групи
+        for audience in [WardrobeAudience.adult, .child, .pet] {
+            check(Set(WardrobeCategory.ordered(for: audience)) == Set(WardrobeCategory.allCases), "редоследот губи групи")
+        }
+        let item = WardrobeItem(name: "Lead", category: .petWalk, seasons: [])
+        check(!item.needsKind, "работите за милениче бараат вид")
+    }
 
     private static func kidOutfitsByDay() throws {
         var trip = sampleTrip()

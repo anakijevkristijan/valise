@@ -82,7 +82,7 @@ struct SortWardrobeKindsView: View {
                         .foregroundStyle(Theme.muted)
                 }
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: 6)], spacing: 6) {
-                    ForEach(WardrobeKind.kinds(in: item.category)) { kind in
+                    ForEach(WardrobeKind.kinds(in: item.category, for: WardrobeAudience.of(item.ownerID))) { kind in
                         KindChip(title: kind.title, isSelected: false) {
                             assign(kind, to: item)
                         }

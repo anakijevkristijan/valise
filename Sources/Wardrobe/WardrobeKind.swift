@@ -21,8 +21,29 @@ enum WardrobeKind: String, Codable, CaseIterable, Identifiable {
     case bag, backpack
     // Додатоци
     case jewellery, sunglasses, hat, scarf, belt, otherAccessory
+    // Деца
+    case bodysuit, romper, snowsuit, tights, pyjamas, sleepingBag, rainBoots, slippers, mittens, kidsBackpack
+    // Миленичиња
+    case petCoat, petRaincoat, petSweater, petBooties, bandana
+    case collar, harness, leash, idTag
+    case petToy, chewToy
+    case petFood, petBowl, treats
+    case petBed, petBlanket, carrier
+    case petBrush, petShampoo, poopBags, petMeds, petTowel
 
     var id: String { rawValue }
+
+    /// Само за деца / само за возрасни / за миленичиња.
+    func isFor(_ audience: WardrobeAudience) -> Bool {
+        switch audience {
+        case .pet: return category.isPet
+        case .adult:
+            return !category.isPet && ![.bodysuit, .romper, .snowsuit, .tights, .pyjamas, .sleepingBag,
+                                         .rainBoots, .slippers, .mittens, .kidsBackpack].contains(self)
+        case .child:
+            return !category.isPet && ![.heels, .eveningDress, .smartTrousers, .cropTop, .blazer, .jewellery, .belt].contains(self)
+        }
+    }
 
     var category: WardrobeCategory {
         switch self {
@@ -33,12 +54,24 @@ enum WardrobeKind: String, Codable, CaseIterable, Identifiable {
         case .sneakers, .sandals, .smartShoes, .heels, .boots, .hikingBoots, .trainingShoes: return .shoes
         case .swimwear, .sportswear: return .active
         case .bag, .backpack: return .bag
-        case .jewellery, .sunglasses, .hat, .scarf, .belt, .otherAccessory: return .accessory
+        case .jewellery, .sunglasses, .hat, .scarf, .belt, .otherAccessory, .mittens: return .accessory
+        case .bodysuit, .romper: return .onesie
+        case .snowsuit: return .outerwear
+        case .tights: return .bottom
+        case .pyjamas, .sleepingBag: return .sleep
+        case .rainBoots, .slippers: return .shoes
+        case .kidsBackpack: return .bag
+        case .petCoat, .petRaincoat, .petSweater, .petBooties, .bandana: return .petWear
+        case .collar, .harness, .leash, .idTag: return .petWalk
+        case .petToy, .chewToy: return .petToys
+        case .petFood, .petBowl, .treats: return .petFood
+        case .petBed, .petBlanket, .carrier: return .petBed
+        case .petBrush, .petShampoo, .poopBags, .petMeds, .petTowel: return .petCare
         }
     }
 
-    static func kinds(in category: WardrobeCategory) -> [WardrobeKind] {
-        allCases.filter { $0.category == category }
+    static func kinds(in category: WardrobeCategory, for audience: WardrobeAudience = .adult) -> [WardrobeKind] {
+        allCases.filter { $0.category == category && $0.isFor(audience) }
     }
 
     /// Групи каде што видот може да се претпостави без прашање (фустан, торба, додаток).
@@ -47,6 +80,8 @@ enum WardrobeKind: String, Codable, CaseIterable, Identifiable {
         case .dress: return .dress
         case .bag: return .bag
         case .accessory: return .otherAccessory
+        case .petToys: return .petToy
+        case .petBed: return .petBed
         default: return nil
         }
     }
@@ -113,6 +148,41 @@ enum WardrobeKind: String, Codable, CaseIterable, Identifiable {
         case .scarf: return n("Шал", "Scarf", "Шалови", "Scarves", "шал", "шала", "scarf", "scarves")
         case .belt: return n("Каиш", "Belt", "Каиши", "Belts", "каиш", "каиши", "belt", "belts")
         case .otherAccessory: return n("Друго", "Other", "Друго", "Other", "додаток", "додатоци", "accessory", "accessories")
+        // Деца
+        case .bodysuit: return n("Боди", "Bodysuit", "Бодиња", "Bodysuits", "боди", "бодиња", "bodysuit", "bodysuits")
+        case .romper: return n("Комбинезонче", "Romper", "Комбинезончиња", "Rompers", "комбинезонче", "комбинезончиња", "romper", "rompers")
+        case .snowsuit: return n("Скафандер", "Snowsuit", "Скафандери", "Snowsuits", "скафандер", "скафандери", "snowsuit", "snowsuits")
+        case .tights: return n("Хулахопки", "Tights", "Хулахопки", "Tights", "хулахопки", "хулахопки", "pair of tights", "pairs of tights")
+        case .pyjamas: return n("Пижама", "Pyjamas", "Пижами", "Pyjamas", "пижама", "пижами", "pair of pyjamas", "pairs of pyjamas")
+        case .sleepingBag: return n("Вреќа за спиење", "Sleeping bag", "Вреќи за спиење", "Sleeping bags",
+                                    "вреќа за спиење", "вреќи за спиење", "sleeping bag", "sleeping bags")
+        case .rainBoots: return n("Гумени чизми", "Rain boots", "Гумени чизми", "Rain boots", "пар гумени чизми", "пара гумени чизми", "pair of rain boots", "pairs of rain boots")
+        case .slippers: return n("Папучи", "Slippers", "Папучи", "Slippers", "пар папучи", "пара папучи", "pair of slippers", "pairs of slippers")
+        case .mittens: return n("Ракавички", "Mittens", "Ракавички", "Mittens", "пар ракавички", "пара ракавички", "pair of mittens", "pairs of mittens")
+        case .kidsBackpack: return n("Детски ранец", "Kids' backpack", "Детски ранци", "Kids' backpacks", "ранец", "ранци", "backpack", "backpacks")
+        // Миленичиња
+        case .petCoat: return n("Палтенце", "Coat", "Палтенца", "Coats", "палтенце", "палтенца", "coat", "coats")
+        case .petRaincoat: return n("Кабаница", "Raincoat", "Кабаници", "Raincoats", "кабаница", "кабаници", "raincoat", "raincoats")
+        case .petSweater: return n("Џемперче", "Sweater", "Џемперчиња", "Sweaters", "џемперче", "џемперчиња", "sweater", "sweaters")
+        case .petBooties: return n("Чизмички", "Booties", "Чизмички", "Booties", "пар чизмички", "пара чизмички", "set of booties", "sets of booties")
+        case .bandana: return n("Марамче", "Bandana", "Марамчиња", "Bandanas", "марамче", "марамчиња", "bandana", "bandanas")
+        case .collar: return n("Оглавник", "Collar", "Оглавници", "Collars", "оглавник", "оглавници", "collar", "collars")
+        case .harness: return n("Ам", "Harness", "Амови", "Harnesses", "ам", "амови", "harness", "harnesses")
+        case .leash: return n("Поводник", "Lead", "Поводници", "Leads", "поводник", "поводници", "lead", "leads")
+        case .idTag: return n("Плочка со име", "ID tag", "Плочки со име", "ID tags", "плочка", "плочки", "ID tag", "ID tags")
+        case .petToy: return n("Играчка", "Toy", "Играчки", "Toys", "играчка", "играчки", "toy", "toys")
+        case .chewToy: return n("За гризење", "Chew toy", "За гризење", "Chew toys", "играчка за гризење", "играчки за гризење", "chew toy", "chew toys")
+        case .petFood: return n("Храна", "Food", "Храна", "Food", "пакување храна", "пакувања храна", "pack of food", "packs of food")
+        case .petBowl: return n("Чинија", "Bowl", "Чинии", "Bowls", "чинија", "чинии", "bowl", "bowls")
+        case .treats: return n("Награди", "Treats", "Награди", "Treats", "пакување награди", "пакувања награди", "bag of treats", "bags of treats")
+        case .petBed: return n("Креветче", "Bed", "Креветчиња", "Beds", "креветче", "креветчиња", "bed", "beds")
+        case .petBlanket: return n("Ќебе", "Blanket", "Ќебиња", "Blankets", "ќебе", "ќебиња", "blanket", "blankets")
+        case .carrier: return n("Транспортер", "Carrier", "Транспортери", "Carriers", "транспортер", "транспортери", "carrier", "carriers")
+        case .petBrush: return n("Четка", "Brush", "Четки", "Brushes", "четка", "четки", "brush", "brushes")
+        case .petShampoo: return n("Шампон", "Shampoo", "Шампони", "Shampoos", "шампон", "шампони", "shampoo", "shampoos")
+        case .poopBags: return n("Ќесиња", "Poop bags", "Ќесиња", "Poop bags", "ролна ќесиња", "ролни ќесиња", "roll of poop bags", "rolls of poop bags")
+        case .petMeds: return n("Лекови", "Medicine", "Лекови", "Medicine", "лек", "лекови", "medicine", "medicines")
+        case .petTowel: return n("Пешкир", "Towel", "Пешкири", "Towels", "пешкир", "пешкири", "towel", "towels")
         }
     }
 
@@ -159,6 +229,8 @@ enum WardrobeKind: String, Codable, CaseIterable, Identifiable {
         case .hat: return ["sunHat", "winterSet"]
         case .scarf: return ["winterSet"]
         case .belt, .otherAccessory: return []
+        // Детската и опремата за миленичиња не се брои во моите редови
+        default: return []
         }
     }
 
@@ -179,6 +251,8 @@ enum WardrobeKind: String, Codable, CaseIterable, Identifiable {
         case .shoes: return .shoes
         case .active: return .activity
         case .bag, .accessory: return .accessories
+        case .onesie, .sleep: return .clothing
+        case .petWear, .petWalk, .petToys, .petFood, .petBed, .petCare: return .accessories
         }
     }
 
@@ -229,6 +303,7 @@ enum WardrobeKind: String, Codable, CaseIterable, Identifiable {
         case .hat: return 0.8
         case .scarf: return 0.6
         case .belt, .otherAccessory: return 0.3
+        default: return category.volume
         }
     }
 
@@ -266,6 +341,7 @@ enum WardrobeKind: String, Codable, CaseIterable, Identifiable {
         case .hat: return 0.1
         case .scarf, .belt: return 0.15
         case .otherAccessory: return 0.1
+        default: return category.weight
         }
     }
 
@@ -282,17 +358,27 @@ enum WardrobeKind: String, Codable, CaseIterable, Identifiable {
         case .sneakers, .sandals, .smartShoes, .heels, .boots, .hikingBoots, .trainingShoes: return 5
         case .bag, .backpack: return 5
         case .jewellery, .sunglasses, .hat, .scarf, .belt, .otherAccessory: return 6
+        case .tights: return 1
+        case .bodysuit, .romper, .pyjamas, .sleepingBag: return 2
+        case .snowsuit: return 4
+        case .rainBoots, .slippers: return 5
+        case .kidsBackpack: return 5
+        case .mittens: return 6
+        case .petCoat, .petRaincoat, .petSweater: return 2
+        case .bandana, .collar, .harness, .leash, .idTag: return 3
+        case .petBooties: return 5
+        default: return 6
         }
     }
 
     // MARK: Погодување од името
 
     /// Од името на парчето („Сив дуксер“, „Black skirt“…). `category` = само видови од таа група.
-    static func guess(_ name: String, in category: WardrobeCategory?) -> WardrobeKind? {
+    static func guess(_ name: String, in category: WardrobeCategory?, for audience: WardrobeAudience = .adult) -> WardrobeKind? {
         let folded = fold(name)
         guard !folded.isEmpty else { return nil }
         let words = folded.split { !$0.isLetter }.map(String.init)
-        for rule in rules where category == nil || rule.kind.category == category {
+        for rule in rules where (category == nil || rule.kind.category == category) && rule.kind.isFor(audience) {
             if rule.keywords.contains(where: { matches($0, folded: folded, words: words) }) {
                 return rule.kind
             }
@@ -330,6 +416,40 @@ enum WardrobeKind: String, Codable, CaseIterable, Identifiable {
     /// Редоследот е важен: попрецизното прво („вечерен фустан“ пред „фустан“, „t-shirt“ пред „shirt“).
     private static let rules: [Rule] = {
         let raw: [(WardrobeKind, [String])] = [
+            // Миленичиња (се гледаат само во гардероба на милениче)
+            (.petRaincoat, ["кабаниц", "kabanic", "raincoat"]),
+            (.petSweater, ["џемпер", "dzemper", "sweater", "jumper"]),
+            (.petCoat, ["палт", "palt", "јакн", "jakn", "coat", "jacket"]),
+            (.petBooties, ["чизм", "cizm", "boot", "чевл"]),
+            (.bandana, ["марам", "maram", "bandana"]),
+            (.harness, ["=ам", "=am", "harness"]),
+            (.leash, ["поводн", "povodn", "leash", "=lead", "синџир"]),
+            (.collar, ["оглавн", "oglavn", "огрлиц", "ogrlic", "collar"]),
+            (.idTag, ["плочк", "plock", "tag"]),
+            (.chewToy, ["гриз", "griz", "chew", "коска", "koska", "bone"]),
+            (.petToy, ["играчк", "igrack", "топк", "topk", "=ball", "toy"]),
+            (.treats, ["наград", "nagrad", "treat", "грицк", "grick"]),
+            (.petBowl, ["чиниј", "cinij", "bowl"]),
+            (.petFood, ["храна", "hrana", "гранул", "granul", "food", "konzerv", "конзерв"]),
+            (.carrier, ["транспорт", "transport", "carrier", "кутиј", "crate"]),
+            (.petBlanket, ["ќеб", "kjeb", "keb", "blanket"]),
+            (.petBed, ["кревет", "krevet", "=bed", "душек"]),
+            (.poopBags, ["ќесиј", "kjesi", "kesi", "poop"]),
+            (.petShampoo, ["шампон", "sampon", "shampoo"]),
+            (.petBrush, ["четк", "cetk", "brush", "чешел"]),
+            (.petMeds, ["лек", "=lek", "medic", "таблет", "tablet", "капки"]),
+            (.petTowel, ["пешкир", "peskir", "towel"]),
+            // Деца
+            (.bodysuit, ["боди", "=bodi", "bodysuit", "onesie"]),
+            (.romper, ["комбинезонче", "kombinezonce", "romper", "babygrow"]),
+            (.snowsuit, ["скафандер", "skafander", "snowsuit"]),
+            (.tights, ["хулахоп", "hulahop", "tights"]),
+            (.pyjamas, ["пижам", "pizam", "pyjama", "pajama"]),
+            (.sleepingBag, ["вреќа", "vreka", "sleeping bag"]),
+            (.rainBoots, ["гумени", "gumeni", "rain boot", "wellies", "welly"]),
+            (.slippers, ["папуч", "papuc", "slipper"]),
+            (.mittens, ["ракавиц", "rakavic", "ракавичк", "mitten", "glove"]),
+            (.kidsBackpack, ["ранец", "ranec", "backpack"]),
             (.eveningDress, ["вечерен фустан", "вечерен", "вечерна", "свечен", "evening", "gala", "гала"]),
             (.jumpsuit, ["комбинезон", "kombinezon", "jumpsuit", "overall"]),
             (.skirt, ["сукњ", "suknj", "skirt"]),
@@ -421,7 +541,7 @@ extension WardrobeItem {
     }
 
     /// Треба да се избере вид (маица, џемпер…), за листата да знае каде да го брои.
-    var needsKind: Bool { effectiveKind == nil }
+    var needsKind: Bool { effectiveKind == nil && !category.isPet }
 
     /// Редовите од листата во кои се брои. Без вид - како порано, по групата.
     var packingKeys: [String] { effectiveKind?.packingKeys ?? category.legacyKeys }

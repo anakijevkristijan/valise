@@ -277,7 +277,8 @@ struct AddWardrobeItemView: View {
                 }
                 .frame(height: 260)
 
-                WardrobeItemForm(name: $name, category: $category, kind: $kind, seasons: $seasons)
+                WardrobeItemForm(name: $name, category: $category, kind: $kind, seasons: $seasons,
+                                 audience: WardrobeAudience.of(ownerID))
 
                 Button {
                     let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -330,13 +331,16 @@ struct WardrobeItemForm: View {
     @Binding var category: WardrobeCategory
     @Binding var kind: WardrobeKind?
     @Binding var seasons: Set<Season>
+    /// За кого: групите и видовите се различни за дете и за милениче.
+    let audience: WardrobeAudience
 
     @State private var kindPicked: Bool
     @State private var categoryPicked: Bool
 
     /// `editing` = постоечко парче: групата не се менува сама од името.
     init(name: Binding<String>, category: Binding<WardrobeCategory>, kind: Binding<WardrobeKind?>,
-         seasons: Binding<Set<Season>>, editing: Bool = false) {
+         seasons: Binding<Set<Season>>, editing: Bool = false, audience: WardrobeAudience = .adult) {
+        self.audience = audience
         _name = name
         _category = category
         _kind = kind
@@ -349,7 +353,7 @@ struct WardrobeItemForm: View {
         VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 8) {
                 Eyebrow(L("Име", "Name"))
-                TextField("", text: $name, prompt: Text(L("пр. Црна кожна јакна", "e.g. Black leather jacket")).foregroundColor(Theme.muted.opacity(0.7)))
+                TextField("", text: $name, prompt: Text(namePrompt).foregroundColor(Theme.muted.opacity(0.7)))
                     .font(.serif(22))
                     .foregroundStyle(Theme.ink)
                     .textInputAutocapitalization(.sentences)
@@ -360,7 +364,7 @@ struct WardrobeItemForm: View {
             VStack(alignment: .leading, spacing: 10) {
                 Eyebrow(L("Група", "Group"))
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 8)], spacing: 8) {
-                    ForEach(WardrobeCategory.allCases) { option in
+                    ForEach(WardrobeCategory.categories(for: audience)) { option in
                         ChipButton(title: option.title, isSelected: category == option, expand: true) {
                             pick(option)
                         }
@@ -371,14 +375,14 @@ struct WardrobeItemForm: View {
             VStack(alignment: .leading, spacing: 10) {
                 Eyebrow(L("Вид", "Type"))
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 8)], spacing: 8) {
-                    ForEach(WardrobeKind.kinds(in: category)) { option in
+                    ForEach(WardrobeKind.kinds(in: category, for: audience)) { option in
                         KindChip(title: option.title, isSelected: kind == option) {
                             kindPicked = true
                             kind = option
                         }
                     }
                 }
-                if kind == nil {
+                if kind == nil && audience != .pet {
                     Text(L("Избери вид - така листата знае дали е маица, џемпер или дуксер.",
                            "Pick a type - so the list knows if it's a T-shirt, a sweater or a hoodie."))
                         .font(.sans(12))
@@ -388,6 +392,7 @@ struct WardrobeItemForm: View {
             }
             .animation(.easeInOut(duration: 0.2), value: category)
 
+            if audience != .pet || category == .petWear {
             VStack(alignment: .leading, spacing: 10) {
                 Eyebrow(L("Сезони", "Seasons"))
                 HStack(spacing: 8) {
@@ -415,6 +420,23 @@ struct WardrobeItemForm: View {
                     }
                 }
             }
+            }
+        }
+        .onAppear {
+            // Групата да е од гардеробата на тој член (пр. милениче: „Облека за милениче“)
+            let allowed = WardrobeCategory.categories(for: audience)
+            if !allowed.contains(category), let first = allowed.first {
+                category = first
+                if kind.map({ !$0.isFor(audience) }) ?? false { kind = nil }
+            }
+        }
+    }
+
+    private var namePrompt: String {
+        switch audience {
+        case .adult: return L("пр. Црна кожна јакна", "e.g. Black leather jacket")
+        case .child: return L("пр. Жолта кабаница", "e.g. Yellow raincoat")
+        case .pet: return L("пр. Црвен поводник", "e.g. Red lead")
         }
     }
 
@@ -424,16 +446,16 @@ struct WardrobeItemForm: View {
         guard category != option else { return }
         category = option
         if kind?.category != option {
-            kind = WardrobeKind.guess(name, in: option) ?? WardrobeKind.safeDefault(for: option)
+            kind = WardrobeKind.guess(name, in: option, for: audience) ?? WardrobeKind.safeDefault(for: option)
             kindPicked = false
         }
     }
 
     private func guessFromName(_ typed: String) {
         guard !kindPicked else { return }
-        if let found = WardrobeKind.guess(typed, in: category) {
+        if let found = WardrobeKind.guess(typed, in: category, for: audience) {
             kind = found
-        } else if !categoryPicked, let found = WardrobeKind.guess(typed, in: nil) {
+        } else if !categoryPicked, let found = WardrobeKind.guess(typed, in: nil, for: audience) {
             category = found.category
             kind = found
         }
@@ -501,7 +523,8 @@ struct EditWardrobeItemView: View {
                             .frame(maxWidth: .infinity)
                             .shadow(color: Theme.navy.opacity(0.18), radius: 10, x: 0, y: 6)
                     }
-                    WardrobeItemForm(name: $name, category: $category, kind: $kind, seasons: $seasons, editing: true)
+                    WardrobeItemForm(name: $name, category: $category, kind: $kind, seasons: $seasons, editing: true,
+                                     audience: WardrobeAudience.of(item.ownerID))
                     Button {
                         var updated = item
                         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)

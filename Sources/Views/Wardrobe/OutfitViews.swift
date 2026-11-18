@@ -112,9 +112,10 @@ struct OutfitCollage: View {
         default: break
         }
         switch item.category {
-        case .outerwear, .top, .dress, .active: return .upper
+        case .outerwear, .top, .dress, .active, .onesie, .sleep, .petWear: return .upper
         case .bottom: return .lower
         case .shoes, .bag, .accessory: return .side
+        case .petWalk, .petToys, .petFood, .petBed, .petCare: return .side
         }
     }
 
@@ -129,6 +130,11 @@ struct OutfitCollage: View {
         case .accessory: return 5
         case .bag: return 6
         case .shoes: return 7
+        case .onesie, .sleep: return 2
+        case .petWear: return 0
+        case .petWalk: return 5
+        case .petToys: return 6
+        case .petFood, .petBed, .petCare: return 7
         }
     }
 
@@ -552,7 +558,7 @@ struct OutfitBuilderView: View {
                         }
                     }
 
-                    ForEach(WardrobeCategory.allCases) { category in
+                    ForEach(WardrobeCategory.ordered(for: WardrobeAudience.of(owner))) { category in
                         let list = wardrobe.items(in: category, season: season, owner: owner)
                         if !list.isEmpty {
                             VStack(alignment: .leading, spacing: 10) {
